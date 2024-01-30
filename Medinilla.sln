@@ -1,0 +1,31 @@
+﻿
+Microsoft Visual Studio Solution File, Format Version 12.00
+# Visual Studio Version 17
+VisualStudioVersion = 17.8.34309.116
+MinimumVisualStudioVersion = 10.0.40219.1
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Medinilla", "Medinilla\Medinilla.csproj", "{89F8D437-F1F2-41C6-815C-4A997075E737}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ClassGen", "ClassGen\ClassGen.csproj", "{ACEC8749-3EB1-45DF-97ED-EC1E0C00C51C}"
+EndProject
+Global
+	GlobalSection(SolutionConfigurationPlatforms) = preSolution
+		Debug|Any CPU = Debug|Any CPU
+		Release|Any CPU = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(ProjectConfigurationPlatforms) = postSolution
+		{89F8D437-F1F2-41C6-815C-4A997075E737}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{89F8D437-F1F2-41C6-815C-4A997075E737}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{89F8D437-F1F2-41C6-815C-4A997075E737}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{89F8D437-F1F2-41C6-815C-4A997075E737}.Release|Any CPU.Build.0 = Release|Any CPU
+		{ACEC8749-3EB1-45DF-97ED-EC1E0C00C51C}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{ACEC8749-3EB1-45DF-97ED-EC1E0C00C51C}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{ACEC8749-3EB1-45DF-97ED-EC1E0C00C51C}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{ACEC8749-3EB1-45DF-97ED-EC1E0C00C51C}.Release|Any CPU.Build.0 = Release|Any CPU
+	EndGlobalSection
+	GlobalSection(SolutionProperties) = preSolution
+		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(ExtensibilityGlobals) = postSolution
+		SolutionGuid = {AEBA9E02-4DA6-4520-899B-B35AB90AA2B5}
+	EndGlobalSection
+EndGlobal
