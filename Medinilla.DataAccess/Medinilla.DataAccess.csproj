@@ -10,8 +10,4 @@
     <PackageReference Include="Microsoft.Extensions.DependencyInjection" Version="8.0.0" />
   </ItemGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\Medinilla.DataAccess\Medinilla.DataAccess.csproj" />
-  </ItemGroup>
-
 </Project>

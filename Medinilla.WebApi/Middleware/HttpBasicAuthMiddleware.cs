@@ -1,4 +1,5 @@
-﻿using Medinilla.Services.Interfaces;
+﻿using Medinilla.Infrastructure;
+using Medinilla.Services.Interfaces;
 using System.Net;
 using System.Text;
 
@@ -36,8 +37,7 @@ public class HttpBasicAuthMiddleware
             return;
         }
 
-        var creds = Encoding.ASCII.GetString(Convert.FromBase64String(details[1])).Split(':');
-        var token = await _authentication.ValidateCredentials(creds[0], creds[1]);
+        var token = await _authentication.ValidateCredentials(details[1]);
 
         if(string.IsNullOrEmpty(token))
         {
@@ -45,7 +45,7 @@ public class HttpBasicAuthMiddleware
             return;
         }
 
-        context.Request.Headers.Append("X-FastAccess-Token", token);
+        context.Request.Headers.Append(Constants.FastAccessHeaderKey, token);
 
         await _next(context);
     }

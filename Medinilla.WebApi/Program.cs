@@ -1,3 +1,4 @@
+using Medinilla.DataAccess;
 using Medinilla.Services;
 using Medinilla.WebApi.Middleware;
 using System.Security.Authentication;
@@ -14,6 +15,7 @@ builder.Services.AddSwaggerGen();
 builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
 
+builder.Services.AddMedinillaDataSources();
 builder.Services.AddMedinillaServices();
 
 builder.WebHost.ConfigureKestrel(serverOptions => serverOptions.ConfigureHttpsDefaults(o =>

@@ -2,5 +2,5 @@
 
 public interface IMedinillaAuthentication
 {
-    public Task<string?> ValidateCredentials(string username, string password);
+    public Task<string?> ValidateCredentials(string base64EncodedCredentials);
 }
