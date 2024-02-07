@@ -1,7 +1,11 @@
 ﻿using Medinilla.Infrastructure;
 using Medinilla.Services.Interfaces;
+using Medinilla.WebApi.ApiModels;
 using System.Net;
 using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using System.Text.Json.Serialization.Metadata;
 
 namespace Medinilla.WebApi.Middleware;
 
@@ -42,6 +46,15 @@ public class HttpBasicAuthMiddleware
         if(string.IsNullOrEmpty(token))
         {
             context.Response.StatusCode = (int)HttpStatusCode.Unauthorized;
+
+            var error = new ErrorApiModel()
+            {
+                TraceId = System.Diagnostics.Activity.Current!.TraceId.ToString(),
+                Error = "Invalid username or password."
+            };
+            await JsonSerializer.SerializeAsync(context.Response.Body, error, 
+                new JsonSerializerOptions() { WriteIndented = true, PropertyNamingPolicy = JsonNamingPolicy.CamelCase });
+
             return;
         }
 
