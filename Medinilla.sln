@@ -7,6 +7,14 @@ Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Medinilla", "Medinilla\Medi
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ClassGen", "ClassGen\ClassGen.csproj", "{ACEC8749-3EB1-45DF-97ED-EC1E0C00C51C}"
 EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Medinilla.WebApi", "Medinilla.WebApi\Medinilla.WebApi.csproj", "{212C79D7-BD83-4B55-8EDE-B5CC218A687E}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{86EF603F-F303-4A59-95F4-0873CDD601C0}"
+EndProject
+Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Internal", "Internal", "{3C2ACFDD-B335-49D1-BC31-A3C891C1C75C}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Medinilla.Services", "Medillina.Services\Medinilla.Services.csproj", "{31A0B4D1-3F86-4A5D-806A-AF37DDC7F1F1}"
+EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
 		Debug|Any CPU = Debug|Any CPU
@@ -21,9 +29,20 @@ Global
 		{ACEC8749-3EB1-45DF-97ED-EC1E0C00C51C}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{ACEC8749-3EB1-45DF-97ED-EC1E0C00C51C}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{ACEC8749-3EB1-45DF-97ED-EC1E0C00C51C}.Release|Any CPU.Build.0 = Release|Any CPU
+		{212C79D7-BD83-4B55-8EDE-B5CC218A687E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{212C79D7-BD83-4B55-8EDE-B5CC218A687E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{212C79D7-BD83-4B55-8EDE-B5CC218A687E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{212C79D7-BD83-4B55-8EDE-B5CC218A687E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{31A0B4D1-3F86-4A5D-806A-AF37DDC7F1F1}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{31A0B4D1-3F86-4A5D-806A-AF37DDC7F1F1}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{31A0B4D1-3F86-4A5D-806A-AF37DDC7F1F1}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{31A0B4D1-3F86-4A5D-806A-AF37DDC7F1F1}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
+	EndGlobalSection
+	GlobalSection(NestedProjects) = preSolution
+		{31A0B4D1-3F86-4A5D-806A-AF37DDC7F1F1} = {3C2ACFDD-B335-49D1-BC31-A3C891C1C75C}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {AEBA9E02-4DA6-4520-899B-B35AB90AA2B5}
