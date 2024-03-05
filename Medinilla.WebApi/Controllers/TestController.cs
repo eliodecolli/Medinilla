@@ -26,7 +26,7 @@ namespace Medinilla.WebApi.Controllers
                 });
                 
                 Console.WriteLine("Accepting connection from client {0}", clientIdentifier);
-                await _webSocketDigestionService.Consume(webSocket);
+                await _webSocketDigestionService.Consume(webSocket, clientIdentifier);
             }
         }
     }

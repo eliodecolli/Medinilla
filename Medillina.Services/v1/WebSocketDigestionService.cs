@@ -1,4 +1,5 @@
-﻿using Medinilla.Services.Interfaces;
+﻿using Medinilla.DataTypes.WAMP;
+using Medinilla.Services.Interfaces;
 using System.Net.WebSockets;
 using System.Text;
 
@@ -6,7 +7,14 @@ namespace Medinilla.Services.v1;
 
 public class WebSocketDigestionService : IBasicWebSocketDigestionService
 {
-    public async Task Consume(WebSocket webSocket)
+    private readonly IOcppCallRouter _callRouter;
+
+    public WebSocketDigestionService(IOcppCallRouter callRouter)
+    {
+        _callRouter = callRouter;
+    }
+
+    public async Task Consume(WebSocket webSocket, string clientIdentifier)
     {
         var buffer = new ArraySegment<byte>(new byte[1024]);
         
@@ -20,20 +28,10 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService
 
             if (result.Count > 0)
             {
-                var received = buffer.Take(result.Count);
-                var command = Encoding.UTF8.GetString(received.ToArray());
+                var received = buffer.Take(result.Count).ToArray();
+                Console.WriteLine($"Received {result.Count} bytes from {clientIdentifier}");
 
-                if (command.ToLower() == "bye")
-                {
-                    Console.WriteLine("Received BYE command from ws.");
-                    await webSocket.CloseAsync(WebSocketCloseStatus.NormalClosure, null, CancellationToken.None).ConfigureAwait(false);
-                    return;
-                }
-                else
-                {
-                    Console.WriteLine("Received '{0}' form ws.", command);
-                    await webSocket.SendAsync(Encoding.UTF8.GetBytes("Gotcha"), WebSocketMessageType.Text, true, CancellationToken.None);
-                }
+                await _callRouter.RouteOcppCall(received, clientIdentifier);
             }
             else
             {

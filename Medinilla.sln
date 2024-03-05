@@ -3,21 +3,23 @@ Microsoft Visual Studio Solution File, Format Version 12.00
 # Visual Studio Version 17
 VisualStudioVersion = 17.8.34309.116
 MinimumVisualStudioVersion = 10.0.40219.1
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Medinilla", "Medinilla\Medinilla.csproj", "{89F8D437-F1F2-41C6-815C-4A997075E737}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Medinilla", "Medinilla\Medinilla.csproj", "{89F8D437-F1F2-41C6-815C-4A997075E737}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "ClassGen", "ClassGen\ClassGen.csproj", "{ACEC8749-3EB1-45DF-97ED-EC1E0C00C51C}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "ClassGen", "ClassGen\ClassGen.csproj", "{ACEC8749-3EB1-45DF-97ED-EC1E0C00C51C}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Medinilla.WebApi", "Medinilla.WebApi\Medinilla.WebApi.csproj", "{212C79D7-BD83-4B55-8EDE-B5CC218A687E}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Medinilla.WebApi", "Medinilla.WebApi\Medinilla.WebApi.csproj", "{212C79D7-BD83-4B55-8EDE-B5CC218A687E}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{86EF603F-F303-4A59-95F4-0873CDD601C0}"
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Internal", "Internal", "{3C2ACFDD-B335-49D1-BC31-A3C891C1C75C}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Medinilla.Services", "Medillina.Services\Medinilla.Services.csproj", "{31A0B4D1-3F86-4A5D-806A-AF37DDC7F1F1}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Medinilla.Services", "Medillina.Services\Medinilla.Services.csproj", "{31A0B4D1-3F86-4A5D-806A-AF37DDC7F1F1}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Medinilla.Infrastructure", "Medinilla.Infrastructure\Medinilla.Infrastructure.csproj", "{4745F277-85B2-428F-BB89-C43ADD6A06B0}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Medinilla.Infrastructure", "Medinilla.Infrastructure\Medinilla.Infrastructure.csproj", "{4745F277-85B2-428F-BB89-C43ADD6A06B0}"
 EndProject
-Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Medinilla.DataAccess", "Medinilla.DataAccess\Medinilla.DataAccess.csproj", "{0120B4D1-393E-4FDC-A897-CDF79411DE6E}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Medinilla.DataAccess", "Medinilla.DataAccess\Medinilla.DataAccess.csproj", "{0120B4D1-393E-4FDC-A897-CDF79411DE6E}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Medinilla.DataTypes", "Medinilla.DataTypes\Medinilla.DataTypes.csproj", "{32D6C7CD-FF26-494F-852F-4799207A401E}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -49,6 +51,10 @@ Global
 		{0120B4D1-393E-4FDC-A897-CDF79411DE6E}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{0120B4D1-393E-4FDC-A897-CDF79411DE6E}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{0120B4D1-393E-4FDC-A897-CDF79411DE6E}.Release|Any CPU.Build.0 = Release|Any CPU
+		{32D6C7CD-FF26-494F-852F-4799207A401E}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{32D6C7CD-FF26-494F-852F-4799207A401E}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{32D6C7CD-FF26-494F-852F-4799207A401E}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{32D6C7CD-FF26-494F-852F-4799207A401E}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -57,6 +63,7 @@ Global
 		{31A0B4D1-3F86-4A5D-806A-AF37DDC7F1F1} = {3C2ACFDD-B335-49D1-BC31-A3C891C1C75C}
 		{4745F277-85B2-428F-BB89-C43ADD6A06B0} = {3C2ACFDD-B335-49D1-BC31-A3C891C1C75C}
 		{0120B4D1-393E-4FDC-A897-CDF79411DE6E} = {3C2ACFDD-B335-49D1-BC31-A3C891C1C75C}
+		{32D6C7CD-FF26-494F-852F-4799207A401E} = {3C2ACFDD-B335-49D1-BC31-A3C891C1C75C}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {AEBA9E02-4DA6-4520-899B-B35AB90AA2B5}
