@@ -42,4 +42,6 @@ app.UseMiddleware<HttpBasicAuthMiddleware>();
 
 app.MapControllers();
 
+app.UseWebSockets();
+
 app.Run();
