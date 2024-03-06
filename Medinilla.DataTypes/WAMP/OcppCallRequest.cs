@@ -29,13 +29,15 @@ public sealed class OcppCallRequest : BaseOcppMessage
         throw new Exception($"Couldn't deserialize Payload to type {typeof(T).Name}");
     }
 
-    public OcppCallResult CreateResult<T>(string payload)
+    public OcppCallResult CreateResult<T>(T payload)
+        where T : class
     {
-        return new OcppCallResult(MessageId, payload);
+        return new OcppCallResult(MessageId, JsonSerializer.Serialize(payload));
     }
 
-    public OcppCallError CreateErrorResult(string errorCode, string errorDescription = "", string? details = null)
+    public OcppCallError CreateErrorResult<T>(string errorCode, string errorDescription = "", T? details = null)
+        where T: class
     {
-        return new OcppCallError(MessageId, errorCode, errorDescription, details);
+        return new OcppCallError(MessageId, errorCode, errorDescription, JsonSerializer.Serialize(details));
     }
 }

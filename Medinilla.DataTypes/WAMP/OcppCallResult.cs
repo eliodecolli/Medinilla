@@ -5,7 +5,7 @@ namespace Medinilla.DataTypes.WAMP;
 
 public sealed class OcppCallResult : BaseOcppMessage
 {
-    public OcppCallResult(string msgId, string payload)
+    public OcppCallResult(string msgId, string? payload)
     {
         MessageType = OcppJMessageType.CALL_RESULT;
         MessageId = msgId;

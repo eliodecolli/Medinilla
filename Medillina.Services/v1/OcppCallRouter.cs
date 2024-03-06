@@ -62,7 +62,7 @@ public class OcppCallRouter : IOcppCallRouter
                         _logger.LogError($"Invalid action '{action}'");
                         return new RpcResult()
                         {
-                            Error = ocppCall.CreateErrorResult(OcppCallError.ErrorCodes.NotImplemented, $"Action {action} is not implemented on our end."),
+                            Error = ocppCall.CreateErrorResult<object>(OcppCallError.ErrorCodes.NotImplemented, $"Action {action} is not implemented on our end."),
                             Result = null
                         };
                     }

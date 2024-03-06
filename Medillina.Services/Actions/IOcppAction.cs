@@ -4,7 +4,7 @@ namespace Medinilla.Services.Actions;
 
 public interface IOcppAction
 {
-    string ActionName { get; set; }
+    string ActionName { get; }
 
     Task<RpcResult> Execute(OcppCallRequest call);
 }
