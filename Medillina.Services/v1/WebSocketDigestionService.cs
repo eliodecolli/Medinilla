@@ -11,17 +11,29 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService
     private readonly IOcppCallRouter _callRouter;
     private readonly ILogger<WebSocketDigestionService> _logger;
 
+    private WebSocket _webSocket;
+    private string _clientIndentifier;
+
     public WebSocketDigestionService(IOcppCallRouter callRouter, ILogger<WebSocketDigestionService> logger)
     {
         _callRouter = callRouter;
         _logger = logger;
     }
 
+    public async Task Send(byte[] data)
+    {
+        await _webSocket.SendAsync(data, WebSocketMessageType.Text, true, CancellationToken.None)
+            .ConfigureAwait(false);
+        _logger.LogInformation("Sent {0} bytes to {1}", data.Length, _clientIndentifier);
+    }
+
     public async Task Consume(WebSocket webSocket, string clientIdentifier)
     {
-        var buffer = new ArraySegment<byte>(new byte[1024]);
+        _webSocket = webSocket;
+        _clientIndentifier = clientIdentifier;
         
         while(true) {
+            var buffer = new ArraySegment<byte>(new byte[1024]);
             var result = await webSocket.ReceiveAsync(buffer, CancellationToken.None).ConfigureAwait(false);
             if (result.CloseStatus.HasValue)
             {
