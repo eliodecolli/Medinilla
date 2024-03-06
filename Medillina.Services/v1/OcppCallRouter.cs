@@ -27,10 +27,12 @@ public class OcppCallRouter : IOcppCallRouter
 
         var messageString = Encoding.UTF8.GetString(buffer);
 #if DEBUG
-        File.WriteAllBytes("CALL_log_" + DateTime.Now.ToBinary() + ".txt", buffer.ToArray());
+        File.WriteAllBytes("ocpp_log_" + DateTime.Now.ToBinary() + ".txt", buffer.ToArray());
 #endif
         // I'm very ashamed for the way I'm doing this but I was too lazy to write a working Regex, and ChatGPT was failing to give me a working pattern :(
-        var parsedMessage = Encoding.UTF8.GetString(buffer).TrimStart('[').TrimEnd(']').Split(',');
+        var parsedMessage = Encoding.UTF8.GetString(buffer).TrimStart('[')
+                                                           .TrimEnd(']')
+                                                           .Split(',');
 
         if (int.TryParse(parsedMessage[0].TrimNewLinesAndWhiteSpaces(), out int messageTypeTemp))
         {

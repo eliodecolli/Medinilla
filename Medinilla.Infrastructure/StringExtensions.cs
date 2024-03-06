@@ -10,6 +10,11 @@ public static class StringExtensions
         var startQuotationIndex = value.IndexOf('"');
         var endQuotationIndex = value.LastIndexOf('"');
 
+        if (startQuotationIndex == -1 && endQuotationIndex == -1)
+        {
+            return string.Empty;
+        }
+
         var len = endQuotationIndex - startQuotationIndex;
         return value.Substring(startQuotationIndex, len);
     }

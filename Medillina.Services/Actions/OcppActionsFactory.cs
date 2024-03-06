@@ -1,14 +1,22 @@
-﻿namespace Medinilla.Services.Actions;
+﻿using Microsoft.Extensions.Logging;
+
+namespace Medinilla.Services.Actions;
 
 public class OcppActionsFactory : IOcppActionsFactory
 {
-    private static Dictionary<string, IOcppAction> _registry;
+    private Dictionary<string, IOcppAction> _registry;
+    private readonly ILogger<OcppActionsFactory> _logger;
 
-    // pass actions as interfaces here in order to inject them via DI :)
-    public OcppActionsFactory()
+
+    public OcppActionsFactory(ILogger<OcppActionsFactory> logger, IOcppAction[] registeredActions)
     {
+        _logger = logger;
         _registry = new Dictionary<string, IOcppAction>();
-        // add actions here
+        foreach(var action in registeredActions)
+        {
+            _registry.Add(action.ActionName, action);
+            _logger.LogInformation("Registered action {0}", action.ActionName);
+        }
     }
 
     public IOcppAction? GetAction(string actionName)
