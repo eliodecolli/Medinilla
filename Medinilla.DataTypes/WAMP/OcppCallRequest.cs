@@ -18,6 +18,16 @@ public sealed class OcppCallRequest : BaseOcppMessage
 
     public string Payload { get; private set; }
 
+    public byte[] ToByteArray()
+    {
+        var payload = string.Compare(Payload, "null") == 0 ? "{}" : Payload;
+        var requestString = $"[{MessageType},\"{MessageId}\",\"{Action}\",{payload}]";
+#if DEBUG
+        Console.WriteLine("-------------{0}OCPP CALL Request: {1}{0}{2}{0}-------------", Environment.NewLine, requestString, payload);
+#endif
+        return Encoding.UTF8.GetBytes(requestString);
+    }
+
     public T As<T>() where T : class
     {
         var result = JsonSerializer.Deserialize<T>(Payload, new JsonSerializerOptions() { PropertyNameCaseInsensitive = true });

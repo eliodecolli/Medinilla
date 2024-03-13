@@ -5,11 +5,11 @@ namespace Medinilla.WebApi.Controllers
 {
     [Route("api")]
     [ApiController]
-    public class TestController : ControllerBase
+    public class WSController : ControllerBase
     {
         private readonly IBasicWebSocketDigestionService _webSocketDigestionService;
         
-        public TestController(IBasicWebSocketDigestionService webSocketDigestionService)
+        public WSController(IBasicWebSocketDigestionService webSocketDigestionService)
         {
             _webSocketDigestionService = webSocketDigestionService;
         }

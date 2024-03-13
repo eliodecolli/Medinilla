@@ -10,27 +10,38 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService
 {
     private readonly IOcppCallRouter _callRouter;
     private readonly ILogger<WebSocketDigestionService> _logger;
+    private readonly IWebSocketFactory _webSocketsFactory;
 
     private WebSocket _webSocket;
     private string _clientIndentifier;
 
-    public WebSocketDigestionService(IOcppCallRouter callRouter, ILogger<WebSocketDigestionService> logger)
+    private string _currentMessageId;
+
+    public WebSocketDigestionService(IWebSocketFactory webSocketsFactory, IOcppCallRouter callRouter, ILogger<WebSocketDigestionService> logger)
     {
         _callRouter = callRouter;
         _logger = logger;
+        _webSocketsFactory = webSocketsFactory;
     }
 
-    public async Task Send(byte[] data)
+    public async Task Send(string payload, string action)
     {
-        await _webSocket.SendAsync(data, WebSocketMessageType.Text, true, CancellationToken.None)
-            .ConfigureAwait(false);
-        _logger.LogInformation("Sent {0} bytes to {1}", data.Length, _clientIndentifier);
+        if(_currentMessageId == null)
+        {
+            _currentMessageId = Guid.NewGuid().ToString();
+            var request = new OcppCallRequest(_currentMessageId, action, payload);
+            var buffer = request.ToByteArray();
+
+            await _webSocket.SendAsync(buffer, WebSocketMessageType.Text, true, CancellationToken.None).ConfigureAwait(false);
+            _logger.LogInformation("Sent {0} bytes to {1}", buffer.Length, _clientIndentifier);
+        }
     }
 
     public async Task Consume(WebSocket webSocket, string clientIdentifier)
     {
         _webSocket = webSocket;
         _clientIndentifier = clientIdentifier;
+        _webSocketsFactory.RegisterWebSocketDigestionService(clientIdentifier, this);
         
         while(true) {
             var buffer = new ArraySegment<byte>(new byte[1024]);

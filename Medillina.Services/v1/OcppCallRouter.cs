@@ -102,7 +102,8 @@ public class OcppCallRouter : IOcppCallRouter
             return new RpcResult()
             {
                 Error = OcppCallError.InternalError,
-                Result = null
+                Result = null,
+                ReturnToCS = true
             };
         }
     }
