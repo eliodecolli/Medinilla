@@ -4,5 +4,5 @@ namespace Medinilla.Services.Interfaces;
 
 public interface IBasicWebSocketDigestionService
 {
-    Task Consume(WebSocket webSocket);
+    Task Consume(WebSocket webSocket, string clientIdentifier);
 }
