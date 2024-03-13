@@ -6,5 +6,5 @@ public interface IOcppAction
 {
     string ActionName { get; }
 
-    Task<RpcResult> Execute(OcppCallRequest call);
+    Task<RpcResult> Execute(OcppCallRequest call, string clientIdentifier);
 }

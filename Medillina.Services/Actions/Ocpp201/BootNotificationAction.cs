@@ -15,13 +15,14 @@ public sealed class BootNotificationAction : IOcppAction
 
     public string ActionName { get => "BootNotification"; }
 
-    public Task<RpcResult> Execute(OcppCallRequest call)
+    public Task<RpcResult> Execute(OcppCallRequest call, string clientIdentifier)
     {
         var notification = call.As<BootNotificationRequest>();
-        _logger.LogInformation("Received boot notification {0}. Vendor: {1} Model: {2}",
+        _logger.LogInformation("Received boot notification {0} from {3}. Vendor: {1} Model: {2}",
             notification.Reason,
             notification.ChargingStation is not null ? notification.ChargingStation.VendorName : "UNDEFINED",
-            notification.ChargingStation is not null ? notification.ChargingStation.Model : "UNDEFINED");
+            notification.ChargingStation is not null ? notification.ChargingStation.Model : "UNDEFINED",
+            clientIdentifier);
 
         // idk do something here..?
         return Task.FromResult(new RpcResult()

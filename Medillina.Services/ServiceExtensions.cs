@@ -11,6 +11,7 @@ public static class ServiceExtensions
     private static void AddOcppActions(IServiceCollection services)
     {
         services.AddScoped<IOcppAction, BootNotificationAction>();
+        services.AddScoped<IOcppAction, HeartbeatAction>();
         //...add more
     }
 

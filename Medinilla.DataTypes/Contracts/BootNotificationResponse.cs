@@ -19,6 +19,7 @@ public sealed class BootNotificationResponse
     // TODO: This is related to the heartbeat interval and some other stuff so you gotta revisit it.
     public int Interval { get; private set; }
 
+    [JsonConverter(typeof(JsonStringEnumConverter))]
     public RegistrationStatusEnum Status { get; private set; }
 
     public StatusInfo? StatusInfo { get; private set; }

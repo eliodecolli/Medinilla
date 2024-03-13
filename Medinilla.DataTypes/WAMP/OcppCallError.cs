@@ -104,7 +104,11 @@ public sealed class OcppCallError: BaseOcppMessage
 
     public byte[] ToByteArray()
     {
-        var details = ErrorDetails is not null ? JsonSerializer.Serialize(ErrorDetails) : "{}";
-        return Encoding.UTF8.GetBytes($"[{(int)MessageType},\"{MessageId}\",\"{ErrorDescription}\",{details}]");
+        var details = string.Compare(ErrorDetails, "null") != 0 ? ErrorDetails : "{}";
+        var responseString = $"[{(int)MessageType},\"{MessageId}\",\"{ErrorCode}\",\"{ErrorDescription}\",{details}]";
+#if DEBUG
+        Console.WriteLine("-------------{0}OCPP Error Response: {1}{0}{2}{0}-------------", Environment.NewLine, responseString, details);
+#endif
+        return Encoding.UTF8.GetBytes(responseString);
     }
 }

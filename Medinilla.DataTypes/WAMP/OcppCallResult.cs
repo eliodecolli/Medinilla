@@ -1,5 +1,6 @@
 ﻿using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Medinilla.DataTypes.WAMP;
 
@@ -26,7 +27,12 @@ public sealed class OcppCallResult : BaseOcppMessage
 
     public byte[] ToByteArray()
     {
-        var payload = Payload is not null ? JsonSerializer.Serialize(Payload) : "{}";
-        return Encoding.UTF8.GetBytes($"[{(int)MessageType},\"{MessageId}\",{payload}]");
+        var payload = string.Compare(Payload, "null") == 0 ? "{}" : Payload;
+
+        var responseString = $"[{(int)MessageType},\"{MessageId}\",{payload}]";
+#if DEBUG
+        Console.WriteLine("-------------{0}OCPP Response: {1}{0}{2}{0}-------------", Environment.NewLine, responseString, payload);
+#endif
+        return Encoding.UTF8.GetBytes(responseString);
     }
 }

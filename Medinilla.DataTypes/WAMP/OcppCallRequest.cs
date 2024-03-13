@@ -20,7 +20,7 @@ public sealed class OcppCallRequest : BaseOcppMessage
 
     public T As<T>() where T : class
     {
-        var result = JsonSerializer.Deserialize<T>(Payload);
+        var result = JsonSerializer.Deserialize<T>(Payload, new JsonSerializerOptions() { PropertyNameCaseInsensitive = true });
         if(result is not null)
         {
             return result;
@@ -32,7 +32,10 @@ public sealed class OcppCallRequest : BaseOcppMessage
     public OcppCallResult CreateResult<T>(T payload)
         where T : class
     {
-        return new OcppCallResult(MessageId, JsonSerializer.Serialize(payload));
+        return new OcppCallResult(MessageId, JsonSerializer.Serialize(payload, new JsonSerializerOptions()
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+        }));
     }
 
     public OcppCallError CreateErrorResult<T>(string errorCode, string errorDescription = "", T? details = null)
