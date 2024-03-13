@@ -27,7 +27,12 @@ public class OcppCallRouter : IOcppCallRouter
 
         var messageString = Encoding.UTF8.GetString(buffer);
 #if DEBUG
-        File.WriteAllBytes("ocpp_log_" + DateTime.Now.ToBinary() + ".txt", buffer.ToArray());
+        var salt = new Random().Next().ToString("X");
+        if(!Directory.Exists("logs"))
+        {
+            Directory.CreateDirectory("logs");
+        }
+        File.WriteAllBytes("logs/ocpp_log_" + DateTime.Now.ToBinary() + "_" + salt + "_" + ".txt", buffer.ToArray());
 #endif
         // I'm very ashamed for the way I'm doing this but I was too lazy to write a working Regex, and ChatGPT was failing to give me a working pattern :(
         var parsedMessage = Encoding.UTF8.GetString(buffer).TrimStart('[')
@@ -52,7 +57,7 @@ public class OcppCallRouter : IOcppCallRouter
             {
                 case OcppJMessageType.CALL:
                     var action = parsedMessage[2].ExtractValueInQuotationMarks();
-                    var payload = parsedMessage[3];
+                    var payload = string.Join(',', parsedMessage.Skip(3));  // TODO: WRITE A FUCKING TOKENIZER!
 
                     var ocppCall = new OcppCallRequest(messageId, action, payload);
 

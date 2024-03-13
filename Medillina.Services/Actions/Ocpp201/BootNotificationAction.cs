@@ -19,7 +19,9 @@ public sealed class BootNotificationAction : IOcppAction
     {
         var notification = call.As<BootNotificationRequest>();
         _logger.LogInformation("Received boot notification {0}. Vendor: {1} Model: {2}",
-            notification.Reason, notification.ChargingStation.VendorName, notification.ChargingStation.Model);
+            notification.Reason,
+            notification.ChargingStation is not null ? notification.ChargingStation.VendorName : "UNDEFINED",
+            notification.ChargingStation is not null ? notification.ChargingStation.Model : "UNDEFINED");
 
         // idk do something here..?
         return Task.FromResult(new RpcResult()

@@ -16,8 +16,8 @@ public static class ServiceExtensions
 
     public static void AddMedinillaServices(this IServiceCollection serviceCollection)
     {
-        serviceCollection.AddSingleton<IOcppActionsFactory, OcppActionsFactory>();
         serviceCollection.AddSingleton<IMedinillaAuthentication, MedinillaAuthentication>();
+        serviceCollection.AddScoped<IOcppActionsFactory, OcppActionsFactory>();
         serviceCollection.AddScoped<IOcppCallRouter, OcppCallRouter>();
         serviceCollection.AddScoped<IBasicWebSocketDigestionService, WebSocketDigestionService>();
 

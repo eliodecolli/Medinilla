@@ -8,7 +8,7 @@ public class OcppActionsFactory : IOcppActionsFactory
     private readonly ILogger<OcppActionsFactory> _logger;
 
 
-    public OcppActionsFactory(ILogger<OcppActionsFactory> logger, IOcppAction[] registeredActions)
+    public OcppActionsFactory(ILogger<OcppActionsFactory> logger, IEnumerable<IOcppAction> registeredActions)
     {
         _logger = logger;
         _registry = new Dictionary<string, IOcppAction>();

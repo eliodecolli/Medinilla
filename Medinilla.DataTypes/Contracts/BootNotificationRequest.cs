@@ -12,6 +12,7 @@ public sealed class BootNotificationRequest
         ChargingStation = chargingStation;
     }
 
+    [JsonConverter(typeof(JsonStringEnumConverter))]
     public BootReasonEnum Reason { get; private set; }
 
     public ChargingStation ChargingStation { get; private set; }

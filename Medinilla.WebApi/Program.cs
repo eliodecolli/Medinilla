@@ -38,7 +38,7 @@ app.UseAuthorization();
 
 app.UseAuthentication();
 
-app.UseMiddleware<HttpBasicAuthMiddleware>();
+//app.UseMiddleware<HttpBasicAuthMiddleware>();
 
 app.MapControllers();
 
