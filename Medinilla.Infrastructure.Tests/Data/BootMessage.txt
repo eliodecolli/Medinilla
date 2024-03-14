@@ -1,0 +1,1 @@
+[2,"123-abc-456-def","BootNotification", {"reason": "PowerUp", "chargingStation": { "model": "Test Model", "vendor": "Test Vendor" }}]
