@@ -21,6 +21,7 @@ public static class ServiceExtensions
         serviceCollection.AddScoped<IOcppActionsFactory, OcppActionsFactory>();
         serviceCollection.AddScoped<IOcppCallRouter, OcppCallRouter>();
         serviceCollection.AddScoped<IBasicWebSocketDigestionService, WebSocketDigestionService>();
+        serviceCollection.AddScoped<IOcppMessageParser, OcppMessageParser>();
 
         AddOcppActions(serviceCollection);
     }
