@@ -9,6 +9,12 @@ public class OcppMessageTokenizerShould
     public const string RawMessage =
         "[2     ,  \"123-abc-456-def\" , \"BootNotification\"  , {\"reason\": \"PowerUp\",\r\n\"chargingStation\": { \"model\": \"Test Model\", \"vendor\": \"Test Vendor\" }}]";
 
+    public const string RawMessageEmptyJson =
+        "[2     ,  \"123-abc-456-def\" , \"BootNotification\"  , {}]";
+
+    public const string RawMessageInvalid =
+        "[2     ,  \"123-abc-456-def\" , \"BootNotification\"  , {]";
+
     class ChargingStation
     {
         public string Model { get; set; }
@@ -51,5 +57,37 @@ public class OcppMessageTokenizerShould
         Assert.Equal("PowerUp", parsedJson.Reason);
         Assert.Equal("Test Model", parsedJson.ChargingStation.Model);
         Assert.Equal("Test Vendor", parsedJson.ChargingStation.Vendor);
+    }
+
+    [Fact]
+    public void NotPanicWhenEmptyJsonIsFound()
+    {
+        var tokenizer = new OcppMessageTokenizer();
+
+        var tokens = tokenizer.Tokenize(RawMessageEmptyJson).ToList();
+        Assert.Equal(4, tokens.Count);
+
+        var numberToken = tokens[0];
+        Assert.Equal(TokenType.Integer, numberToken.Type);
+        Assert.True(int.TryParse(numberToken.Value, out int _));
+
+        var stringToken1 = tokens[1];
+        Assert.Equal(TokenType.String, stringToken1.Type);
+        Assert.Equal("123-abc-456-def", stringToken1.Value);
+
+        var stringToken2 = tokens[2];
+        Assert.Equal(TokenType.String, stringToken2.Type);
+        Assert.Equal("BootNotification", stringToken2.Value);
+
+        var jsonToken = tokens[3];
+        Assert.Equal(TokenType.Json, jsonToken.Type);
+        Assert.Equal("{}", jsonToken.Value);
+    }
+
+    [Fact]
+    public void PanicWhenInvalidMessage()
+    {
+        var tokenizer = new OcppMessageTokenizer();
+        Assert.Throws<Exception>(() => tokenizer.Tokenize(RawMessageInvalid));
     }
 }
