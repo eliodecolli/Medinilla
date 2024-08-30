@@ -2,7 +2,6 @@
 using Medinilla.Services.Interfaces;
 using Microsoft.Extensions.Logging;
 using System.Net.WebSockets;
-using System.Text;
 
 namespace Medinilla.Services.v1;
 
@@ -14,17 +13,40 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService
     private WebSocket _webSocket;
     private string _clientIndentifier;
 
+    private string _currentCall;
+
     public WebSocketDigestionService(IOcppCallRouter callRouter, ILogger<WebSocketDigestionService> logger)
     {
         _callRouter = callRouter;
         _logger = logger;
     }
 
-    public async Task Send(byte[] data)
+    private void SetCurrentCall(string value)
     {
-        await _webSocket.SendAsync(data, WebSocketMessageType.Text, true, CancellationToken.None)
-            .ConfigureAwait(false);
-        _logger.LogInformation("Sent {0} bytes to {1}", data.Length, _clientIndentifier);
+        _currentCall = value;
+    }
+
+    private bool IsServiceBusy()
+    {
+        return !string.IsNullOrEmpty(_currentCall);
+    }
+
+    public async Task Send(OcppCallRequest request)
+    {
+        if(!IsServiceBusy())
+        {
+            var data = request.ToBytes();
+
+            await _webSocket.SendAsync(data, WebSocketMessageType.Text, true, CancellationToken.None)
+                .ConfigureAwait(false);
+            _logger.LogInformation("Sent {0} bytes to {1}", data.Length, _clientIndentifier);
+
+            SetCurrentCall(request.MessageId);
+        }
+        else
+        {
+            _logger.LogWarning("Trying to send a message to {0} but there's a pending request waiting for a response.", _clientIndentifier);
+        }
     }
 
     public async Task Consume(WebSocket webSocket, string clientIdentifier)
@@ -50,7 +72,7 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService
                 var rpcResult = await _callRouter.RouteOcppCall(received, clientIdentifier);
                 if(rpcResult.Error is not null)
                 {
-                    if (rpcResult.ReturnToCS)
+                    if (_currentCall != rpcResult.Error.MessageId)
                     {
                         await webSocket.SendAsync(rpcResult.Error.ToByteArray(), WebSocketMessageType.Text, true, CancellationToken.None)
                             .ConfigureAwait(false);
@@ -60,13 +82,14 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService
                     }
                     else
                     {
+                        SetCurrentCall(string.Empty);
                         _logger.LogInformation("Received error result for message {0}: {1} - {2}",
                             rpcResult.Error.MessageId, rpcResult.Error.ErrorCode, rpcResult.Error.ErrorDescription);
                     }
                 }
                 else if(rpcResult.Result is not null)
                 {
-                    if(rpcResult.ReturnToCS)
+                    if(_currentCall != rpcResult.Result.MessageId)
                     {
                         await webSocket.SendAsync(rpcResult.Result.ToByteArray(), WebSocketMessageType.Text, true, CancellationToken.None)
                             .ConfigureAwait(false);
@@ -75,6 +98,7 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService
                     }
                     else
                     {
+                        SetCurrentCall(string.Empty);
                         _logger.LogInformation("Received response for {0} from {1}", rpcResult.Result.MessageId, clientIdentifier);
                     }
                 }
