@@ -3,6 +3,7 @@ using Medinilla.Infrastructure;
 using Medinilla.Services;
 using Medinilla.WebApi.Middleware;
 using System.Security.Authentication;
+using System.Security.Cryptography.X509Certificates;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -20,10 +21,11 @@ builder.Services.AddMedinillaInfrastructure();
 builder.Services.AddMedinillaDataSources();
 builder.Services.AddMedinillaServices();
 
-builder.WebHost.ConfigureKestrel(serverOptions => serverOptions.ConfigureHttpsDefaults(o =>
-{
-    o.SslProtocols = SslProtocols.Tls12;
-}));
+// builder.WebHost.ConfigureKestrel(serverOptions => serverOptions.ConfigureHttpsDefaults(o =>
+// {
+//     var xp = File.ReadAllBytes("cert.pfx");
+//     o.ServerCertificate = new X509Certificate2(xp);
+// }));
 
 var app = builder.Build();
 

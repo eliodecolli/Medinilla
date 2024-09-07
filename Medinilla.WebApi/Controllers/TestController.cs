@@ -14,7 +14,7 @@ namespace Medinilla.WebApi.Controllers
             _webSocketDigestionService = webSocketDigestionService;
         }
 
-        [HttpGet("/ws/{clientIdentifier}")]
+        [HttpGet("/{clientIdentifier}")]
         public async Task Get(string? clientIdentifier)
         {
             if (HttpContext.WebSockets.IsWebSocketRequest)
