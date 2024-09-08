@@ -18,13 +18,6 @@ public sealed class OcppMessageParser : IOcppMessageParser
 
     public void LoadRaw(string input)
     {
-        var random = new Random().Next();
-        if (!Directory.Exists("logs/raw/"))
-        {
-            Directory.CreateDirectory("logs/raw/");
-        }
-        
-        File.WriteAllText("logs/raw/" + random + ".txt", input);
         _tokens = _tokenizer.Tokenize(input).ToList();
     }
 

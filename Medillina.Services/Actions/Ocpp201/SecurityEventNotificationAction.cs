@@ -19,7 +19,7 @@ public sealed class SecurityEventNotificationAction : IOcppAction
     {
         var notification = call.As<SecurityEventNotificationRequest>();
         _logger.LogInformation("{0} Received Security Notification Request: \"{1}\" with type \"{2}\"",
-                            clientIdentifier, notification.TechInfo, notification.Type);
+            clientIdentifier, notification.TechInfo, notification.Type);
 
         // idk do something here..?
         return Task.FromResult(new RpcResult()
