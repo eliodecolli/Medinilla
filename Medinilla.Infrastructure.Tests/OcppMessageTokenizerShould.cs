@@ -15,6 +15,9 @@ public class OcppMessageTokenizerShould
     public const string RawMessageInvalid =
         "[2     ,  \"123-abc-456-def\" , \"BootNotification\"  , {]";
 
+    public const string RawMessageError = 
+        "[4,\"46fec632-7413-4a12-935c-540337813301\",\"SecurityError\",\"\",{}]";
+
     class ChargingStation
     {
         public string Model { get; set; }
@@ -27,6 +30,36 @@ public class OcppMessageTokenizerShould
         public string Reason { get; set; }
 
         public ChargingStation ChargingStation { get; set; }
+    }
+
+    [Fact]
+    public void GetTokensSuccessfullyFromErrorMessage()
+    {
+        var tokenizer = new OcppMessageTokenizer();
+
+        var tokens = tokenizer.Tokenize(RawMessageError).ToList();
+        Assert.Equal(5, tokens.Count);
+
+        var numberToken = tokens[0];
+        Assert.Equal(TokenType.Integer, numberToken.Type);
+        Assert.True(int.TryParse(numberToken.Value, out int _));
+        Assert.Equal("4", numberToken.Value);
+
+        var uid = tokens[1];
+        Assert.Equal(TokenType.String, uid.Type);
+        Assert.Equal("46fec632-7413-4a12-935c-540337813301", uid.Value);
+
+        var msgCode = tokens[2];
+        Assert.Equal(TokenType.String, msgCode.Type);
+        Assert.Equal("SecurityError", msgCode.Value);
+
+        var details = tokens[3];
+        Assert.Equal(TokenType.String, details.Type);
+        Assert.Equal("", details.Value);
+
+        var json = tokens[4];
+        Assert.Equal(TokenType.Json, json.Type);
+        Assert.Equal("{}", json.Value);
     }
 
     [Fact]
