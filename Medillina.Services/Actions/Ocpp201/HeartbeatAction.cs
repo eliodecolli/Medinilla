@@ -15,7 +15,6 @@ internal class HeartbeatAction : IOcppAction
 
     public Task<RpcResult> Execute(OcppCallRequest call, string clientIdentifier)
     {
-        _logger.LogInformation("Received heartbeat from {0}", clientIdentifier);
         return Task.FromResult(new RpcResult()
         {
             Result = call.CreateResult(new HeartbeatResponse()),
