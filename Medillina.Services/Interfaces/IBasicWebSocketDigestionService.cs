@@ -8,6 +8,4 @@ public interface IBasicWebSocketDigestionService
     Task Consume(WebSocket webSocket, string clientIdentifier);
 
     Task Send(OcppCallRequest request);
-
-    Task Send(string request);
 }

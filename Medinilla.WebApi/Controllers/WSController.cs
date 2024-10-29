@@ -1,4 +1,5 @@
-﻿using Medinilla.Services.Interfaces;
+﻿using Medinilla.DataTypes.WAMP;
+using Medinilla.Services.Interfaces;
 using Medinilla.WebApi.ApiModels;
 using Microsoft.AspNetCore.Mvc;
 using System.Net.Mime;
@@ -12,11 +13,20 @@ namespace Medinilla.WebApi.Controllers
         private readonly IBasicWebSocketDigestionService _webSocketDigestionService;
 
         private readonly IWSDigestionServiceCollection _wsDigestionServiceCollection;
+
+        private readonly IOcppMessageParser _parser;
         
-        public WSController(IBasicWebSocketDigestionService webSocketDigestionService, IWSDigestionServiceCollection _collection)
+        public WSController(IBasicWebSocketDigestionService webSocketDigestionService, IWSDigestionServiceCollection _collection, IOcppMessageParser parser)
         {
             _webSocketDigestionService = webSocketDigestionService;
             _wsDigestionServiceCollection = _collection;
+            _parser = parser;
+        }
+
+        private async Task WriteHttpResponse(string response, int code)
+        {
+            HttpContext.Response.StatusCode = code;
+            await HttpContext.Response.WriteAsync(response);
         }
 
         [Consumes(MediaTypeNames.Text.Plain)]
@@ -26,7 +36,20 @@ namespace Medinilla.WebApi.Controllers
             var service = _wsDigestionServiceCollection.Get(clientIdentifier ?? "");
             if (service is not null)
             {
-                await service.Send(data);
+                _parser.LoadRaw(data);
+                if (_parser.GetMessageType() != OcppJMessageType.CALL)
+                {
+                    await WriteHttpResponse("Invalid OCPP Message: Only CALL types are supported for this operation.", StatusCodes.Status400BadRequest);
+                }
+                else
+                {
+                    await service.Send(_parser.ParseCall());
+                }
+            }
+            else
+            {
+                await WriteHttpResponse("Could not load service required to perform operation. Please check the provided client identifier or make sure the charging station is connected to the server",
+                    StatusCodes.Status400BadRequest);
             }
         }
 
@@ -37,8 +60,7 @@ namespace Medinilla.WebApi.Controllers
             {
                 if (string.IsNullOrEmpty(clientIdentifier))
                 {
-                    HttpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
-                    await HttpContext.Response.WriteAsync("Client Identifier must be provided.");
+                    await WriteHttpResponse("Client Identifier must be provided.", StatusCodes.Status400BadRequest);
                     return;
                 }
 
@@ -55,8 +77,7 @@ namespace Medinilla.WebApi.Controllers
             }
             else
             {
-                HttpContext.Response.StatusCode = StatusCodes.Status400BadRequest;
-                await HttpContext.Response.WriteAsync("Only websocket connections are allowed.");
+                await WriteHttpResponse("Only websocket connections are allowed.", StatusCodes.Status400BadRequest);
                 return;
             }
         }
