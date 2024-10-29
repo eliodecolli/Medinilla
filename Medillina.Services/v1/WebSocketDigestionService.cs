@@ -2,24 +2,19 @@
 using Medinilla.Services.Interfaces;
 using Microsoft.Extensions.Logging;
 using System.Net.WebSockets;
+using System.Text;
 
 namespace Medinilla.Services.v1;
 
-public class WebSocketDigestionService : IBasicWebSocketDigestionService
+public class WebSocketDigestionService(IOcppCallRouter callRouter, ILogger<WebSocketDigestionService> logger) : IBasicWebSocketDigestionService
 {
-    private readonly IOcppCallRouter _callRouter;
-    private readonly ILogger<WebSocketDigestionService> _logger;
+    private readonly IOcppCallRouter _callRouter = callRouter;
+    private readonly ILogger<WebSocketDigestionService> _logger = logger;
 
     private WebSocket _webSocket;
     private string _clientIndentifier;
 
     private string _currentCall;
-
-    public WebSocketDigestionService(IOcppCallRouter callRouter, ILogger<WebSocketDigestionService> logger)
-    {
-        _callRouter = callRouter;
-        _logger = logger;
-    }
 
     private void SetCurrentCall(string value)
     {
@@ -67,7 +62,6 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService
             if (result.Count > 0)
             {
                 var received = buffer.Take(result.Count).ToArray();
-                _logger.LogInformation($"Received {result.Count} bytes from {clientIdentifier}");
 
                 var rpcResult = await _callRouter.RouteOcppCall(received, clientIdentifier);
                 if(rpcResult.Error is not null)
@@ -93,8 +87,6 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService
                     {
                         await webSocket.SendAsync(rpcResult.Result.ToByteArray(), WebSocketMessageType.Text, true, CancellationToken.None)
                             .ConfigureAwait(false);
-
-                        _logger.LogInformation("Replied to {0} regarding {1}", clientIdentifier, rpcResult.Result.MessageId);
                     }
                     else
                     {
