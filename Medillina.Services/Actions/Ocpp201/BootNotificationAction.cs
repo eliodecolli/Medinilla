@@ -27,7 +27,10 @@ public sealed class BootNotificationAction : IOcppAction
         // idk do something here..?
         return Task.FromResult(new RpcResult()
         {
-            Result = call.CreateResult(new BootNotificationResponse(1, RegistrationStatusEnum.Accepted, null)),
+            Result = call.CreateResult(new BootNotificationResponse(1440, RegistrationStatusEnum.Accepted, new StatusInfo() {
+                ReasonCode = "200",
+                AdditionalInfo = ""
+            })),
             Error = null,
             ReturnToCS = true
         });

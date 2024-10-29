@@ -138,12 +138,11 @@ public sealed class OcppMessageTokenizer : ITokenizer
                 idx += 1;
             }
 
-            if (!string.IsNullOrEmpty(token))
+            if (tokenType != TokenType.Unknown)
             {
                 var createdToken = new Token(tokenType, token);
                 tokens.Add(createdToken);
             }
-            
         }
 
         return tokens;
