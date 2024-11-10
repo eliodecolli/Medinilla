@@ -8,21 +8,12 @@ namespace Medinilla.WebApi.Controllers
 {
     [Route("api")]
     [ApiController]
-    public class WSController : ControllerBase
+    public class WSController(
+        IBasicWebSocketDigestionService webSocketDigestionService,
+        IWSDigestionServiceCollection collection,
+        IOcppMessageParser parser)
+        : ControllerBase
     {
-        private readonly IBasicWebSocketDigestionService _webSocketDigestionService;
-
-        private readonly IWSDigestionServiceCollection _wsDigestionServiceCollection;
-
-        private readonly IOcppMessageParser _parser;
-        
-        public WSController(IBasicWebSocketDigestionService webSocketDigestionService, IWSDigestionServiceCollection _collection, IOcppMessageParser parser)
-        {
-            _webSocketDigestionService = webSocketDigestionService;
-            _wsDigestionServiceCollection = _collection;
-            _parser = parser;
-        }
-
         private async Task WriteHttpResponse(string response, int code)
         {
             HttpContext.Response.StatusCode = code;
@@ -33,17 +24,17 @@ namespace Medinilla.WebApi.Controllers
         [HttpPost("/ws/{clientIdentifier}")]
         public async Task Post(string? clientIdentifier, [FromBody]string data)
         {
-            var service = _wsDigestionServiceCollection.Get(clientIdentifier ?? "");
+            var service = collection.Get(clientIdentifier ?? "");
             if (service is not null)
             {
-                _parser.LoadRaw(data);
-                if (_parser.GetMessageType() != OcppJMessageType.CALL)
+                parser.LoadRaw(data);
+                if (parser.GetMessageType() != OcppJMessageType.CALL)
                 {
                     await WriteHttpResponse("Invalid OCPP Message: Only CALL types are supported for this operation.", StatusCodes.Status400BadRequest);
                 }
                 else
                 {
-                    await service.Send(_parser.ParseCall());
+                    await service.Send(parser.ParseCall());
                 }
             }
             else
@@ -71,9 +62,9 @@ namespace Medinilla.WebApi.Controllers
                 });
                 
                 Console.WriteLine("Accepting connection from client {0}", clientIdentifier);
-                _wsDigestionServiceCollection.Set(clientIdentifier, _webSocketDigestionService);
+                collection.Set(clientIdentifier, webSocketDigestionService);
 
-                await _webSocketDigestionService.Consume(webSocket, clientIdentifier);
+                await webSocketDigestionService.Consume(webSocket, clientIdentifier);
             }
             else
             {

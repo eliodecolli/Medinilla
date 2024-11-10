@@ -4,12 +4,9 @@ using Microsoft.Extensions.Logging;
 
 namespace Medinilla.Services.Actions.Ocpp201;
 
-internal class HeartbeatAction : IOcppAction
+internal class HeartbeatAction(ILogger<HeartbeatAction> logger) : IOcppAction
 {
-    private readonly ILogger<HeartbeatAction> _logger;
-
-    public HeartbeatAction(ILogger<HeartbeatAction> logger)
-        => _logger = logger;
+    private readonly ILogger<HeartbeatAction> _logger = logger;
 
     public string ActionName => "Heartbeat";
 

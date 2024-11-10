@@ -5,20 +5,13 @@ using Medinilla.Services.Interfaces;
 
 namespace Medinilla.Services.v1;
 
-public sealed class OcppMessageParser : IOcppMessageParser
+public sealed class OcppMessageParser(ITokenizer tokenizer) : IOcppMessageParser
 {
-    private readonly ITokenizer _tokenizer;
-    private List<IToken> _tokens;
-
-    public OcppMessageParser(ITokenizer tokenizer)
-    {
-        _tokenizer = tokenizer;
-        _tokens = new List<IToken>();
-    }
+    private List<IToken> _tokens = new();
 
     public void LoadRaw(string input)
     {
-        _tokens = _tokenizer.Tokenize(input).ToList();
+        _tokens = tokenizer.Tokenize(input).ToList();
     }
 
     private void AssertLoadFirst()

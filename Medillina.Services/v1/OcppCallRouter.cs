@@ -6,19 +6,12 @@ using System.Text;
 
 namespace Medinilla.Services.v1;
 
-public class OcppCallRouter : IOcppCallRouter
+public class OcppCallRouter(
+    ILogger<OcppCallRouter> logger,
+    IOcppActionsFactory actionsFactory,
+    IOcppMessageParser parser)
+    : IOcppCallRouter
 {
-    private readonly ILogger<OcppCallRouter> _logger;
-    private readonly IOcppActionsFactory _actionsFactory;
-    private readonly IOcppMessageParser _parser;
-
-    public OcppCallRouter(ILogger<OcppCallRouter> logger, IOcppActionsFactory actionsFactory, IOcppMessageParser parser)
-    {
-        _logger = logger;
-        _actionsFactory = actionsFactory;
-        _parser = parser;
-    }
-
     public async Task<RpcResult> RouteOcppCall(byte[] buffer, string? clientIdentifier)
     {
         if (clientIdentifier is null)
@@ -27,12 +20,12 @@ public class OcppCallRouter : IOcppCallRouter
         }
 
         var messageString = Encoding.UTF8.GetString(buffer);
-        _parser.LoadRaw(messageString);
+        parser.LoadRaw(messageString);
 
-        switch (_parser.GetMessageType())
+        switch (parser.GetMessageType())
         {
             case OcppJMessageType.CALL:
-                var ocppCall = _parser.ParseCall();
+                var ocppCall = parser.ParseCall();
 #if DEBUG
                 var salt = new Random().Next().ToString("X");
                 if (!Directory.Exists("logs"))
@@ -45,10 +38,10 @@ public class OcppCallRouter : IOcppCallRouter
                 }
 #endif
 
-                var ocppAction = _actionsFactory.GetAction(ocppCall.Action);
+                var ocppAction = actionsFactory.GetAction(ocppCall.Action);
                 if (ocppAction is null)
                 {
-                    _logger.LogError($"Invalid action '{ocppCall.Action}'");
+                    logger.LogError($"Invalid action '{ocppCall.Action}'");
                     return new RpcResult()
                     {
                         Error = ocppCall.CreateErrorResult<object>(OcppCallError.ErrorCodes.NotImplemented, $"Action {ocppCall.Action} is not implemented on our end."),
@@ -62,21 +55,21 @@ public class OcppCallRouter : IOcppCallRouter
             case OcppJMessageType.CALL_RESULT:
                 return new RpcResult()
                 {
-                    Result = _parser.ParseResult(),
+                    Result = parser.ParseResult(),
                     Error = null
                 };
 
             case OcppJMessageType.CALL_ERROR:
                 return new RpcResult()
                 {
-                    Error = _parser.ParseError(),
+                    Error = parser.ParseError(),
                     Result = null
                 };
 
             default:
                 return new RpcResult()
                 {
-                    Error = new OcppCallError(_parser.TryExtractMessageId() ?? "Unknown", OcppCallError.ErrorCodes.MessageTypeNotSupported, ""),
+                    Error = new OcppCallError(parser.TryExtractMessageId() ?? "Unknown", OcppCallError.ErrorCodes.MessageTypeNotSupported, ""),
                     Result = null
                 };
         }

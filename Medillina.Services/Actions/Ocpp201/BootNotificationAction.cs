@@ -6,19 +6,14 @@ using Microsoft.Extensions.Logging;
 
 namespace Medinilla.Services.Actions.Ocpp201;
 
-public sealed class BootNotificationAction : IOcppAction
+public sealed class BootNotificationAction(ILogger<BootNotificationAction> logger) : IOcppAction
 {
-    private ILogger<BootNotificationAction> _logger;
-
-    public BootNotificationAction(ILogger<BootNotificationAction> logger)
-        => _logger = logger;
-
     public string ActionName { get => "BootNotification"; }
 
     public Task<RpcResult> Execute(OcppCallRequest call, string clientIdentifier)
     {
         var notification = call.As<BootNotificationRequest>();
-        _logger.LogInformation("Received boot notification {0} from {3}. Vendor: {1} Model: {2}",
+        logger.LogInformation("Received boot notification {0} from {3}. Vendor: {1} Model: {2}",
             notification.Reason,
             notification.ChargingStation is not null ? notification.ChargingStation.VendorName : "UNDEFINED",
             notification.ChargingStation is not null ? notification.ChargingStation.Model : "UNDEFINED",
