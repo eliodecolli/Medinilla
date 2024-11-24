@@ -6,25 +6,42 @@ using System.Text;
 
 namespace Medinilla.Services.v1;
 
-public class WebSocketDigestionService : IBasicWebSocketDigestionService
+public class WebSocketDigestionService(IOcppCallRouter callRouter, ILogger<WebSocketDigestionService> logger) : IBasicWebSocketDigestionService
 {
-    private readonly IOcppCallRouter _callRouter;
-    private readonly ILogger<WebSocketDigestionService> _logger;
+    private readonly IOcppCallRouter _callRouter = callRouter;
+    private readonly ILogger<WebSocketDigestionService> _logger = logger;
 
     private WebSocket _webSocket;
     private string _clientIndentifier;
 
-    public WebSocketDigestionService(IOcppCallRouter callRouter, ILogger<WebSocketDigestionService> logger)
+    private string _currentCall;
+
+    private void SetCurrentCall(string value)
     {
-        _callRouter = callRouter;
-        _logger = logger;
+        _currentCall = value;
     }
 
-    public async Task Send(byte[] data)
+    private bool IsServiceBusy()
     {
-        await _webSocket.SendAsync(data, WebSocketMessageType.Text, true, CancellationToken.None)
-            .ConfigureAwait(false);
-        _logger.LogInformation("Sent {0} bytes to {1}", data.Length, _clientIndentifier);
+        return !string.IsNullOrEmpty(_currentCall);
+    }
+
+    public async Task Send(OcppCallRequest request)
+    {
+        if(!IsServiceBusy())
+        {
+            var data = request.ToBytes();
+
+            await _webSocket.SendAsync(data, WebSocketMessageType.Text, true, CancellationToken.None)
+                .ConfigureAwait(false);
+            _logger.LogInformation("Sent {0} bytes to {1}", data.Length, _clientIndentifier);
+
+            SetCurrentCall(request.MessageId);
+        }
+        else
+        {
+            _logger.LogWarning("Trying to send a message to {0} but there's a pending request waiting for a response.", _clientIndentifier);
+        }
     }
 
     public async Task Consume(WebSocket webSocket, string clientIdentifier)
@@ -45,12 +62,11 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService
             if (result.Count > 0)
             {
                 var received = buffer.Take(result.Count).ToArray();
-                _logger.LogInformation($"Received {result.Count} bytes from {clientIdentifier}");
 
                 var rpcResult = await _callRouter.RouteOcppCall(received, clientIdentifier);
                 if(rpcResult.Error is not null)
                 {
-                    if (rpcResult.ReturnToCS)
+                    if (_currentCall != rpcResult.Error.MessageId)
                     {
                         await webSocket.SendAsync(rpcResult.Error.ToByteArray(), WebSocketMessageType.Text, true, CancellationToken.None)
                             .ConfigureAwait(false);
@@ -60,21 +76,21 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService
                     }
                     else
                     {
+                        SetCurrentCall(string.Empty);
                         _logger.LogInformation("Received error result for message {0}: {1} - {2}",
                             rpcResult.Error.MessageId, rpcResult.Error.ErrorCode, rpcResult.Error.ErrorDescription);
                     }
                 }
                 else if(rpcResult.Result is not null)
                 {
-                    if(rpcResult.ReturnToCS)
+                    if(_currentCall != rpcResult.Result.MessageId)
                     {
                         await webSocket.SendAsync(rpcResult.Result.ToByteArray(), WebSocketMessageType.Text, true, CancellationToken.None)
                             .ConfigureAwait(false);
-
-                        _logger.LogInformation("Replied to {0} regarding {1}", clientIdentifier, rpcResult.Result.MessageId);
                     }
                     else
                     {
+                        SetCurrentCall(string.Empty);
                         _logger.LogInformation("Received response for {0} from {1}", rpcResult.Result.MessageId, clientIdentifier);
                     }
                 }
