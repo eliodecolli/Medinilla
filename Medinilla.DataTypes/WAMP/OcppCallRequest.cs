@@ -34,7 +34,7 @@ public sealed class OcppCallRequest : BaseOcppMessage
     {
         return new OcppCallResult(MessageId, JsonSerializer.Serialize(payload, new JsonSerializerOptions()
         {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
         }));
     }
 
