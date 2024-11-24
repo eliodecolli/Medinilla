@@ -1,1 +1,1 @@
-java -jar ocpp-charge-point-emulator-cli.jar --csUrl=ws://localhost:9000 --stationCount=2 --inTransactionFraction=0.5
+java -jar ocpp-charge-point-emulator-cli.jar --csUrl=wss://localhost:9000/ws/ --stationCount=2 --inTransactionFraction=0.5
