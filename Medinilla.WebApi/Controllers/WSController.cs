@@ -1,12 +1,10 @@
 ﻿using Medinilla.DataTypes.WAMP;
 using Medinilla.Services.Interfaces;
-using Medinilla.WebApi.ApiModels;
 using Microsoft.AspNetCore.Mvc;
 using System.Net.Mime;
 
 namespace Medinilla.WebApi.Controllers
 {
-    [Route("api")]
     [ApiController]
     public class WSController : ControllerBase
     {

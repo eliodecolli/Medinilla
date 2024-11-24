@@ -21,12 +21,6 @@ builder.Services.AddMedinillaInfrastructure();
 builder.Services.AddMedinillaDataSources();
 builder.Services.AddMedinillaServices();
 
-// builder.WebHost.ConfigureKestrel(serverOptions => serverOptions.ConfigureHttpsDefaults(o =>
-// {
-//     var xp = File.ReadAllBytes("cert.pfx");
-//     o.ServerCertificate = new X509Certificate2(xp);
-// }));
-
 var app = builder.Build();
 
 // Configure the HTTP request pipeline.
