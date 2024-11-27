@@ -3,9 +3,9 @@
 namespace Medinilla.DataTypes.Contracts.Common;
 
 [JsonConverter(typeof(JsonStringEnumConverter))]
-public enum RegistrationStatusEnum
+public enum TransactionEventEnum
 {
-    Accepted,
-    Pending,
-    Rejected
+    Ended,
+    Started,
+    Updated
 }

@@ -19,6 +19,7 @@ builder.Logging.AddConsole();
 
 builder.Services.AddMedinillaInfrastructure();
 builder.Services.AddMedinillaDataSources();
+builder.Services.AddMedinillaDataAccess();
 builder.Services.AddMedinillaServices();
 
 var app = builder.Build();

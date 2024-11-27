@@ -14,6 +14,7 @@ public static class ServiceExtensions
         services.AddScoped<IOcppAction, HeartbeatAction>();
         services.AddScoped<IOcppAction, SecurityEventNotificationAction>();
         services.AddScoped<IOcppAction, AuthorizeAction>();
+        services.AddScoped<IOcppAction, TransactionEventAction>();
         //...add more
     }
 
