@@ -8,7 +8,9 @@ public static class ServiceCollectionExtensions
 {
     public static void AddMedinillaDataAccess(this IServiceCollection services)
     {
+        services.AddEntityFrameworkNpgsql();
         services.AddDbContext<MedinillaOcppDbContext>();
-        services.AddScoped<TransactionsUnitOfWork>();
+        services.AddTransient<TransactionsUnitOfWork>();
+        services.AddTransient<ChargingStationUnitOfWork>();
     }
 }

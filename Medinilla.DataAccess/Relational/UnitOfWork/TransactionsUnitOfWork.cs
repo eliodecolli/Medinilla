@@ -1,10 +1,9 @@
 ﻿using Medinilla.DataAccess.Interfaces;
 using Medinilla.DataAccess.Relational.Models;
-using Microsoft.EntityFrameworkCore;
 
 namespace Medinilla.DataAccess.Relational.UnitOfWork;
 
-public sealed class TransactionsUnitOfWork(MedinillaOcppDbContext context)
+public sealed class TransactionsUnitOfWork(MedinillaOcppDbContext context) : BaseUnitOfWork(context)
 {
     private IRepository<Transaction> _transactionRepository = new GenericRepository<Transaction>(context);
 
@@ -16,7 +15,7 @@ public sealed class TransactionsUnitOfWork(MedinillaOcppDbContext context)
     public async Task<Transaction?> TryGetLatestTransaction(string transactionId)
     {
         var relatedTransactions = await _transactionRepository.Filter(x => x.TransactionId == transactionId);
-        return await relatedTransactions.OrderByDescending(x => x.SeqNo).FirstOrDefaultAsync();
+        return await Task.FromResult(relatedTransactions.OrderByDescending(x => x.SeqNo).FirstOrDefault());
     }
 
     public async Task<int[]> TryGetMissingTransactions(string transactionId)
@@ -24,7 +23,7 @@ public sealed class TransactionsUnitOfWork(MedinillaOcppDbContext context)
         var retval = new List<int>();
 
         var relatedTransactions = await _transactionRepository.Filter(x => x.TransactionId == transactionId);
-        var seqNos = await relatedTransactions.Select(x => x.SeqNo).OrderBy(x => x).ToListAsync();
+        var seqNos = await Task.FromResult(relatedTransactions.Select(x => x.SeqNo).OrderBy(x => x).ToList());
 
         // this might be a little bit too much but it's the best I can do right now :(
         for (var i = 0; i < seqNos.Count; i++)
@@ -40,10 +39,5 @@ public sealed class TransactionsUnitOfWork(MedinillaOcppDbContext context)
         }
 
         return [.. retval];
-    }
-
-    public async Task Save()
-    {
-        await context.SaveChangesAsync();
     }
 }

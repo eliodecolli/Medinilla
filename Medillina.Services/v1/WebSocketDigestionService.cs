@@ -1,16 +1,14 @@
 ﻿using Medinilla.DataTypes.WAMP;
 using Medinilla.Services.Interfaces;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Net.WebSockets;
 using System.Text;
 
 namespace Medinilla.Services.v1;
 
-public class WebSocketDigestionService(IOcppCallRouter callRouter, ILogger<WebSocketDigestionService> logger) : IBasicWebSocketDigestionService
+public class WebSocketDigestionService(IServiceProvider serviceProvider, ILogger<WebSocketDigestionService> _logger) : IBasicWebSocketDigestionService
 {
-    private readonly IOcppCallRouter _callRouter = callRouter;
-    private readonly ILogger<WebSocketDigestionService> _logger = logger;
-
     private WebSocket _webSocket;
     private string _clientIndentifier;
 
@@ -44,6 +42,14 @@ public class WebSocketDigestionService(IOcppCallRouter callRouter, ILogger<WebSo
         }
     }
 
+    private IOcppCallRouter GetCallRouter()
+    {
+        // we need to make sure that we initialize a new router for every message, to avoid triggering the DbContext :(
+        var scope = serviceProvider.CreateScope();
+        return scope.ServiceProvider.GetService<IOcppCallRouter>()!;
+    }
+
+
     public async Task Consume(WebSocket webSocket, string clientIdentifier)
     {
         _webSocket = webSocket;
@@ -63,7 +69,9 @@ public class WebSocketDigestionService(IOcppCallRouter callRouter, ILogger<WebSo
             {
                 var received = buffer.Take(result.Count).ToArray();
 
-                var rpcResult = await _callRouter.RouteOcppCall(received, clientIdentifier);
+                var callRouter = GetCallRouter();
+                var rpcResult = await callRouter!.RouteOcppCall(received, clientIdentifier);
+
                 if(rpcResult.Error is not null)
                 {
                     if (_currentCall != rpcResult.Error.MessageId)

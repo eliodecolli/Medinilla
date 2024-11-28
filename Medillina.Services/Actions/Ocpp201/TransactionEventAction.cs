@@ -11,7 +11,6 @@ namespace Medinilla.Services.Actions.Ocpp201;
 public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logger, TransactionsUnitOfWork unitOfWork)
     : IOcppAction
 {
-
     public string ActionName => "TransactionEvent";
 
     private DbTransaction MapOcppTransaction(TransactionEventRequest request)
@@ -33,7 +32,7 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
         switch(request.EventType)
         {
             case TransactionEventEnum.Updated:
-                _logger.LogInformation($"{clientIdentifier}: Received transaction update status.");
+                _logger.LogInformation($"{clientIdentifier}: Received transaction update status. Id={request.TransactionInfo.TransactionId} SeqNo={request.SeqNo}");
                 break;
             case TransactionEventEnum.Started:
                 _logger.LogInformation($"{clientIdentifier} started a new transaction. Reason: {request.TriggerReason}");
@@ -48,17 +47,29 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
 
         // check whether we have any missing transactions
         var latest = await unitOfWork.TryGetLatestTransaction(request.TransactionInfo.TransactionId);
-        if (latest is not null && latest.SeqNo + 1 != request.SeqNo)
+        if (latest is not null)
         {
-            _logger.LogWarning($"{clientIdentifier}: Transaction {request.TransactionInfo.TransactionId} - Missing transaction update event. Latest SeqNo: {latest.SeqNo} Current SeqNo: {request.SeqNo}");
-
-            /// TODO: Schedule a get transaction report or something
+            var diff = request.SeqNo - latest.SeqNo;
+            if (diff > 1)
+            {
+                _logger.LogWarning($"{clientIdentifier}: Transaction {request.TransactionInfo.TransactionId} - Missing transaction update event. Latest SeqNo: {latest.SeqNo} Current SeqNo: {request.SeqNo}");
+                /// TODO: Schedule a get transaction report or something
+            }
+            else if (diff == 0)
+            {
+                _logger.LogWarning($"{clientIdentifier}: Transaction {request.TransactionInfo.TransactionId} repeated SeqNo={request.SeqNo}");
+                unitOfWork.Discard();
+            }
         }
 
         if (request.EventType == TransactionEventEnum.Ended)
         {
             // generate a snapshot of the transaction here
+            // calculate the total costs
+            // send it back to the charging station
         }
+
+        await unitOfWork.Save();
 
         var response = new TransactionEventResponse();
         return new RpcResult()

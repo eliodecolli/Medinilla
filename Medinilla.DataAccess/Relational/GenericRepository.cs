@@ -1,5 +1,4 @@
 ﻿using Medinilla.DataAccess.Interfaces;
-using Microsoft.EntityFrameworkCore;
 
 namespace Medinilla.DataAccess.Relational
 {
@@ -12,9 +11,9 @@ namespace Medinilla.DataAccess.Relational
             return result.Entity;
         }
 
-        public async Task<bool> DeleteMany(Predicate<T> predicate)
+        public async Task<bool> DeleteMany(Func<T, bool> predicate)
         {
-            var items = context.Set<T>().Where(e => predicate(e));
+            var items = context.Set<T>().Where(predicate);
             if(!items.Any())
             {
                 return await Task.FromResult(false);
@@ -25,9 +24,9 @@ namespace Medinilla.DataAccess.Relational
             return await Task.FromResult(true);
         }
 
-        public async Task<bool> DeleteOne(Predicate<T> predicate)
+        public async Task<bool> DeleteOne(Func<T, bool> predicate)
         {
-            var item = context.Set<T>().First(e => predicate(e));
+            var item = context.Set<T>().First(predicate);
             if (item is null)
             {
                 return await Task.FromResult(false);
@@ -37,14 +36,14 @@ namespace Medinilla.DataAccess.Relational
             return await Task.FromResult(true);
         }
 
-        public async Task<IQueryable<T>> Filter(Predicate<T> predicate)
+        public async Task<IEnumerable<T>> Filter(Func<T, bool> predicate)
         {
-            return await Task.FromResult(context.Set<T>().Where(e => predicate(e)));
+            return await Task.FromResult(context.Set<T>().Where(predicate));
         }
 
-        public async Task<T> Get(Predicate<T> predicate)
+        public async Task<T?> Get(params object[] keyValues)
         {
-            return await context.Set<T>().FirstAsync(e => predicate(e));
+            return await context.Set<T>().FindAsync(keyValues);
         }
     }
 }
