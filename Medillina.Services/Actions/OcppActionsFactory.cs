@@ -15,7 +15,6 @@ public class OcppActionsFactory : IOcppActionsFactory
         foreach(var action in registeredActions)
         {
             _registry.Add(action.ActionName, action);
-            _logger.LogInformation("Registered action {0}", action.ActionName);
         }
     }
 

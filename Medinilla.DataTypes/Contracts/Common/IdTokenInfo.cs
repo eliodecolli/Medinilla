@@ -25,7 +25,7 @@ public sealed class IdTokenInfo
     /// <summary>
     /// Only used when the IdToken is only valid for one or more specific EVSEs, not for the entire Charging Station.
     /// </summary>
-    public int? EvseId { get; set; }
+    public int[]? EvseId { get; set; }
 
     /// <summary>
     /// Second preferred user interface language of identifier user.Don’t use when language1 is omitted, has to be different from language1.

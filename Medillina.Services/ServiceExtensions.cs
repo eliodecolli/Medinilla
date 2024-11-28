@@ -14,14 +14,14 @@ public static class ServiceExtensions
         services.AddScoped<IOcppAction, HeartbeatAction>();
         services.AddScoped<IOcppAction, SecurityEventNotificationAction>();
         services.AddScoped<IOcppAction, AuthorizeAction>();
+        services.AddScoped<IOcppAction, TransactionEventAction>();
         //...add more
     }
 
     public static void AddMedinillaServices(this IServiceCollection serviceCollection)
     {
-        serviceCollection.AddSingleton<IMedinillaAuthentication, MedinillaAuthentication>();
         serviceCollection.AddSingleton<IWSDigestionServiceCollection, WSDigestionServiceCollection>();
-        serviceCollection.AddScoped<IOcppActionsFactory, OcppActionsFactory>();
+        serviceCollection.AddTransient<IOcppActionsFactory, OcppActionsFactory>();
         serviceCollection.AddScoped<IOcppCallRouter, OcppCallRouter>();
         serviceCollection.AddScoped<IBasicWebSocketDigestionService, WebSocketDigestionService>();
         serviceCollection.AddScoped<IOcppMessageParser, OcppMessageParser>();
