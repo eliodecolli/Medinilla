@@ -16,7 +16,7 @@ public sealed class BootNotificationAction(ChargingStationUnitOfWork unitOfWork,
     {
         return new CS()
         {
-            Id = clientIdentifier,
+            ClientIdentifier = clientIdentifier,
             Model = request.ChargingStation.Model,
             Vendor = request.ChargingStation.VendorName,
             LatestBootNotificationReason = Enum.GetName(request.Reason)!

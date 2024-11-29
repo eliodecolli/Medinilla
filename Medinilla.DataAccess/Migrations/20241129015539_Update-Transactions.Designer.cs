@@ -3,6 +3,7 @@ using System;
 using Medinilla.DataAccess.Relational;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,16 +12,15 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Medinilla.DataAccess.Migrations
 {
     [DbContext(typeof(MedinillaOcppDbContext))]
-    partial class MedinillaOcppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20241129015539_Update-Transactions")]
+    partial class UpdateTransactions
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
                 .HasAnnotation("ProductVersion", "9.0.0")
-                .HasAnnotation("Proxies:ChangeTracking", false)
-                .HasAnnotation("Proxies:CheckEquality", false)
-                .HasAnnotation("Proxies:LazyLoading", true)
                 .HasAnnotation("Relational:MaxIdentifierLength", 63);
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
@@ -143,10 +143,6 @@ namespace Medinilla.DataAccess.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("TriggerReason")
-                        .IsRequired()
-                        .HasColumnType("text");
-
                     b.Property<string>("UnitName")
                         .IsRequired()
                         .HasColumnType("text");
@@ -169,19 +165,11 @@ namespace Medinilla.DataAccess.Migrations
                     b.Property<Guid>("ChargingStationId")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("EndReason")
-                        .IsRequired()
-                        .HasColumnType("text");
-
                     b.Property<DateTime>("EndedAt")
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid?>("EvseConnectorId")
                         .HasColumnType("uuid");
-
-                    b.Property<string>("StartReason")
-                        .IsRequired()
-                        .HasColumnType("text");
 
                     b.Property<DateTime>("StartedAt")
                         .HasColumnType("timestamp with time zone");

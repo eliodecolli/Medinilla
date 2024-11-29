@@ -3,7 +3,6 @@ using Medinilla.Services.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Net.WebSockets;
-using System.Text;
 
 namespace Medinilla.Services.v1;
 
@@ -57,7 +56,7 @@ public class WebSocketDigestionService(IServiceProvider serviceProvider, ILogger
         
         while(true) {
             var buffer = new ArraySegment<byte>(new byte[1024]);
-            var result = await webSocket.ReceiveAsync(buffer, CancellationToken.None).ConfigureAwait(false);
+            var result = await webSocket.ReceiveAsync(buffer, CancellationToken.None);
             if (result.CloseStatus.HasValue)
             {
                 _logger.LogWarning("WS connection for {0} has been closed. {1}:{2}",
@@ -76,8 +75,7 @@ public class WebSocketDigestionService(IServiceProvider serviceProvider, ILogger
                 {
                     if (_currentCall != rpcResult.Error.MessageId)
                     {
-                        await webSocket.SendAsync(rpcResult.Error.ToByteArray(), WebSocketMessageType.Text, true, CancellationToken.None)
-                            .ConfigureAwait(false);
+                        await webSocket.SendAsync(rpcResult.Error.ToByteArray(), WebSocketMessageType.Text, true, CancellationToken.None);
 
                         _logger.LogError("Error while handling message {0}: {1} - {2}",
                             rpcResult.Error.MessageId, rpcResult.Error.ErrorCode, rpcResult.Error.ErrorDescription);
@@ -93,8 +91,7 @@ public class WebSocketDigestionService(IServiceProvider serviceProvider, ILogger
                 {
                     if(_currentCall != rpcResult.Result.MessageId)
                     {
-                        await webSocket.SendAsync(rpcResult.Result.ToByteArray(), WebSocketMessageType.Text, true, CancellationToken.None)
-                            .ConfigureAwait(false);
+                        await webSocket.SendAsync(rpcResult.Result.ToByteArray(), WebSocketMessageType.Text, true, CancellationToken.None);
                     }
                     else
                     {

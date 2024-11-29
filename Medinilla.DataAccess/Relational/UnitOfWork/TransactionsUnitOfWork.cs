@@ -3,16 +3,17 @@ using Medinilla.DataAccess.Relational.Models;
 
 namespace Medinilla.DataAccess.Relational.UnitOfWork;
 
-public sealed class TransactionsUnitOfWork(MedinillaOcppDbContext context) : BaseUnitOfWork(context)
+public sealed class TransactionsUnitOfWork(MedinillaOcppDbContext context)
 {
-    private IRepository<Transaction> _transactionRepository = new GenericRepository<Transaction>(context);
+    private IRepository<TransactionEvent> _transactionRepository = new GenericRepository<TransactionEvent>(context);
+    private IRepository<TransactionSnapshot> _snapshotRepository = new GenericRepository<TransactionSnapshot>(context);
 
-    public async Task RegisterTransaction(Transaction transaction)
+    public async Task RegisterTransaction(TransactionEvent transaction)
     {
         await _transactionRepository.Create(transaction);
     }
 
-    public async Task<Transaction?> TryGetLatestTransaction(string transactionId)
+    public async Task<TransactionEvent?> TryGetLatestTransaction(string transactionId)
     {
         var relatedTransactions = await _transactionRepository.Filter(x => x.TransactionId == transactionId);
         return await Task.FromResult(relatedTransactions.OrderByDescending(x => x.SeqNo).FirstOrDefault());
@@ -39,5 +40,10 @@ public sealed class TransactionsUnitOfWork(MedinillaOcppDbContext context) : Bas
         }
 
         return [.. retval];
+    }
+
+    public async Task<TransactionSnapshot> RegisterFinalSnapshot(TransactionSnapshot snapshot)
+    {
+        return await _snapshotRepository.Create(snapshot);
     }
 }

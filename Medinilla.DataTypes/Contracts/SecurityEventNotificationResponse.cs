@@ -5,5 +5,5 @@ namespace Medinilla.DataTypes.Contracts;
 public sealed class SecurityEventNotificationResponse
 {
 
-    public CustomDataType CustomData { get; set; }
+    public CustomData CustomData { get; set; }
 }

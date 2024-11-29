@@ -32,7 +32,7 @@ public class TransactionEventRequest
     /// Indication that this transaction event happened when the Charging Station was offline. 
     /// Default = false, meaning: the event occurred when the Charging Station was online
     /// </summary>
-    public bool Offline { get; set; }
+    public bool? Offline { get; set; }
 
     /// <summary>
     /// If the Charging Station is able to report the number of phases used, then it SHALL provide it. 
