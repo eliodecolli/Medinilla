@@ -23,21 +23,31 @@ public class WebSocketDigestionService(IServiceProvider serviceProvider, ILogger
         return !string.IsNullOrEmpty(_currentCall);
     }
 
-    public async Task Send(OcppCallRequest request)
+    public async Task<WSDigestionServiceCallResult> Send(OcppCallRequest request)
     {
         if(!IsServiceBusy())
         {
-            var data = request.ToBytes();
+            try
+            {
+                var data = request.ToBytes();
 
-            await _webSocket.SendAsync(data, WebSocketMessageType.Text, true, CancellationToken.None)
-                .ConfigureAwait(false);
-            _logger.LogInformation("Sent {0} bytes to {1}", data.Length, _clientIndentifier);
+                await _webSocket.SendAsync(data, WebSocketMessageType.Text, true, CancellationToken.None)
+                    .ConfigureAwait(false);
+                _logger.LogInformation("Sent {0} bytes to {1}", data.Length, _clientIndentifier);
 
-            SetCurrentCall(request.MessageId);
+                SetCurrentCall(request.MessageId);
+                return WSDigestionServiceCallResult.Success;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError("Unable to send OCPP Call Request. Exception: " + ex);
+                return WSDigestionServiceCallResult.Fail;
+            }
         }
         else
         {
             _logger.LogWarning("Trying to send a message to {0} but there's a pending request waiting for a response.", _clientIndentifier);
+            return WSDigestionServiceCallResult.ServiceBusy;
         }
     }
 
@@ -47,7 +57,6 @@ public class WebSocketDigestionService(IServiceProvider serviceProvider, ILogger
         var scope = serviceProvider.CreateScope();
         return scope.ServiceProvider.GetService<IOcppCallRouter>()!;
     }
-
 
     public async Task Consume(WebSocket webSocket, string clientIdentifier)
     {

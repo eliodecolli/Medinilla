@@ -16,11 +16,11 @@ public class ChargingStation
 
     public DateTime? ModifiedAt { get; set; }
 
-    public virtual ICollection<EvseConnector>? EvseConnectors { get; set; }
+    public virtual ICollection<EvseConnector> EvseConnectors { get; set; }
 
-    public virtual ICollection<TransactionEvent>? TransactionEvents { get; set; }
+    public virtual ICollection<TransactionEvent> TransactionEvents { get; set; }
 
-    public virtual ICollection<TransactionSnapshot>? TransactionSnapshots { get; set; }
+    public virtual ICollection<TransactionSnapshot> TransactionSnapshots { get; set; }
 
     public virtual ICollection<Tariff>? Tariffs { get; set; }
 }

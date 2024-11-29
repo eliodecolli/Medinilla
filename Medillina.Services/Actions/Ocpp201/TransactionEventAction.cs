@@ -47,7 +47,7 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
         decimal total = 0.0M;
         foreach (var meter in meters)
         {
-            total += meter.SampledValue.Select(m => m.Value * (decimal)Math.Pow(m.UnitOfMeasure.Multiplier, 10)).Sum();
+            total += meter.SampledValue.Select(m => m.Value * (decimal)Math.Pow(10, m.UnitOfMeasure.Multiplier)).Sum();
         }
         return total;
     }
@@ -104,12 +104,14 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
         }
         else
         {
+            var response = new TransactionEventResponse();
+
             var transaction = MapOcppTransaction(chargingStation, request);
-            await unitOfWork.TransactionsSubUnit.RegisterTransaction(transaction);
+            chargingStation.TransactionEvents.Add(transaction);
 
             // check whether we have any missing transactions
-            var currentTransactions = chargingStation.TransactionEvents is not null ? chargingStation.TransactionEvents.Where(t => t.TransactionId == request.TransactionInfo.TransactionId) : [];
-
+            var currentTransactions = chargingStation.TransactionEvents is not null ? chargingStation.TransactionEvents.Where(t => t.TransactionId == request.TransactionInfo.TransactionId &&
+                                                                                                                                   t.SeqNo != request.SeqNo).OrderBy(t => t.Timestamp).AsEnumerable() : [];
             var latest = currentTransactions.LastOrDefault();
             if (latest is not null)
             {
@@ -122,7 +124,7 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
                 else if (diff == 0)
                 {
                     _logger.LogWarning($"{clientIdentifier}: Transaction {request.TransactionInfo.TransactionId} repeated SeqNo={request.SeqNo}");
-                    //await unitOfWork.Discard();
+                    await unitOfWork.Discard();
                 }
             }
 
@@ -151,12 +153,12 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
                     EndReason = Enum.GetName(request.TriggerReason) ?? "UNKNOWN",
                 };
 
-                await unitOfWork.TransactionsSubUnit.RegisterFinalSnapshot(snapshot);
+                response.TotalCost = snapshot.TotalCost;
+                chargingStation.TransactionSnapshots.Add(snapshot);
             }
 
             await unitOfWork.Save();
 
-            var response = new TransactionEventResponse();
             return new RpcResult()
             {
                 Result = call.CreateResult(response),
