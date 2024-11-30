@@ -86,6 +86,35 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
         };
     }
 
+    private decimal GenerateTransactionSnapshot(DbChargingStation cs, IEnumerable<TransactionEvent> currentTransactions, DbTransaction tx, TransactionEventRequest request)
+    {
+        // generate a snapshot of the transaction here
+        // calculate the total costs
+        // send it back to the charging station
+        var totalValueMetered = currentTransactions.Select(c => c.MeteredValue).Sum();
+        var unit = currentTransactions.Where(t => !string.IsNullOrEmpty(t.UnitName)).FirstOrDefault()?.UnitName ?? "";
+
+        var connector = cs.EvseConnectors?.Where(c => c.ConnectorId == (request.Evse?.ConnectorId ?? 1) && c.EvseId == (request.Evse?.Id ?? 1)).FirstOrDefault();
+
+        var snapshot = new TransactionSnapshot()
+        {
+            ChargingStationId = cs.Id,
+            StartedAt = currentTransactions.FirstOrDefault()?.Timestamp ?? tx.Timestamp,
+            EndedAt = tx.Timestamp,
+            TotalMeteredValue = totalValueMetered,
+            TotalCost = CalculateTotalCosts(totalValueMetered, cs, unit),
+            TokenId = request.IdToken?.Token ?? "",
+            EvseConnectorId = connector?.Id ?? null,
+            TransactionId = request.TransactionInfo.TransactionId,
+            Unit = unit,
+            StartReason = currentTransactions.FirstOrDefault()?.TriggerReason ?? "UNKNOWN",
+            EndReason = Enum.GetName(request.TriggerReason) ?? "UNKNOWN",
+        };
+
+        cs.TransactionSnapshots.Add(snapshot);
+        return snapshot.TotalCost;
+    }
+
     public async Task<RpcResult> Execute(OcppCallRequest call, string clientIdentifier)
     {
         var request = call.As<TransactionEventRequest>();
@@ -176,31 +205,7 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
                             };
                         }
 
-                        // generate a snapshot of the transaction here
-                        // calculate the total costs
-                        // send it back to the charging station
-                        var totalValueMetered = currentTransactions.Select(c => c.MeteredValue).Sum() + CalculateTotalMeteredValue(request.MeterValue);
-                        var unit = currentTransactions.Where(t => !string.IsNullOrEmpty(t.UnitName)).FirstOrDefault()?.UnitName ?? "";
-
-                        var connector = chargingStation.EvseConnectors?.Where(c => c.ConnectorId == (request.Evse?.ConnectorId ?? 1) && c.EvseId == (request.Evse?.Id ?? 1)).FirstOrDefault();
-
-                        var snapshot = new TransactionSnapshot()
-                        {
-                            ChargingStationId = chargingStation.Id,
-                            StartedAt = currentTransactions.FirstOrDefault()?.Timestamp ?? transaction.Timestamp,
-                            EndedAt = transaction.Timestamp,
-                            TotalMeteredValue = totalValueMetered,
-                            TotalCost = CalculateTotalCosts(totalValueMetered, chargingStation, unit),
-                            TokenId = request.IdToken?.Token ?? "",
-                            EvseConnectorId = connector?.Id ?? null,
-                            TransactionId = request.TransactionInfo.TransactionId,
-                            Unit = unit,
-                            StartReason = currentTransactions.FirstOrDefault()?.TriggerReason ?? "UNKNOWN",
-                            EndReason = Enum.GetName(request.TriggerReason) ?? "UNKNOWN",
-                        };
-
-                        response.TotalCost = snapshot.TotalCost;
-                        chargingStation.TransactionSnapshots.Add(snapshot);
+                        response.TotalCost = GenerateTransactionSnapshot(chargingStation, currentTransactions, transaction, request);
                     }
 
                     await unitOfWork.Save();

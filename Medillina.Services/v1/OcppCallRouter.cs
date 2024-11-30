@@ -1,4 +1,5 @@
 ﻿using Medinilla.DataTypes.WAMP;
+using Medinilla.Infrastructure.Tokenizer;
 using Medinilla.Services.Actions;
 using Medinilla.Services.Interfaces;
 using Microsoft.Extensions.Logging;
@@ -10,13 +11,11 @@ public class OcppCallRouter : IOcppCallRouter
 {
     private readonly ILogger<OcppCallRouter> _logger;
     private readonly IOcppActionsFactory _actionsFactory;
-    private readonly IOcppMessageParser _parser;
 
-    public OcppCallRouter(ILogger<OcppCallRouter> logger, IOcppActionsFactory actionsFactory, IOcppMessageParser parser)
+    public OcppCallRouter(ILogger<OcppCallRouter> logger, IOcppActionsFactory actionsFactory)
     {
         _logger = logger;
         _actionsFactory = actionsFactory;
-        _parser = parser;
     }
 
     public async Task<RpcResult> RouteOcppCall(byte[] buffer, string? clientIdentifier)
@@ -27,12 +26,14 @@ public class OcppCallRouter : IOcppCallRouter
         }
 
         var messageString = Encoding.UTF8.GetString(buffer);
-        _parser.LoadRaw(messageString);
 
-        switch (_parser.GetMessageType())
+        var parser = new OcppMessageParser();
+        parser.LoadRaw(messageString);
+
+        switch (parser.GetMessageType())
         {
             case OcppJMessageType.CALL:
-                var ocppCall = _parser.ParseCall();
+                var ocppCall = parser.ParseCall();
 #if DEBUG
                 var salt = new Random().Next().ToString("X");
                 if (!Directory.Exists("logs"))
@@ -62,21 +63,21 @@ public class OcppCallRouter : IOcppCallRouter
             case OcppJMessageType.CALL_RESULT:
                 return new RpcResult()
                 {
-                    Result = _parser.ParseResult(),
+                    Result = parser.ParseResult(),
                     Error = null
                 };
 
             case OcppJMessageType.CALL_ERROR:
                 return new RpcResult()
                 {
-                    Error = _parser.ParseError(),
+                    Error = parser.ParseError(),
                     Result = null
                 };
 
             default:
                 return new RpcResult()
                 {
-                    Error = new OcppCallError(_parser.TryExtractMessageId() ?? "Unknown", OcppCallError.ErrorCodes.MessageTypeNotSupported, ""),
+                    Error = new OcppCallError(parser.TryExtractMessageId() ?? "Unknown", OcppCallError.ErrorCodes.MessageTypeNotSupported, ""),
                     Result = null
                 };
         }

@@ -1,4 +1,5 @@
-﻿using Medinilla.DataTypes.WAMP;
+﻿using Medinilla.DataTypes.Core;
+using Medinilla.DataTypes.WAMP;
 using Medinilla.Services.v1;
 using System.Net.WebSockets;
 
@@ -8,5 +9,5 @@ public interface IBasicWebSocketDigestionService
 {
     Task Consume(WebSocket webSocket, string clientIdentifier);
 
-    Task<WSDigestionServiceCallResult> Send(OcppCallRequest request);
+    Task<WebSocketResponse> Send(OcppCallRequest request);
 }
