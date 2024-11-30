@@ -24,5 +24,7 @@ public class TransactionEvent
 
     public string TriggerReason { get; set; }
 
+    public string EventType { get; set; }
+
     public virtual ChargingStation ChargingStation { get; set; }
 }

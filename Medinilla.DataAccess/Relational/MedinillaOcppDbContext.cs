@@ -29,6 +29,8 @@ public class MedinillaOcppDbContext(IConfiguration config) : DbContext
 
         // configure indecies
         modelBuilder.Entity<TransactionEvent>().HasIndex(c => c.TransactionId);
+        modelBuilder.Entity<TransactionEvent>().HasIndex(c => c.SeqNo);
+        modelBuilder.Entity<TransactionEvent>().HasIndex(c => c.EventType);
         modelBuilder.Entity<ChargingStation>().HasIndex(c => c.ClientIdentifier);
 
         // configure charging station

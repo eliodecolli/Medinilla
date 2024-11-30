@@ -13,6 +13,16 @@ namespace Medinilla.Services.Actions.Ocpp201;
 public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logger, ChargingStationUnitOfWork unitOfWork)
     : IOcppAction
 {
+    // quick access
+    private sealed class EventTypes
+    {
+        public static string Start = Enum.GetName(TransactionEventEnum.Started) ?? "Started";
+
+        public static string End = Enum.GetName(TransactionEventEnum.Ended) ?? "Ended";
+
+        public static string Update = Enum.GetName(TransactionEventEnum.Updated) ?? "Updated";
+    }
+
     public string ActionName => "TransactionEvent";
 
     private string TryGetUnit(IEnumerable<MeterValue>? meters)
@@ -71,7 +81,8 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
             ChargingStationId = cs.Id,
             MeteredValue = CalculateTotalMeteredValue(request.MeterValue),
             UnitName = TryGetUnit(request.MeterValue),
-            TriggerReason = Enum.GetName(request.TriggerReason) ?? "UNKNOWN"
+            TriggerReason = Enum.GetName(request.TriggerReason) ?? "UNKNOWN",
+            EventType = Enum.GetName(request.EventType) ?? "UNKNOWN"
         };
     }
 
@@ -80,9 +91,6 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
         var request = call.As<TransactionEventRequest>();
         switch(request.EventType)
         {
-            //case TransactionEventEnum.Updated:
-            //    _logger.LogInformation($"{clientIdentifier}: Received transaction update status. Id={request.TransactionInfo.TransactionId} SeqNo={request.SeqNo}");
-            //    break;
             case TransactionEventEnum.Started:
                 _logger.LogInformation($"{clientIdentifier} started a new transaction. Reason: {request.TriggerReason}");
                 break;
@@ -107,63 +115,103 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
             var response = new TransactionEventResponse();
 
             var transaction = MapOcppTransaction(chargingStation, request);
-            chargingStation.TransactionEvents.Add(transaction);
-
-            // check whether we have any missing transactions
-            var currentTransactions = chargingStation.TransactionEvents is not null ? chargingStation.TransactionEvents.Where(t => t.TransactionId == request.TransactionInfo.TransactionId &&
-                                                                                                                                   t.SeqNo != request.SeqNo).OrderBy(t => t.Timestamp).AsEnumerable() : [];
-            var latest = currentTransactions.LastOrDefault();
-            if (latest is not null)
+            if (transaction is null)
             {
-                var diff = request.SeqNo - latest.SeqNo;
-                if (diff > 1)
+                _logger.LogError($"{clientIdentifier}: Could not map incoming request: {call.Payload} to relational transaction type.");
+                return new RpcResult()
                 {
-                    _logger.LogWarning($"{clientIdentifier}: Transaction {request.TransactionInfo.TransactionId} - Missing transaction update event. Latest SeqNo: {latest.SeqNo} Current SeqNo: {request.SeqNo}");
-                    /// TODO: Schedule a get transaction report or something
-                }
-                else if (diff == 0)
-                {
-                    _logger.LogWarning($"{clientIdentifier}: Transaction {request.TransactionInfo.TransactionId} repeated SeqNo={request.SeqNo}");
-                    await unitOfWork.Discard();
-                }
-            }
-
-            if (request.EventType == TransactionEventEnum.Ended)
-            {
-                // generate a snapshot of the transaction here
-                // calculate the total costs
-                // send it back to the charging station
-                var totalValueMetered = currentTransactions.Select(c => c.MeteredValue).Sum() + CalculateTotalMeteredValue(request.MeterValue);
-                var unit = currentTransactions.Where(t => !string.IsNullOrEmpty(t.UnitName)).FirstOrDefault()?.UnitName ?? "";
-
-                var connector = chargingStation.EvseConnectors?.Where(c => c.ConnectorId == (request.Evse?.ConnectorId ?? 1) && c.EvseId == (request.Evse?.Id ?? 1)).FirstOrDefault();
-                
-                var snapshot = new TransactionSnapshot()
-                {
-                    ChargingStationId = chargingStation.Id,
-                    StartedAt = currentTransactions.FirstOrDefault()?.Timestamp ?? transaction.Timestamp,
-                    EndedAt = transaction.Timestamp,
-                    TotalMeteredValue = totalValueMetered,
-                    TotalCost = CalculateTotalCosts(totalValueMetered, chargingStation, unit),
-                    TokenId = request.IdToken?.Token ?? "",
-                    EvseConnectorId = connector?.Id ?? null,
-                    TransactionId = request.TransactionInfo.TransactionId,
-                    Unit = unit,
-                    StartReason = currentTransactions.FirstOrDefault()?.TriggerReason ?? "UNKNOWN",
-                    EndReason = Enum.GetName(request.TriggerReason) ?? "UNKNOWN",
+                    Error = OcppCallError.InternalError,
                 };
-
-                response.TotalCost = snapshot.TotalCost;
-                chargingStation.TransactionSnapshots.Add(snapshot);
             }
-
-            await unitOfWork.Save();
-
-            return new RpcResult()
+            else
             {
-                Result = call.CreateResult(response),
-                ReturnToCS = true
-            };
+                var currentTransactions = chargingStation.TransactionEvents is not null ? chargingStation.TransactionEvents
+                    .Where(t => t.TransactionId == request.TransactionInfo.TransactionId)
+                    .OrderBy(t => t.SeqNo).AsEnumerable() : [];
+
+                if (currentTransactions.Any(c => (c.SeqNo == request.SeqNo)))
+                {
+                    _logger.LogWarning($"{clientIdentifier}: Transaction {request.TransactionInfo.TransactionId} trying to send a duplicate of an old SeqNo={request.SeqNo}");
+
+                    return new RpcResult()
+                    {
+                        Error = call.CreateErrorResult<TransactionEventResponse>(OcppCallError.ErrorCodes.PropertyConstraintViolation, $"Duplicate SeqNo='{request.SeqNo}' is not allowed.")
+                    };
+                }
+                else if(currentTransactions.Any(c => (c.EventType != EventTypes.Update) && c.EventType == Enum.GetName(request.EventType)))
+                {
+                    _logger.LogWarning($"{clientIdentifier}: Transaction {request.TransactionInfo.TransactionId} is trying to send a duplicate event of type EventType='{Enum.GetName(request.EventType) ?? "<UNKNOWN>"}'.");
+                    return new RpcResult()
+                    {
+                        Error = call.CreateErrorResult<TransactionEventResponse>(OcppCallError.ErrorCodes.OccurrenceConstraintViolation, $"Duplicate EventType='{Enum.GetName(request.EventType) ?? "<UNKNOWN>"}' is not allowed.")
+                    };
+                }
+                else
+                {
+                    chargingStation.TransactionEvents.Add(transaction);
+
+                    ////////////////////////////////////////////////
+                    /// Don't do this right now.
+                    /// 
+                    // do we really wanna check this?
+                    // my fear is that it might grow out exponentially once the system scales up a lot
+                    //var missingTransactions = await unitOfWork.TransactionsSubUnit.TryGetMissingTransactionsForIncomingEvent(currentTransactions, request.SeqNo);
+                    //if (missingTransactions.Length > 0)
+                    //{
+                    //    _logger.LogWarning($"{clientIdentifier}: Transaction {request.TransactionInfo.TransactionId} - Missing transaction(s) update event for {string.Join(";", missingTransactions.Select(x => "SeqNo=" + x))} Current SeqNo: {request.SeqNo}");
+                    //    // TODO: Schedule a get transaction report or something
+                    //}
+                    /////////////////////////////////////////////////
+                    
+                    if (request.EventType == TransactionEventEnum.Ended)
+                    {
+                        // first check for sanity
+                        if (currentTransactions.LastOrDefault()?.SeqNo > request.SeqNo)
+                        {
+                            // the END event cannot have a smaller SeqNo than the rest of them
+                            await unitOfWork.Discard();
+                            return new RpcResult()
+                            {
+                                Error = call.CreateErrorResult<TransactionEventResponse>(OcppCallError.ErrorCodes.OccurrenceConstraintViolation, $"Transaction {request.TransactionInfo.TransactionId} with EventType='Ended' must have greatest SeqNo than its previous siblings.")
+                            };
+                        }
+
+                        // generate a snapshot of the transaction here
+                        // calculate the total costs
+                        // send it back to the charging station
+                        var totalValueMetered = currentTransactions.Select(c => c.MeteredValue).Sum() + CalculateTotalMeteredValue(request.MeterValue);
+                        var unit = currentTransactions.Where(t => !string.IsNullOrEmpty(t.UnitName)).FirstOrDefault()?.UnitName ?? "";
+
+                        var connector = chargingStation.EvseConnectors?.Where(c => c.ConnectorId == (request.Evse?.ConnectorId ?? 1) && c.EvseId == (request.Evse?.Id ?? 1)).FirstOrDefault();
+
+                        var snapshot = new TransactionSnapshot()
+                        {
+                            ChargingStationId = chargingStation.Id,
+                            StartedAt = currentTransactions.FirstOrDefault()?.Timestamp ?? transaction.Timestamp,
+                            EndedAt = transaction.Timestamp,
+                            TotalMeteredValue = totalValueMetered,
+                            TotalCost = CalculateTotalCosts(totalValueMetered, chargingStation, unit),
+                            TokenId = request.IdToken?.Token ?? "",
+                            EvseConnectorId = connector?.Id ?? null,
+                            TransactionId = request.TransactionInfo.TransactionId,
+                            Unit = unit,
+                            StartReason = currentTransactions.FirstOrDefault()?.TriggerReason ?? "UNKNOWN",
+                            EndReason = Enum.GetName(request.TriggerReason) ?? "UNKNOWN",
+                        };
+
+                        response.TotalCost = snapshot.TotalCost;
+                        chargingStation.TransactionSnapshots.Add(snapshot);
+                    }
+
+                    await unitOfWork.Save();
+
+                    return new RpcResult()
+                    {
+                        Result = call.CreateResult(response),
+                        ReturnToCS = true
+                    };
+                }
+            }
         }
     }
 }
