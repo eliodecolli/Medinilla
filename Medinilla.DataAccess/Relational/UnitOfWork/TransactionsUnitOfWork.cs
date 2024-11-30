@@ -3,41 +3,45 @@ using Medinilla.DataAccess.Relational.Models;
 
 namespace Medinilla.DataAccess.Relational.UnitOfWork;
 
-public sealed class TransactionsUnitOfWork(MedinillaOcppDbContext context) : BaseUnitOfWork(context)
+public sealed class TransactionsUnitOfWork(MedinillaOcppDbContext context)
 {
-    private IRepository<Transaction> _transactionRepository = new GenericRepository<Transaction>(context);
+    private IRepository<TransactionEvent> _transactionRepository = new GenericRepository<TransactionEvent>(context);
+    private IRepository<TransactionSnapshot> _snapshotRepository = new GenericRepository<TransactionSnapshot>(context);
 
-    public async Task RegisterTransaction(Transaction transaction)
+    public async Task RegisterTransaction(TransactionEvent transaction)
     {
         await _transactionRepository.Create(transaction);
     }
 
-    public async Task<Transaction?> TryGetLatestTransaction(string transactionId)
+    public async Task<TransactionEvent?> TryGetLatestTransaction(string transactionId)
     {
         var relatedTransactions = await _transactionRepository.Filter(x => x.TransactionId == transactionId);
         return await Task.FromResult(relatedTransactions.OrderByDescending(x => x.SeqNo).FirstOrDefault());
     }
 
-    public async Task<int[]> TryGetMissingTransactions(string transactionId)
+    public async Task<int[]> TryGetMissingTransactionsForIncomingEvent(IEnumerable<TransactionEvent> relatedTransactions, int incomingSeqNo)
     {
-        var retval = new List<int>();
+        var retval = new HashSet<int>();
 
-        var relatedTransactions = await _transactionRepository.Filter(x => x.TransactionId == transactionId);
-        var seqNos = await Task.FromResult(relatedTransactions.Select(x => x.SeqNo).OrderBy(x => x).ToList());
+        var seqNos = await Task.FromResult(relatedTransactions.Select(x => x.SeqNo).ToList());
+        seqNos.Add(incomingSeqNo);
 
-        // this might be a little bit too much but it's the best I can do right now :(
-        for (var i = 0; i < seqNos.Count; i++)
+        var lastSeqNo = seqNos.OrderBy(x => x).LastOrDefault();
+
+        for (var i = 1; i <= lastSeqNo; i++)
         {
-            if (i + 1 < seqNos.Count && seqNos[i + 1] - seqNos[i] > 1)
+            if (!seqNos.Contains(i))
             {
-                var range = seqNos[i + 1] - seqNos[i];
-                for (var j = 1; j <= range; j++)
-                {
-                    retval.Add(seqNos[i] + j);
-                }
+                // yeah we're already past it
+                retval.Add(i);
             }
         }
 
         return [.. retval];
+    }
+
+    public async Task<TransactionSnapshot> RegisterFinalSnapshot(TransactionSnapshot snapshot)
+    {
+        return await _snapshotRepository.Create(snapshot);
     }
 }

@@ -3,6 +3,7 @@ using System;
 using Medinilla.DataAccess.Relational;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -11,9 +12,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Medinilla.DataAccess.Migrations
 {
     [DbContext(typeof(MedinillaOcppDbContext))]
-    partial class MedinillaOcppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20241129021725_Update-Transactions-AddReasons")]
+    partial class UpdateTransactionsAddReasons
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -124,10 +127,6 @@ namespace Medinilla.DataAccess.Migrations
                     b.Property<int?>("EVSEId")
                         .HasColumnType("integer");
 
-                    b.Property<string>("EventType")
-                        .IsRequired()
-                        .HasColumnType("text");
-
                     b.Property<string>("IdToken")
                         .HasColumnType("text");
 
@@ -158,10 +157,6 @@ namespace Medinilla.DataAccess.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("ChargingStationId");
-
-                    b.HasIndex("EventType");
-
-                    b.HasIndex("SeqNo");
 
                     b.HasIndex("TransactionId");
 

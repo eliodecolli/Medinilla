@@ -1,13 +1,10 @@
-﻿using Microsoft.EntityFrameworkCore;
-using System.ComponentModel.DataAnnotations.Schema;
+﻿namespace Medinilla.DataAccess.Relational.Models;
 
-namespace Medinilla.DataAccess.Relational.Models;
-
-[Table("charging_station")]
-[PrimaryKey("Id")]
-public sealed class ChargingStation
+public class ChargingStation
 {
-    public string Id { get; set; }
+    public Guid Id { get; set; }
+
+    public string ClientIdentifier { get; set; }
 
     public string Model {  get; set; }
 
@@ -18,4 +15,12 @@ public sealed class ChargingStation
     public DateTime CreatedAt {  get; set; }
 
     public DateTime? ModifiedAt { get; set; }
+
+    public virtual ICollection<EvseConnector> EvseConnectors { get; set; }
+
+    public virtual ICollection<TransactionEvent> TransactionEvents { get; set; }
+
+    public virtual ICollection<TransactionSnapshot> TransactionSnapshots { get; set; }
+
+    public virtual ICollection<Tariff>? Tariffs { get; set; }
 }

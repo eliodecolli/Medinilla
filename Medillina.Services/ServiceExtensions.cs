@@ -15,6 +15,7 @@ public static class ServiceExtensions
         services.AddScoped<IOcppAction, SecurityEventNotificationAction>();
         services.AddScoped<IOcppAction, AuthorizeAction>();
         services.AddScoped<IOcppAction, TransactionEventAction>();
+        services.AddScoped<IOcppAction, StatusNotificationAction>();
         //...add more
     }
 
