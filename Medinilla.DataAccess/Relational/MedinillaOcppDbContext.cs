@@ -28,9 +28,14 @@ public class MedinillaOcppDbContext(IConfiguration config) : DbContext
         modelBuilder.Entity<TransactionSnapshot>().ToTable("transactions_snapshot");
 
         // configure indecies
+        modelBuilder.Entity<TransactionSnapshot>().HasIndex(c => new { c.ChargingStationId, c.TransactionId });
+        modelBuilder.Entity<TransactionSnapshot>().HasIndex(c => c.TransactionId);
+
+        modelBuilder.Entity<TransactionEvent>().HasIndex(c => new { c.ChargingStationId, c.TransactionId });
         modelBuilder.Entity<TransactionEvent>().HasIndex(c => c.TransactionId);
         modelBuilder.Entity<TransactionEvent>().HasIndex(c => c.SeqNo);
         modelBuilder.Entity<TransactionEvent>().HasIndex(c => c.EventType);
+
         modelBuilder.Entity<ChargingStation>().HasIndex(c => c.ClientIdentifier);
 
         // configure charging station
@@ -50,7 +55,7 @@ public class MedinillaOcppDbContext(IConfiguration config) : DbContext
             .WithOne(c => c.ChargingStation)
             .HasForeignKey(c => c.ChargingStationId);
 
-        // configure transactions snapshots
+        // configure transaction snapshots
         modelBuilder.Entity<TransactionSnapshot>().HasOne(c => c.EvseConnector)
             .WithMany()
             .HasForeignKey(c =>c.EvseConnectorId);
