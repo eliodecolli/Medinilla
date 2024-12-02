@@ -16,6 +16,7 @@ public sealed class AuthorizationAlgorithmFactory
         }
     }
 
-    // I know, no checks, who gives a fuck
     public IAuthAlgorithm? Get(AuthorizationAlgorithm algorithm) => _store[algorithm] ?? null;
+
+    public IAuthAlgorithm[] All() => [.. _store.Values];
 }

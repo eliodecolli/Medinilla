@@ -84,7 +84,7 @@ public sealed class AuthorizeAction(ChargingStationUnitOfWork unitOfWork,
         var idToken = chargingStaiton.IdTokens.Where(c => c.Token == request.IdToken.Token).FirstOrDefault();
         if (idToken is null)
         {
-            logger.LogError($"{clientIdentifier}: Id Token with value {request.IdToken.Token} was not found");
+            logger.LogInformation($"{clientIdentifier}: Id Token with value {request.IdToken.Token} was not found");
             return new RpcResult()
             {
                 Result = call.CreateResult(GenerateResponse(AuthorizeStatus.Unknown))
