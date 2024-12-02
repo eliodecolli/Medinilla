@@ -1,13 +1,10 @@
 ﻿using Medinilla.DataTypes.Core;
 using Medinilla.DataTypes.WAMP;
 using Medinilla.Services.Interfaces;
-using Microsoft.EntityFrameworkCore.Query.Internal;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Collections.Concurrent;
-using System.Linq;
 using System.Net.WebSockets;
-using System.Security.Cryptography.X509Certificates;
 using System.Text;
 
 namespace Medinilla.Services.v1;

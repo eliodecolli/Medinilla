@@ -38,5 +38,5 @@ public sealed class IdTokenInfo
     /// </summary>
     public IdToken? GroupIdToken { get; set; }
 
-    // Missing: MessageContentType.
+    public MessageContent? PersonalMessage { get; set; }
 }

@@ -1,4 +1,6 @@
 ﻿using Medinilla.DataAccess.Relational.Models;
+using Medinilla.DataAccess.Relational.Models.Authorization;
+using Medinilla.DataTypes.Core.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
 
@@ -26,6 +28,9 @@ public class MedinillaOcppDbContext(IConfiguration config) : DbContext
         modelBuilder.Entity<Tariff>().ToTable("tariff");
         modelBuilder.Entity<TransactionEvent>().ToTable("transactions_event");
         modelBuilder.Entity<TransactionSnapshot>().ToTable("transactions_snapshot");
+        modelBuilder.Entity<IdToken>().ToTable("core_id_token");
+        modelBuilder.Entity<AuthorizationDetails>().ToTable("core_auth_details");
+        modelBuilder.Entity<AuthorizationUser>().ToTable("core_auth_user");
 
         // configure indecies
         modelBuilder.Entity<TransactionSnapshot>().HasIndex(c => new { c.ChargingStationId, c.TransactionId });
@@ -35,6 +40,8 @@ public class MedinillaOcppDbContext(IConfiguration config) : DbContext
         modelBuilder.Entity<TransactionEvent>().HasIndex(c => c.TransactionId);
         modelBuilder.Entity<TransactionEvent>().HasIndex(c => c.SeqNo);
         modelBuilder.Entity<TransactionEvent>().HasIndex(c => c.EventType);
+
+        modelBuilder.Entity<IdToken>().HasIndex(c => new { c.ChargingStationId, c.Token });
 
         modelBuilder.Entity<ChargingStation>().HasIndex(c => c.ClientIdentifier);
 
@@ -55,9 +62,28 @@ public class MedinillaOcppDbContext(IConfiguration config) : DbContext
             .WithOne(c => c.ChargingStation)
             .HasForeignKey(c => c.ChargingStationId);
 
+        modelBuilder.Entity<ChargingStation>().HasOne(c => c.AuthorizationDetails)
+            .WithOne(c => c.ChargingStation)
+            .HasForeignKey<AuthorizationDetails>(c => c.ChargingStationId);
+
         // configure transaction snapshots
         modelBuilder.Entity<TransactionSnapshot>().HasOne(c => c.EvseConnector)
             .WithMany()
             .HasForeignKey(c =>c.EvseConnectorId);
+
+        // configure auth
+        modelBuilder.Entity<IdToken>().HasOne(c => c.ChargingStation)
+            .WithMany()
+            .HasForeignKey(c => c.ChargingStationId);
+
+        modelBuilder.Entity<IdToken>().HasOne(c => c.User)
+            .WithMany(c => c.Tokens)
+            .HasForeignKey(c => c.AuthorizationUserId);
+
+        modelBuilder.Entity<IdToken>().Property(c => c.Blocked)
+            .HasDefaultValue(false);
+
+        modelBuilder.Entity<AuthorizationDetails>().Property(c => c.AuthBlob)
+            .HasColumnType("json");
     }
 }

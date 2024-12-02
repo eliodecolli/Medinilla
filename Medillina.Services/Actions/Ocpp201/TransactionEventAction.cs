@@ -149,7 +149,7 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
                 _logger.LogError($"{clientIdentifier}: Could not map incoming request: {call.Payload} to relational transaction type.");
                 return new RpcResult()
                 {
-                    Error = OcppCallError.InternalError,
+                    Error = call.CreateErrorResult<TransactionEventResponse>(OcppCallError.ErrorCodes.InternalError, "Could not map Transaction Event."),
                 };
             }
             else
