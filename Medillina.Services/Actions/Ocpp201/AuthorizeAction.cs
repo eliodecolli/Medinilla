@@ -7,7 +7,7 @@ using Medinilla.DataTypes.WAMP;
 using Microsoft.Extensions.Logging;
 
 using IdTokenDbContext = Medinilla.DataAccess.Relational.Models.Authorization.IdToken;
-using AuthDetails = Medinilla.DataAccess.Relational.Models.Authorization.AuthorizationDetails;
+using ChargingStationDbContext = Medinilla.DataAccess.Relational.Models.ChargingStation;
 
 namespace Medinilla.Services.Actions.Ocpp201;
 
@@ -18,10 +18,11 @@ public sealed class AuthorizeAction(ChargingStationUnitOfWork unitOfWork,
     public string ActionName => "Authorize";
 
     public AuthorizationAlgorithm[] AlgorithmsCheck = [
+        AuthorizationAlgorithm.Default,
         AuthorizationAlgorithm.LocationCheck,
         AuthorizationAlgorithm.DateRangeCheck,
-        AuthorizationAlgorithm.LocationCheck,
         AuthorizationAlgorithm.ExpirationCheck,
+        AuthorizationAlgorithm.CreditCheck,
     ];
 
     private AuthorizeResponse GenerateResponse(string status)
@@ -39,23 +40,26 @@ public sealed class AuthorizeAction(ChargingStationUnitOfWork unitOfWork,
 
     private async Task<(string?, AuthorizationAlgorithm?)> CheckAuthorizationWithAlgo(IdToken token,
         IdTokenDbContext dbIdToken,
-        AuthDetails authDetails)
+        ChargingStationDbContext cs)
     {
+        var context = AuthUtils.GenerateAuthContext(cs, null, false);
+        var result = AuthorizeStatus.Accepted;
+
         foreach (var algorithmName in AlgorithmsCheck)
         {
             var algorithm = authorizationAlgorithmFactory.Get(algorithmName);
             if (algorithm is not null)
             {
-                var result = await algorithm.Authorize(token, dbIdToken, authDetails);
+                var tempResult = await algorithm.Authorize(token, dbIdToken, context);
 
-                if (result is not null)
+                if (tempResult != AuthorizeStatus.Accepted)
                 {
-                    return (result, algorithmName);
+                    return (tempResult, algorithmName);
                 }
             }
         }
 
-        return (null, null);
+        return (result, null);
     }
 
     public async Task<RpcResult> Execute(OcppCallRequest call, string clientIdentifier)
@@ -93,8 +97,8 @@ public sealed class AuthorizeAction(ChargingStationUnitOfWork unitOfWork,
 
         try
         {
-            var (resultStatus, algo) = await CheckAuthorizationWithAlgo(request.IdToken, idToken, chargingStaiton.AuthorizationDetails);
-            if (resultStatus is not null)
+            var (resultStatus, algo) = await CheckAuthorizationWithAlgo(request.IdToken, idToken, chargingStaiton);
+            if (resultStatus != AuthorizeStatus.Accepted)
             {
                 logger.LogInformation($"{clientIdentifier}: {Enum.GetName(algo.Value)}: Failed Authorization for token {idToken.Token}.");
                 return new RpcResult()

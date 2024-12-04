@@ -1,5 +1,4 @@
 ﻿using Medinilla.Core.Interfaces;
-using Medinilla.DataAccess.Relational.Models.Authorization;
 using Medinilla.DataTypes.Contracts.Common;
 using Medinilla.DataTypes.Core.Authorization;
 
@@ -9,10 +8,11 @@ public sealed class ExpiryCheckAlgo : IAuthAlgorithm
 {
     public AuthorizationAlgorithm Algorithm => AuthorizationAlgorithm.ExpirationCheck;
 
-    public async Task<string?> Authorize(DataTypes.Contracts.Common.IdToken idToken,
+    public int Priority => 1;
+
+    public async Task<string> Authorize(IdToken idToken,
         DataAccess.Relational.Models.Authorization.IdToken dbIdToken,
-        AuthorizationDetails authDetails,
-        object? state)
+        AuthorizationContext context)
     {
         var status = dbIdToken.ExpiryDate > DateTime.UtcNow ?
             AuthorizeStatus.Expired :

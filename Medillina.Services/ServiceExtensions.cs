@@ -26,6 +26,10 @@ public static class ServiceExtensions
     {
         services.AddScoped<IAuthAlgorithm, EvseCheckAlgo>();
         services.AddScoped<IAuthAlgorithm, ExpiryCheckAlgo>();
+        services.AddScoped<IAuthAlgorithm, DummyAuthorization>();
+        services.AddScoped<IAuthAlgorithm, LocationCheckAlgo>();
+        services.AddScoped<IAuthAlgorithm, DateRangeCheckAlgo>();
+        services.AddScoped<IAuthAlgorithm, CreditCheckAlgo>();
         //...add more
     }
 

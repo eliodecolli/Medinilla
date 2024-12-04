@@ -20,7 +20,13 @@ public class IdToken
 
     public bool Blocked { get; set; }
 
+    public bool IsUnderTx { get; set; }
+
     public virtual ChargingStation ChargingStation { get; set; }
 
     public virtual AuthorizationUser User { get; set; }
+
+    public virtual ICollection<TransactionSnapshot> TransactionSnapshots { get; set; }
+
+    public virtual ICollection<TransactionEvent> TransactionEvents { get; set; }
 }

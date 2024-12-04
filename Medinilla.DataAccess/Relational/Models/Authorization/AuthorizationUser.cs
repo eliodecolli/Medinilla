@@ -10,5 +10,7 @@ public class AuthorizationUser
 
     public bool IsActive { get; set; }
 
+    public decimal? ActiveCredit { get; set; }
+
     public virtual ICollection<IdToken> Tokens { get; set; }
 }

@@ -43,4 +43,6 @@ public sealed class AuthDetailsBlob
     public LocationCheckBlob? LocationCheck { get; set; }
 
     public CreditCheckBlob? CreditCheck { get; set; }
+
+    public DateRangeCheckBlob? DateRangeCheck { get; set; }
 }

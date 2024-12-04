@@ -83,6 +83,14 @@ public class MedinillaOcppDbContext(IConfiguration config) : DbContext
         modelBuilder.Entity<IdToken>().Property(c => c.Blocked)
             .HasDefaultValue(false);
 
+        modelBuilder.Entity<IdToken>().HasMany(c => c.TransactionSnapshots)
+            .WithOne()
+            .HasForeignKey(c => c.IdTokenId);
+
+        modelBuilder.Entity<IdToken>().HasMany(c => c.TransactionEvents)
+            .WithOne()
+            .HasForeignKey(c => c.IdTokenId);
+
         modelBuilder.Entity<AuthorizationDetails>().Property(c => c.AuthBlob)
             .HasColumnType("json");
     }

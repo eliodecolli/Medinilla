@@ -18,5 +18,5 @@ public sealed class AuthorizationAlgorithmFactory
 
     public IAuthAlgorithm? Get(AuthorizationAlgorithm algorithm) => _store[algorithm] ?? null;
 
-    public IAuthAlgorithm[] All() => [.. _store.Values];
+    public IAuthAlgorithm[] All() => [.. _store.Values.OrderBy(a => a.Priority)];
 }

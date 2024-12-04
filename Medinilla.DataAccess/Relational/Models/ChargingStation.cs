@@ -16,6 +16,10 @@ public class ChargingStation
 
     public string LatestBootNotificationReason {  get; set; }
 
+    public string? Location { get; set; }
+
+    public string? Alias { get; set; }
+
     public DateTime CreatedAt {  get; set; }
 
     public DateTime? ModifiedAt { get; set; }
