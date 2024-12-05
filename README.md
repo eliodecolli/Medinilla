@@ -17,7 +17,11 @@ Currently implemented OCPP messages:
 - Heartbeat
 - Security Event
 - Authorize
+- Transaction Event
 
 ## Work overview
-While actions themselves are "implemented" in a sense that they allow a communication between CSMS-CS, they still do not follow any business logic (or even OCPP rules for that matter). They simply make sure that the charging stations receives at least something back to keep the connection alive. Ie, during the authorization process, the CS receives an `Accepted` status, but there are no checks in place to make sure the transactions can begin.
-Another thing we should do, is fucking make some unit tests for each action. At this moment, it makes no sense since those actions aren't properly implemented, but in the future unit testing is the way we'll make sure everything is up-to-date.
+Actions have been implemented using the following two Charging Station emulators:
+1. https://github.com/extrawest/Charge-Point-Simulator-via-OCPP-2.0.1
+2. https://evlab.i4b.pl/
+
+I wish I could use more, but most reliable emulators are for 1.6, meanwhile 2.0.1 is lacking a lot in this area. Maybe I should consider just running EVerest and simulating scenarios there.
