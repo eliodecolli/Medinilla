@@ -85,27 +85,20 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
         return total;
     }
 
-    private async Task<string> PerformAuthorization(IdTokenDb contextIdToken,
-        DbChargingStation cs,
-        TransactionEventRequest request)
+    private async Task<string> PerformAuthorization(DbChargingStation cs, TransactionEventRequest request, AuthorizationContext context)
     {
-        var authContext = AuthUtils.GenerateAuthContext(cs, request.Evse?.Id, true);
+        var status = await authFactory.RunAuthorization(request.IdToken, context);
 
-        if (contextIdToken == null)
+        if (status == AuthorizeStatus.Accepted)
         {
-            return AuthorizeStatus.Unknown;
+            status = request.EventType == TransactionEventEnum.Started && 
+                context.IdToken is not null &&
+                context.IdToken.IsUnderTx ?
+                AuthorizeStatus.ConcurrentTx :
+                AuthorizeStatus.Accepted;
         }
 
-        foreach(var algorithm in authFactory.All())
-        {
-            var result = await algorithm.Authorize(request.IdToken, contextIdToken, authContext).ConfigureAwait(false);
-            if (result != AuthorizeStatus.Accepted)
-            {
-                return result;
-            }
-        }
-
-        return AuthorizeStatus.Accepted;
+        return status;
     }
 
     private async Task<bool> PerformTokenCleanUp(DbChargingStation cs, IdToken token)
@@ -173,17 +166,7 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
     public async Task<RpcResult> Execute(OcppCallRequest call, string clientIdentifier)
     {
         var request = call.As<TransactionEventRequest>();
-        switch(request.EventType)
-        {
-            case TransactionEventEnum.Started:
-                _logger.LogInformation($"{clientIdentifier} started a new transaction. Reason: {request.TriggerReason}");
-                break;
-            case TransactionEventEnum.Ended:
-                _logger.LogInformation($"{clientIdentifier} ended transaction with id {request.TransactionInfo.TransactionId}");
-                break;
-        }
 
-        // TODO: Implement checks here and append everything on a DB
         var chargingStation = await unitOfWork.GetChargingStation(clientIdentifier);
 
         if (chargingStation == null)
@@ -197,38 +180,6 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
         }
         else
         {
-            var idToken = chargingStation.IdTokens.FirstOrDefault(t => t.Token == request.IdToken?.Token);
-
-            if (request.IdToken is not null)
-            {
-                if (idToken is not null)
-                {
-                    var authStatus = await PerformAuthorization(idToken, chargingStation, request);
-                    if (authStatus != AuthorizeStatus.Accepted)
-                    {
-                        var authResponse = new TransactionEventResponse()
-                        {
-                            IdTokenInfo = new IdTokenInfo()
-                            {
-                                Status = authStatus,
-                            }
-                        };
-                        return new RpcResult()
-                        {
-                            Result = call.CreateResult(authResponse)
-                        };
-                    }
-                }
-            }
-
-            var response = new TransactionEventResponse()
-            { 
-                IdTokenInfo = new IdTokenInfo()
-                { 
-                    Status = AuthorizeStatus.Accepted,
-                }
-            };
-
             var transaction = MapOcppTransaction(chargingStation, request);
             if (transaction is null)
             {
@@ -263,7 +214,26 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
                 }
                 else
                 {
-                    await unitOfWork.TransactionsSubUnit.RegisterTransaction(transaction, idToken);
+                    var context = AuthUtils.GenerateAuthContext(chargingStation, request.Evse?.Id, true);
+                    var authStatus = await PerformAuthorization(chargingStation, request, context);
+
+                    var response = new TransactionEventResponse()
+                    {
+                        IdTokenInfo = new IdTokenInfo()
+                        {
+                            Status = authStatus,
+                        }
+                    };
+
+                    if (authStatus != AuthorizeStatus.Accepted)
+                    {
+                        return new RpcResult()
+                        {
+                            Result = call.CreateResult(response)
+                        };
+                    }
+
+                    await unitOfWork.TransactionsSubUnit.RegisterTransaction(transaction, context.IdToken);
                     
                     if (request.EventType == TransactionEventEnum.Ended)
                     {
@@ -278,7 +248,7 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
                             };
                         }
 
-                        response.TotalCost = GenerateTransactionSnapshot(chargingStation, currentTransactions, transaction, idToken, request);
+                        response.TotalCost = GenerateTransactionSnapshot(chargingStation, currentTransactions, transaction, context.IdToken, request);
 
                         if (request.IdToken?.Type == IdTokenType.Central)
                         {
@@ -291,6 +261,16 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
                                 _logger.LogWarning($"{clientIdentifier}: Temp token {request.IdToken.Token} couldn't be removed.");
                             }
                         }
+                    }
+
+                    switch (request.EventType)
+                    {
+                        case TransactionEventEnum.Started:
+                            _logger.LogInformation($"{clientIdentifier} started a new transaction. Reason: {request.TriggerReason}");
+                            break;
+                        case TransactionEventEnum.Ended:
+                            _logger.LogInformation($"{clientIdentifier} ended transaction with id {request.TransactionInfo.TransactionId}");
+                            break;
                     }
 
                     await unitOfWork.Save();

@@ -10,14 +10,18 @@ public sealed class ExpiryCheckAlgo : IAuthAlgorithm
 
     public int Priority => 1;
 
-    public async Task<string> Authorize(IdToken idToken,
-        DataAccess.Relational.Models.Authorization.IdToken dbIdToken,
+    public Task<string> Authorize(IdToken? idToken,
         AuthorizationContext context)
     {
-        var status = dbIdToken.ExpiryDate > DateTime.UtcNow ?
+        var status = AuthorizeStatus.Accepted;
+
+        if (context.IdToken is not null)
+        {
+            status = context.IdToken.ExpiryDate > DateTime.UtcNow ?
             AuthorizeStatus.Expired :
             AuthorizeStatus.Accepted;
+        }
 
-        return status;
+        return Task.FromResult(status);
     }
 }

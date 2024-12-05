@@ -11,21 +11,21 @@ public class DateRangeCheckAlgo : IAuthAlgorithm
 
     public AuthorizationAlgorithm Algorithm => AuthorizationAlgorithm.DateRangeCheck;
 
-    public Task<string> Authorize(IdToken? idToken, DataAccess.Relational.Models.Authorization.IdToken dbIdToken, AuthorizationContext context)
+    public Task<string> Authorize(IdToken? idToken, AuthorizationContext context)
     {
+        var status = AuthorizeStatus.Accepted;
+
         var details = context.AuthorizationDetails.AuthBlob.Deserialize<AuthDetailsBlob>();
 
         if (details is not null &&
             details.DateRangeCheck is not null)
         {
             var now = DateTime.UtcNow;
-            var status = now > details.DateRangeCheck.Start && now < details.DateRangeCheck.End ?
+            status = now > details.DateRangeCheck.Start && now < details.DateRangeCheck.End ?
                 AuthorizeStatus.Accepted :
                 AuthorizeStatus.NotAtThisTime;
-
-            return Task.FromResult(status);
         }
 
-        return Task.FromResult(AuthorizeStatus.Accepted);
+        return Task.FromResult(status);
     }
 }

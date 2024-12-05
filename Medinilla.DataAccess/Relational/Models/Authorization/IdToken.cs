@@ -16,8 +16,6 @@ public class IdToken
 
     public DateTime? ExpiryDate { get; set; }
 
-    public bool UnderTx { get; set; }
-
     public bool Blocked { get; set; }
 
     public bool IsUnderTx { get; set; }

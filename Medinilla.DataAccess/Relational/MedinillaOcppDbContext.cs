@@ -1,8 +1,8 @@
 ﻿using Medinilla.DataAccess.Relational.Models;
 using Medinilla.DataAccess.Relational.Models.Authorization;
-using Medinilla.DataTypes.Core.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
+using System.Text.Json;
 
 namespace Medinilla.DataAccess.Relational;
 
@@ -90,8 +90,5 @@ public class MedinillaOcppDbContext(IConfiguration config) : DbContext
         modelBuilder.Entity<IdToken>().HasMany(c => c.TransactionEvents)
             .WithOne()
             .HasForeignKey(c => c.IdTokenId);
-
-        modelBuilder.Entity<AuthorizationDetails>().Property(c => c.AuthBlob)
-            .HasColumnType("json");
     }
 }

@@ -11,19 +11,20 @@ public class LocationCheckAlgo : IAuthAlgorithm
 
     public AuthorizationAlgorithm Algorithm => AuthorizationAlgorithm.LocationCheck;
 
-    public Task<string?> Authorize(IdToken? idToken, DataAccess.Relational.Models.Authorization.IdToken dbIdToken, AuthorizationContext context)
+    public Task<string> Authorize(IdToken? idToken, AuthorizationContext context)
     {
-        var authDetails = context.AuthorizationDetails.AuthBlob.Deserialize<AuthDetailsBlob>();
-        if (authDetails is null ||
-            authDetails.LocationCheck is null ||
-            context.LocationName is null)
-        {
-            return Task.FromResult<string?>(null);
-        }
-        var status = authDetails.LocationCheck.BlockedLocations.Contains(context.LocationName) ?
-            AuthorizeStatus.Accepted :
-            AuthorizeStatus.NotAtThisLocation;
+        var status = AuthorizeStatus.Accepted;
 
-        return Task.FromResult<string?>(status);
+        var authDetails = context.AuthorizationDetails.AuthBlob.Deserialize<AuthDetailsBlob>();
+        if (authDetails is not null &&
+            authDetails.LocationCheck is not null &&
+            context.LocationName is not null)
+        {
+            status = authDetails.LocationCheck.BlockedLocations.Contains(context.LocationName) ?
+                AuthorizeStatus.Accepted :
+                AuthorizeStatus.NotAtThisLocation;
+        }
+
+        return Task.FromResult(status);
     }
 }

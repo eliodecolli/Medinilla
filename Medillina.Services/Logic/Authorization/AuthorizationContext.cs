@@ -10,7 +10,11 @@ public class AuthorizationContext
 
     public decimal? UserActiveCredit { get; set; }
 
+    public IdToken? IdToken { get; set; }
+
     public AuthorizationDetails AuthorizationDetails { get; set; }
 
     public bool SkipIfNullToken { get; set; }
+
+    public IQueryable<IdToken> Tokens { get; set; }
 }

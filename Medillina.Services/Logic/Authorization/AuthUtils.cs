@@ -11,7 +11,8 @@ public static class AuthUtils
             LocationName = cs.Location,
             EvseId = evseId,
             AuthorizationDetails = cs.AuthorizationDetails,
-            SkipIfNullToken = skipIfNullToken
+            SkipIfNullToken = skipIfNullToken,
+            Tokens = cs.IdTokens.AsQueryable(),
         };
     }
 }

@@ -11,10 +11,11 @@ public sealed class EvseCheckAlgo : IAuthAlgorithm
 
     public int Priority => 1;
 
-    public async Task<string> Authorize(IdToken? idToken,
-        DataAccess.Relational.Models.Authorization.IdToken dbIdToken,
+    public Task<string> Authorize(IdToken? idToken,
         AuthorizationContext context)
     {
+        var status = AuthorizeStatus.Accepted;
+
         var authDetails = context.AuthorizationDetails;
         if (authDetails.AuthBlob is null)
         {
@@ -28,16 +29,11 @@ public sealed class EvseCheckAlgo : IAuthAlgorithm
             context.EvseId is not null)
         {
             var evseId = context.EvseId;
-            var status = data.EvseCheck.Evses.Any(e => e.EvseId == evseId) ?
+            status = data.EvseCheck.Evses.Any(e => e.EvseId == evseId) ?
                 AuthorizeStatus.Accepted :
                 AuthorizeStatus.NotAllowedTypeEVSE;
+        }
 
-            return status;
-        }
-        else
-        {
-            // let's just skip it I guess?
-            return AuthorizeStatus.Accepted;
-        }
+        return Task.FromResult(status);
     }
 }

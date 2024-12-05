@@ -11,21 +11,23 @@ public class CreditCheckAlgo : IAuthAlgorithm
 
     public AuthorizationAlgorithm Algorithm => AuthorizationAlgorithm.CreditCheck;
 
-    public Task<string> Authorize(IdToken? idToken, DataAccess.Relational.Models.Authorization.IdToken dbIdToken, AuthorizationContext context)
+    public Task<string> Authorize(IdToken? idToken, AuthorizationContext context)
     {
+        var status = AuthorizeStatus.Accepted;
         var details = context.AuthorizationDetails.AuthBlob.Deserialize<AuthDetailsBlob>();
 
-        if(details is not null &&
+        if(context.IdToken is not null &&
+            details is not null &&
             details.CreditCheck is not null &&
             details.CreditCheck.Flag)
         {
-            var status = (dbIdToken.User.ActiveCredit ?? -1.0M) >= (context.UserActiveCredit ?? 0.0M) ?
+            status = (context.IdToken.User.ActiveCredit ?? -1.0M) >= (context.UserActiveCredit ?? 0.0M) ?
                 AuthorizeStatus.Accepted :
                 AuthorizeStatus.NoCredit;
 
             return Task.FromResult(status);
         }
 
-        return Task.FromResult(AuthorizeStatus.Accepted);
+        return Task.FromResult(status);
     }
 }

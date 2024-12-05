@@ -130,16 +130,24 @@ public class WebSocketDigestionService(IServiceProvider serviceProvider, ILogger
 
     private async Task<byte[]?> AwaitWebSocketResponse()
     {
-        var buffer = new ArraySegment<byte>(new byte[1024]);
-        var result = await _webSocket.ReceiveAsync(buffer, CancellationToken.None);
-        if (result.CloseStatus.HasValue)
+        if (_webSocket.State == WebSocketState.Open)
         {
-            _logger.LogWarning("WS connection for {0} has been closed. {1}:{2}",
-                _clientIdentifier, result.CloseStatus.Value, result.CloseStatusDescription);
+            var buffer = new ArraySegment<byte>(new byte[1024]);
+            var result = await _webSocket.ReceiveAsync(buffer, CancellationToken.None);
+            if (result.CloseStatus.HasValue)
+            {
+                _logger.LogWarning("WS connection for {0} has been closed. {1}:{2}",
+                    _clientIdentifier, result.CloseStatus.Value, result.CloseStatusDescription);
+                return null;
+            }
+
+            return buffer.Take(result.Count).ToArray();
+        }
+        else
+        {
+            _logger.LogWarning($"WS connection has been updated. New status: {Enum.GetName(_webSocket.State)}.");
             return null;
         }
-
-        return buffer.Take(result.Count).ToArray();
     }
 
     public async Task<WebSocketResponse> Send(OcppCallRequest request)
@@ -173,7 +181,7 @@ public class WebSocketDigestionService(IServiceProvider serviceProvider, ILogger
         _clientIdentifier = clientIdentifier;
         
         while(true) {
-           if(!IsServiceBusy())
+           if(!IsServiceBusy() && _webSocket.State == WebSocketState.Open)
             {
                 var received = await AwaitWebSocketResponse().ConfigureAwait(false);
 

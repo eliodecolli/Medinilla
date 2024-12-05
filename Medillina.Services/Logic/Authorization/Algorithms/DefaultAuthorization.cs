@@ -10,12 +10,32 @@ public class DefaultAuthorization : IAuthAlgorithm
 
     public int Priority => 0;
 
-    public Task<string> Authorize(IdToken? idToken, DataAccess.Relational.Models.Authorization.IdToken dbIdToken, AuthorizationContext context)
+    public Task<string> Authorize(IdToken? idToken, AuthorizationContext context)
     {
         var status = AuthorizeStatus.Accepted;
-        if (idToken is not null && !context.SkipIfNullToken)
+        if (idToken is null)
         {
-            status = AuthorizeStatus.Unknown;
+            status = context.SkipIfNullToken ? AuthorizeStatus.Accepted : AuthorizeStatus.Unknown;
+        }
+        else
+        {
+            var token = context.Tokens.FirstOrDefault(t => t.Token == idToken.Token);
+            if (token is null)
+            {
+                status = AuthorizeStatus.Unknown;
+            }
+            else
+            {
+                if (token.Blocked)
+                {
+                    status = AuthorizeStatus.Blocked;
+                }
+                else
+                {
+                    // pass it over to the next authorizers
+                    context.IdToken = token;
+                }
+            }
         }
 
         return Task.FromResult(status);

@@ -1,6 +1,8 @@
 ﻿using Medinilla.DataAccess.Interfaces;
 using Medinilla.DataAccess.Relational.Models;
+using Medinilla.DataAccess.Relational.Models.Authorization;
 using Microsoft.Extensions.Configuration;
+using System.Text.Json;
 
 namespace Medinilla.DataAccess.Relational.UnitOfWork;
 
@@ -8,6 +10,7 @@ public sealed class ChargingStationUnitOfWork(MedinillaOcppDbContext context, IC
 {
     private IRepository<ChargingStation> repository = new GenericRepository<ChargingStation>(context);
     private IRepository<Tariff> tariffsRepo = new GenericRepository<Tariff>(context);
+    private IRepository<AuthorizationDetails> authDetailsRepo = new GenericRepository<AuthorizationDetails>(context);
 
     public EvseUnitOfWork EvseConnectorSubUnit = new EvseUnitOfWork(context); 
 
@@ -28,7 +31,7 @@ public sealed class ChargingStationUnitOfWork(MedinillaOcppDbContext context, IC
             entity.ModifiedAt = DateTime.UtcNow;
         }
 
-        if (chargingStation.Tariffs is null || chargingStation.Tariffs.Count == 0)
+        if (entity.Tariffs is null || entity.Tariffs.Count == 0)
         {
             // get default unit price
             var defaultUnit = config.GetSection("Medinilla").GetSection("DefaultUnit");
@@ -39,6 +42,15 @@ public sealed class ChargingStationUnitOfWork(MedinillaOcppDbContext context, IC
                 ChargingStationId = entity.Id,
                 UnitName = defaultUnit["Name"],
                 UnitPrice = decimal.Parse(defaultUnit["Price"])
+            });
+        }
+
+        if (entity.AuthorizationDetails is null)
+        {
+            await authDetailsRepo.Create(new AuthorizationDetails()
+            {
+                AuthBlob = JsonDocument.Parse(config.GetSection("Medinilla")["DefaultAuthDetails"] ?? "{}"),
+                ChargingStationId = entity.Id,
             });
         }
         
