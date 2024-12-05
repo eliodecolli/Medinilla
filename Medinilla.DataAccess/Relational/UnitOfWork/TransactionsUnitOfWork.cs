@@ -1,5 +1,6 @@
 ﻿using Medinilla.DataAccess.Interfaces;
 using Medinilla.DataAccess.Relational.Models;
+using Medinilla.DataAccess.Relational.Models.Authorization;
 
 namespace Medinilla.DataAccess.Relational.UnitOfWork;
 
@@ -8,8 +9,18 @@ public sealed class TransactionsUnitOfWork(MedinillaOcppDbContext context)
     private IRepository<TransactionEvent> _transactionRepository = new GenericRepository<TransactionEvent>(context);
     private IRepository<TransactionSnapshot> _snapshotRepository = new GenericRepository<TransactionSnapshot>(context);
 
-    public async Task RegisterTransaction(TransactionEvent transaction)
+    public async Task RegisterTransaction(TransactionEvent transaction, IdToken? idToken)
     {
+        if (idToken is not null)
+        {
+            transaction.IdTokenId = idToken.Id;
+            
+            if (!idToken.IsUnderTx)
+            {
+                idToken.IsUnderTx = true;
+            }
+        }
+
         await _transactionRepository.Create(transaction);
     }
 

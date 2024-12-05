@@ -1,53 +1,170 @@
-﻿using Medinilla.DataTypes.WAMP;
+﻿using Medinilla.DataTypes.Core;
+using Medinilla.DataTypes.WAMP;
 using Medinilla.Services.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using System.Collections.Concurrent;
 using System.Net.WebSockets;
+using System.Text;
 
 namespace Medinilla.Services.v1;
 
 public class WebSocketDigestionService(IServiceProvider serviceProvider, ILogger<WebSocketDigestionService> _logger) : IBasicWebSocketDigestionService
 {
     private WebSocket _webSocket;
-    private string _clientIndentifier;
+    private string _clientIdentifier;
+
+    private ConcurrentQueue<(OcppCallRequest, TaskCompletionSource<WebSocketResponse>)> _queuedRequests = new();
+    private object _lock = new();
+    private object _lockQueue = new();
 
     private string _currentCall;
+    private bool queueProcessRunning;
 
     private void SetCurrentCall(string value)
     {
-        _currentCall = value;
+        lock(_lock)
+        {
+            _currentCall = value;
+        }
     }
 
     private bool IsServiceBusy()
     {
-        return !string.IsNullOrEmpty(_currentCall);
+        lock (_lock)
+        {
+            return !string.IsNullOrEmpty(_currentCall);
+        }
     }
 
-    public async Task<WSDigestionServiceCallResult> Send(OcppCallRequest request)
+    private async Task<WebSocketResponse> DoSend(OcppCallRequest request)
     {
-        if(!IsServiceBusy())
+        try
         {
-            try
-            {
-                var data = request.ToBytes();
+            SetCurrentCall(request.MessageId);
+            var data = request.ToBytes();
 
-                await _webSocket.SendAsync(data, WebSocketMessageType.Text, true, CancellationToken.None)
-                    .ConfigureAwait(false);
-                _logger.LogInformation("Sent {0} bytes to {1}", data.Length, _clientIndentifier);
+            await _webSocket.SendAsync(data, WebSocketMessageType.Text, true, CancellationToken.None)
+                .ConfigureAwait(false);
 
-                SetCurrentCall(request.MessageId);
-                return WSDigestionServiceCallResult.Success;
-            }
-            catch (Exception ex)
+            var buffer = await AwaitWebSocketResponse();
+            if (buffer is not null)
             {
-                _logger.LogError("Unable to send OCPP Call Request. Exception: " + ex);
-                return WSDigestionServiceCallResult.Fail;
+                var parser = new OcppMessageParser();
+
+                var messageTextBlob = Encoding.UTF8.GetString(buffer);
+                parser.LoadRaw(messageTextBlob);
+
+                switch(parser.GetMessageType())
+                {
+                    case OcppJMessageType.CALL_RESULT:
+                        return new WebSocketResponse()
+                        {
+                            OcppCallResult = parser.ParseResult(),
+                            ResponseStatus = WebSocketResponseStatus.Success,
+                        };
+                    case OcppJMessageType.CALL_ERROR:
+                        return new WebSocketResponse()
+                        {
+                            OcppCallError = parser.ParseError(),
+                            ResponseStatus = WebSocketResponseStatus.Success,
+                        };
+                }
             }
+
+            return new WebSocketResponse()
+            {
+                ResponseStatus = WebSocketResponseStatus.Fail,
+            };
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError("Unable to send OCPP Call Request. Exception: " + ex);
+            return new WebSocketResponse()
+            {
+                ResponseStatus = WebSocketResponseStatus.Fail,
+            };
+        }
+    }
+
+    private void StartQueueProcessor()
+    {
+        lock (_lockQueue)
+        {
+            if (queueProcessRunning)
+            {
+                return;
+            }
+
+            queueProcessRunning = true;
+        }
+
+        try
+        {
+            Task.Run(async () =>
+            {
+                while (_queuedRequests.TryDequeue(out var dequeuedRequest))
+                {
+                    var (request, tcs) = dequeuedRequest;
+
+                    try
+                    {
+                        var response = await DoSend(request).ConfigureAwait(false);
+                        tcs.SetResult(response);
+                    }
+                    catch (Exception ex)
+                    {
+                        tcs.SetException(ex);
+                    }
+                }
+            });
+        }
+        finally
+        {
+            lock (_lockQueue)
+            {
+                queueProcessRunning = false;
+            }
+        }
+    }
+
+    private async Task<byte[]?> AwaitWebSocketResponse()
+    {
+        if (_webSocket.State == WebSocketState.Open)
+        {
+            var buffer = new ArraySegment<byte>(new byte[1024]);
+            var result = await _webSocket.ReceiveAsync(buffer, CancellationToken.None);
+            if (result.CloseStatus.HasValue)
+            {
+                _logger.LogWarning("WS connection for {0} has been closed. {1}:{2}",
+                    _clientIdentifier, result.CloseStatus.Value, result.CloseStatusDescription);
+                return null;
+            }
+
+            return buffer.Take(result.Count).ToArray();
         }
         else
         {
-            _logger.LogWarning("Trying to send a message to {0} but there's a pending request waiting for a response.", _clientIndentifier);
-            return WSDigestionServiceCallResult.ServiceBusy;
+            _logger.LogWarning($"WS connection has been updated. New status: {Enum.GetName(_webSocket.State)}.");
+            return null;
+        }
+    }
+
+    public async Task<WebSocketResponse> Send(OcppCallRequest request)
+    {
+        if (!IsServiceBusy())
+        {
+            return await DoSend(request).ConfigureAwait(false);
+        }
+        else
+        {
+            _logger.LogWarning("Trying to send a message to {0} but there's a pending request waiting for a response.", _clientIdentifier);
+            var tsc = new TaskCompletionSource<WebSocketResponse>();
+            _queuedRequests.Enqueue(new (request, tsc));
+
+            StartQueueProcessor();
+
+            return await tsc.Task.ConfigureAwait(false);
         }
     }
 
@@ -61,57 +178,51 @@ public class WebSocketDigestionService(IServiceProvider serviceProvider, ILogger
     public async Task Consume(WebSocket webSocket, string clientIdentifier)
     {
         _webSocket = webSocket;
-        _clientIndentifier = clientIdentifier;
+        _clientIdentifier = clientIdentifier;
         
         while(true) {
-            var buffer = new ArraySegment<byte>(new byte[1024]);
-            var result = await webSocket.ReceiveAsync(buffer, CancellationToken.None);
-            if (result.CloseStatus.HasValue)
+           if(!IsServiceBusy() && _webSocket.State == WebSocketState.Open)
             {
-                _logger.LogWarning("WS connection for {0} has been closed. {1}:{2}",
-                    clientIdentifier, result.CloseStatus.Value, result.CloseStatusDescription);
-                return;
-            }
+                var received = await AwaitWebSocketResponse().ConfigureAwait(false);
 
-            if (result.Count > 0)
-            {
-                var received = buffer.Take(result.Count).ToArray();
-
-                var callRouter = GetCallRouter();
-                var rpcResult = await callRouter!.RouteOcppCall(received, clientIdentifier);
-
-                if(rpcResult.Error is not null)
+                if (received is not null)
                 {
-                    if (_currentCall != rpcResult.Error.MessageId)
-                    {
-                        await webSocket.SendAsync(rpcResult.Error.ToByteArray(), WebSocketMessageType.Text, true, CancellationToken.None);
+                    var callRouter = GetCallRouter();
+                    var rpcResult = await callRouter!.RouteOcppCall(received, clientIdentifier);
 
-                        _logger.LogError("Error while handling message {0}: {1} - {2}",
-                            rpcResult.Error.MessageId, rpcResult.Error.ErrorCode, rpcResult.Error.ErrorDescription);
-                    }
-                    else
+                    if (rpcResult.Error is not null)
                     {
-                        SetCurrentCall(string.Empty);
-                        _logger.LogInformation("Received error result for message {0}: {1} - {2}",
-                            rpcResult.Error.MessageId, rpcResult.Error.ErrorCode, rpcResult.Error.ErrorDescription);
+                        if (_currentCall != rpcResult.Error.MessageId)
+                        {
+                            await webSocket.SendAsync(rpcResult.Error.ToByteArray(), WebSocketMessageType.Text, true, CancellationToken.None);
+
+                            _logger.LogError("Error while handling message {0}: {1} - {2}",
+                                rpcResult.Error.MessageId, rpcResult.Error.ErrorCode, rpcResult.Error.ErrorDescription);
+                        }
+                        else
+                        {
+                            SetCurrentCall(string.Empty);
+                            _logger.LogInformation("Received error result for message {0}: {1} - {2}",
+                                rpcResult.Error.MessageId, rpcResult.Error.ErrorCode, rpcResult.Error.ErrorDescription);
+                        }
+                    }
+                    else if (rpcResult.Result is not null)
+                    {
+                        if (_currentCall != rpcResult.Result.MessageId)
+                        {
+                            await webSocket.SendAsync(rpcResult.Result.ToByteArray(), WebSocketMessageType.Text, true, CancellationToken.None);
+                        }
+                        else
+                        {
+                            SetCurrentCall(string.Empty);
+                            _logger.LogInformation("Received response for {0} from {1}", rpcResult.Result.MessageId, clientIdentifier);
+                        }
                     }
                 }
-                else if(rpcResult.Result is not null)
+                else
                 {
-                    if(_currentCall != rpcResult.Result.MessageId)
-                    {
-                        await webSocket.SendAsync(rpcResult.Result.ToByteArray(), WebSocketMessageType.Text, true, CancellationToken.None);
-                    }
-                    else
-                    {
-                        SetCurrentCall(string.Empty);
-                        _logger.LogInformation("Received response for {0} from {1}", rpcResult.Result.MessageId, clientIdentifier);
-                    }
+                    _logger.LogWarning("Received EMPTY data from ws.");
                 }
-            }
-            else
-            {
-                _logger.LogWarning("Received EMPTY data from ws.");
             }
         }
     }

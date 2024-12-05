@@ -4,6 +4,7 @@ using System.Text.Json;
 using Medinilla.DataAccess.Relational;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Medinilla.DataAccess.Migrations
 {
     [DbContext(typeof(MedinillaOcppDbContext))]
-    partial class MedinillaOcppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20241204225516_Authorization-IdTokenTransactions")]
+    partial class AuthorizationIdTokenTransactions
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -34,9 +37,7 @@ namespace Medinilla.DataAccess.Migrations
 
                     b.Property<JsonDocument>("AuthBlob")
                         .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("json")
-                        .HasDefaultValue(System.Text.Json.JsonDocument.Parse("{\"expiryCheck\":{\"flag\":true},\"evseCheck\":{\"evses\":[{\"evseId\":12345,\"allowed\":true},{\"evseId\":67890,\"allowed\":false},{\"evseId\":11223,\"allowed\":true}]},\"locationCheck\":{\"blockedLocations\":[\"LOC-001\",\"LOC-002\",\"LOC-003\"]},\"creditCheck\":null,\"dateRangeCheck\":{\"start\":\"2024-12-06T00:00:00\",\"end\":\"2024-12-07T00:00:00\"}}", new System.Text.Json.JsonDocumentOptions()));
+                        .HasColumnType("json");
 
                     b.Property<Guid>("ChargingStationId")
                         .HasColumnType("uuid");
@@ -109,6 +110,9 @@ namespace Medinilla.DataAccess.Migrations
                     b.Property<string>("Token")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<bool>("UnderTx")
+                        .HasColumnType("boolean");
 
                     b.HasKey("Id");
 

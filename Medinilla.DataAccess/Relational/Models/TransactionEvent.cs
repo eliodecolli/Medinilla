@@ -1,10 +1,14 @@
-﻿namespace Medinilla.DataAccess.Relational.Models;
+﻿using Medinilla.DataAccess.Relational.Models.Authorization;
+
+namespace Medinilla.DataAccess.Relational.Models;
 
 public class TransactionEvent
 {
     public Guid Id { get; set; }
 
     public Guid ChargingStationId { get; set; }
+
+    public Guid? IdTokenId { get; set; }
 
     public string TransactionId { get; set; }
 
@@ -13,8 +17,6 @@ public class TransactionEvent
     public int? EVSEId { get; set; }
 
     public DateTime Timestamp { get; set; }
-
-    public string? IdToken { get; set; }
 
     public bool? Offline { get; set; }
 
@@ -27,4 +29,6 @@ public class TransactionEvent
     public string EventType { get; set; }
 
     public virtual ChargingStation ChargingStation { get; set; }
+
+    public virtual IdToken? IdToken { get; set; }
 }

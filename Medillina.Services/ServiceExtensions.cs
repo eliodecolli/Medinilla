@@ -3,6 +3,9 @@ using Medinilla.Services.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
 using Medinilla.Services.Actions;
 using Medinilla.Services.Actions.Ocpp201;
+using Medinilla.Core.Interfaces;
+using Medinilla.Core.Logic.Authorization.Algorithms;
+using Medinilla.Core.Logic.Authorization;
 
 namespace Medinilla.Services;
 
@@ -19,14 +22,27 @@ public static class ServiceExtensions
         //...add more
     }
 
+    private static void AddAuthAlgos(IServiceCollection services)
+    {
+        services.AddScoped<IAuthAlgorithm, EvseCheckAlgo>();
+        services.AddScoped<IAuthAlgorithm, ExpiryCheckAlgo>();
+        services.AddScoped<IAuthAlgorithm, DefaultAuthorization>();
+        services.AddScoped<IAuthAlgorithm, LocationCheckAlgo>();
+        services.AddScoped<IAuthAlgorithm, DateRangeCheckAlgo>();
+        services.AddScoped<IAuthAlgorithm, CreditCheckAlgo>();
+        //...add more
+    }
+
     public static void AddMedinillaServices(this IServiceCollection serviceCollection)
     {
+        AddOcppActions(serviceCollection);
+        AddAuthAlgos(serviceCollection);
+
         serviceCollection.AddSingleton<IWSDigestionServiceCollection, WSDigestionServiceCollection>();
         serviceCollection.AddTransient<IOcppActionsFactory, OcppActionsFactory>();
         serviceCollection.AddScoped<IOcppCallRouter, OcppCallRouter>();
         serviceCollection.AddScoped<IBasicWebSocketDigestionService, WebSocketDigestionService>();
         serviceCollection.AddScoped<IOcppMessageParser, OcppMessageParser>();
-
-        AddOcppActions(serviceCollection);
+        serviceCollection.AddScoped<AuthorizationAlgorithmFactory>();
     }
 }

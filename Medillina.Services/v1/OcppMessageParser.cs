@@ -10,9 +10,9 @@ public sealed class OcppMessageParser : IOcppMessageParser
     private readonly ITokenizer _tokenizer;
     private List<IToken> _tokens;
 
-    public OcppMessageParser(ITokenizer tokenizer)
+    public OcppMessageParser()
     {
-        _tokenizer = tokenizer;
+        _tokenizer = new OcppMessageTokenizer();
         _tokens = new List<IToken>();
     }
 

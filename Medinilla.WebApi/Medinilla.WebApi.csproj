@@ -16,7 +16,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Medillina.Services\Medinilla.Services.csproj" />
+    <ProjectReference Include="..\Medillina.Services\Medinilla.Core.csproj" />
     <ProjectReference Include="..\Medinilla.DataAccess\Medinilla.DataAccess.csproj" />
     <ProjectReference Include="..\Medinilla.Infrastructure\Medinilla.Infrastructure.csproj" />
   </ItemGroup>

@@ -1,6 +1,4 @@
 ﻿using Medinilla.DataTypes.Contracts.Common;
-using System.ComponentModel;
-using static System.Collections.Specialized.BitVector32;
 
 namespace Medinilla.DataTypes.Contracts;
 

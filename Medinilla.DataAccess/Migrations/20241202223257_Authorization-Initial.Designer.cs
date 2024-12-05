@@ -4,6 +4,7 @@ using System.Text.Json;
 using Medinilla.DataAccess.Relational;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Medinilla.DataAccess.Migrations
 {
     [DbContext(typeof(MedinillaOcppDbContext))]
-    partial class MedinillaOcppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20241202223257_Authorization-Initial")]
+    partial class AuthorizationInitial
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -34,9 +37,7 @@ namespace Medinilla.DataAccess.Migrations
 
                     b.Property<JsonDocument>("AuthBlob")
                         .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("json")
-                        .HasDefaultValue(System.Text.Json.JsonDocument.Parse("{\"expiryCheck\":{\"flag\":true},\"evseCheck\":{\"evses\":[{\"evseId\":12345,\"allowed\":true},{\"evseId\":67890,\"allowed\":false},{\"evseId\":11223,\"allowed\":true}]},\"locationCheck\":{\"blockedLocations\":[\"LOC-001\",\"LOC-002\",\"LOC-003\"]},\"creditCheck\":null,\"dateRangeCheck\":{\"start\":\"2024-12-06T00:00:00\",\"end\":\"2024-12-07T00:00:00\"}}", new System.Text.Json.JsonDocumentOptions()));
+                        .HasColumnType("json");
 
                     b.Property<Guid>("ChargingStationId")
                         .HasColumnType("uuid");
@@ -54,9 +55,6 @@ namespace Medinilla.DataAccess.Migrations
                     b.Property<Guid>("Id")
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
-
-                    b.Property<decimal?>("ActiveCredit")
-                        .HasColumnType("numeric");
 
                     b.Property<Guid>("ChargingStationId")
                         .HasColumnType("uuid");
@@ -103,12 +101,12 @@ namespace Medinilla.DataAccess.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<bool>("IsUnderTx")
-                        .HasColumnType("boolean");
-
                     b.Property<string>("Token")
                         .IsRequired()
                         .HasColumnType("text");
+
+                    b.Property<bool>("UnderTx")
+                        .HasColumnType("boolean");
 
                     b.HasKey("Id");
 
@@ -127,9 +125,6 @@ namespace Medinilla.DataAccess.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
-                    b.Property<string>("Alias")
-                        .HasColumnType("text");
-
                     b.Property<Guid>("AuthDetailsId")
                         .HasColumnType("uuid");
 
@@ -142,9 +137,6 @@ namespace Medinilla.DataAccess.Migrations
 
                     b.Property<string>("LatestBootNotificationReason")
                         .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Location")
                         .HasColumnType("text");
 
                     b.Property<string>("Model")
@@ -233,11 +225,8 @@ namespace Medinilla.DataAccess.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<Guid?>("IdTokenId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("IdTokenId1")
-                        .HasColumnType("uuid");
+                    b.Property<string>("IdToken")
+                        .HasColumnType("text");
 
                     b.Property<decimal>("MeteredValue")
                         .HasColumnType("numeric");
@@ -267,10 +256,6 @@ namespace Medinilla.DataAccess.Migrations
 
                     b.HasIndex("EventType");
 
-                    b.HasIndex("IdTokenId");
-
-                    b.HasIndex("IdTokenId1");
-
                     b.HasIndex("SeqNo");
 
                     b.HasIndex("TransactionId");
@@ -297,12 +282,6 @@ namespace Medinilla.DataAccess.Migrations
                         .HasColumnType("timestamp with time zone");
 
                     b.Property<Guid?>("EvseConnectorId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("IdTokenId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("IdTokenId1")
                         .HasColumnType("uuid");
 
                     b.Property<string>("StartReason")
@@ -333,10 +312,6 @@ namespace Medinilla.DataAccess.Migrations
                     b.HasKey("Id");
 
                     b.HasIndex("EvseConnectorId");
-
-                    b.HasIndex("IdTokenId");
-
-                    b.HasIndex("IdTokenId1");
 
                     b.HasIndex("TransactionId");
 
@@ -409,17 +384,7 @@ namespace Medinilla.DataAccess.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Medinilla.DataAccess.Relational.Models.Authorization.IdToken", null)
-                        .WithMany("TransactionEvents")
-                        .HasForeignKey("IdTokenId");
-
-                    b.HasOne("Medinilla.DataAccess.Relational.Models.Authorization.IdToken", "IdToken")
-                        .WithMany()
-                        .HasForeignKey("IdTokenId1");
-
                     b.Navigation("ChargingStation");
-
-                    b.Navigation("IdToken");
                 });
 
             modelBuilder.Entity("Medinilla.DataAccess.Relational.Models.TransactionSnapshot", b =>
@@ -434,31 +399,14 @@ namespace Medinilla.DataAccess.Migrations
                         .WithMany()
                         .HasForeignKey("EvseConnectorId");
 
-                    b.HasOne("Medinilla.DataAccess.Relational.Models.Authorization.IdToken", null)
-                        .WithMany("TransactionSnapshots")
-                        .HasForeignKey("IdTokenId");
-
-                    b.HasOne("Medinilla.DataAccess.Relational.Models.Authorization.IdToken", "IdToken")
-                        .WithMany()
-                        .HasForeignKey("IdTokenId1");
-
                     b.Navigation("ChargingStation");
 
                     b.Navigation("EvseConnector");
-
-                    b.Navigation("IdToken");
                 });
 
             modelBuilder.Entity("Medinilla.DataAccess.Relational.Models.Authorization.AuthorizationUser", b =>
                 {
                     b.Navigation("Tokens");
-                });
-
-            modelBuilder.Entity("Medinilla.DataAccess.Relational.Models.Authorization.IdToken", b =>
-                {
-                    b.Navigation("TransactionEvents");
-
-                    b.Navigation("TransactionSnapshots");
                 });
 
             modelBuilder.Entity("Medinilla.DataAccess.Relational.Models.ChargingStation", b =>
