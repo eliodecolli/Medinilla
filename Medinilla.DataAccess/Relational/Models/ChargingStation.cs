@@ -6,6 +6,8 @@ public class ChargingStation
 {
     public Guid Id { get; set; }
 
+    public Guid AccountId { get; set; }
+
     public Guid AuthDetailsId { get; set; }
 
     public string ClientIdentifier { get; set; }
@@ -23,6 +25,8 @@ public class ChargingStation
     public DateTime CreatedAt {  get; set; }
 
     public DateTime? ModifiedAt { get; set; }
+
+    public virtual Account Account { get; set; }
 
     public virtual AuthorizationDetails AuthorizationDetails { get; set; }
 

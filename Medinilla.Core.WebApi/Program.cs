@@ -1,9 +1,7 @@
 using Medinilla.DataAccess;
 using Medinilla.Infrastructure;
+using Medinilla.RealTime;
 using Medinilla.Services;
-using Medinilla.WebApi.Middleware;
-using System.Security.Authentication;
-using System.Security.Cryptography.X509Certificates;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -18,6 +16,7 @@ builder.Logging.ClearProviders();
 builder.Logging.AddConsole();
 
 builder.Services.AddMedinillaInfrastructure();
+builder.Services.AddRealTimeServices();
 builder.Services.AddMedinillaDataAccess();
 builder.Services.AddMedinillaServices();
 
