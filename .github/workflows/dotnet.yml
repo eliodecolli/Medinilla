@@ -27,6 +27,6 @@ jobs:
       with:
         version: "29.2"
     - name: Build
-      run: dotnet build --no-restore
+      run: dotnet build -clp:NoSummary --no-restore
     - name: Test
       run: dotnet test --no-build --verbosity normal
