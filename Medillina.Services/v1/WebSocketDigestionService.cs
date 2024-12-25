@@ -1,15 +1,23 @@
-﻿using Medinilla.DataTypes.Core;
+﻿using Google.Protobuf;
+using Medinilla.Core.SharedContracts.Comms;
+using Medinilla.Core.SharedContracts.Comms.Ocpp;
+using Medinilla.DataTypes.Core;
 using Medinilla.DataTypes.WAMP;
+using Medinilla.RealTime;
 using Medinilla.Services.Interfaces;
-using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
+using RabbitMQ.Client.Events;
 using System.Collections.Concurrent;
 using System.Net.WebSockets;
 using System.Text;
 
 namespace Medinilla.Services.v1;
 
-public class WebSocketDigestionService(IServiceProvider serviceProvider, ILogger<WebSocketDigestionService> _logger) : IBasicWebSocketDigestionService
+public class WebSocketDigestionService(IServiceProvider serviceProvider,
+    IConfiguration config,
+    ILogger<WebSocketDigestionService> _logger,
+    ICommunicationProvider commsProvider) : IBasicWebSocketDigestionService
 {
     private WebSocket _webSocket;
     private string _clientIdentifier;
@@ -168,56 +176,99 @@ public class WebSocketDigestionService(IServiceProvider serviceProvider, ILogger
         }
     }
 
-    private IOcppCallRouter GetCallRouter()
+    private string GetChannelName(string clientIdentification)
     {
-        // we need to make sure that we initialize a new router for every message, to avoid triggering the DbContext :(
-        var scope = serviceProvider.CreateScope();
-        return scope.ServiceProvider.GetService<IOcppCallRouter>()!;
+        return $"ws.{clientIdentification}";
+    }
+
+    private async Task RunCommsChannel(object state)
+    {
+        var ea = (BasicDeliverEventArgs)state;
+        try
+        {
+            var result = ea.Body.ToArray();
+
+            var commsResult = Comms.Parser.ParseFrom(result);
+            switch (commsResult.MessageType)
+            {
+                case CommsMessageType.OcppResponse:
+                    var parsed = WampResult.Parser.ParseFrom(commsResult.Payload.ToByteArray());
+                    if (!parsed.Result.IsEmpty)
+                    {
+                        await _webSocket.SendAsync(parsed.Result.ToArray(), WebSocketMessageType.Text, true, CancellationToken.None)
+                            .ConfigureAwait(false);
+                    }
+                    else if (!parsed.Error.IsEmpty)
+                    {
+                        await _webSocket.SendAsync(parsed.Error.ToArray(), WebSocketMessageType.Text, true, CancellationToken.None)
+                            .ConfigureAwait(false);
+                    }
+                    break;
+                case CommsMessageType.OcppRequest:
+                    break;
+            }
+        }
+        catch(Exception ex)
+        {
+            _logger.LogError($"Error from {ea.RoutingKey}: {ex.ToString()}");
+
+        }
     }
 
     public async Task Consume(WebSocket webSocket, string clientIdentifier)
     {
         _webSocket = webSocket;
         _clientIdentifier = clientIdentifier;
+
+        var comms = commsProvider.GetMessenger("RabbitMQ");
+
+        if (comms is null)
+        {
+            _logger.LogError("Unable to get a messenger for RabbitMQ.");
+            throw new Exception("Unable to get a messenger for RabbitMQ.");
+        }
+
+        var signalChannelName = config.GetSection("Comms")["SignalChannel"];
+        if (string.IsNullOrEmpty(signalChannelName))
+        {
+            throw new Exception("Signal channel name is not set.");
+        }
+
+        var channelName = GetChannelName(clientIdentifier);
+
+        await comms.RegisterChannel(signalChannelName);
+
+        await comms.RegisterChannel(channelName);
         
-        while(true) {
+        // handle response flow
+        var responseChannelName = $"{channelName}.response";
+        await comms.RegisterChannel(responseChannelName);
+        await comms.RegisterHandler(responseChannelName, RunCommsChannel);
+
+        await comms.SendMessage(signalChannelName, new CommunicationChannelSignal()
+        {
+            ChannelName = channelName,
+            ChannelType = ChannelType.OcppEvent,
+        }.ToByteArray());
+
+        _logger.LogInformation($"Signaled client for {clientIdentifier} to start listening on {channelName} with response on {responseChannelName}.");
+
+        while (true) {
            if(!IsServiceBusy() && _webSocket.State == WebSocketState.Open)
             {
                 var received = await AwaitWebSocketResponse().ConfigureAwait(false);
 
                 if (received is not null)
                 {
-                    var callRouter = GetCallRouter();
-                    var rpcResult = await callRouter!.RouteOcppCall(received, clientIdentifier);
+                    _logger.LogInformation($"Received {received.Length} bytes from {clientIdentifier}");
 
-                    if (rpcResult.Error is not null)
+                    var payload = new OcppMessage()
                     {
-                        if (_currentCall != rpcResult.Error.MessageId)
-                        {
-                            await webSocket.SendAsync(rpcResult.Error.ToByteArray(), WebSocketMessageType.Text, true, CancellationToken.None);
+                        ClientIdentifier = clientIdentifier,
+                        Payload = ByteString.CopyFrom(received),
+                    };
 
-                            _logger.LogError("Error while handling message {0}: {1} - {2}",
-                                rpcResult.Error.MessageId, rpcResult.Error.ErrorCode, rpcResult.Error.ErrorDescription);
-                        }
-                        else
-                        {
-                            SetCurrentCall(string.Empty);
-                            _logger.LogInformation("Received error result for message {0}: {1} - {2}",
-                                rpcResult.Error.MessageId, rpcResult.Error.ErrorCode, rpcResult.Error.ErrorDescription);
-                        }
-                    }
-                    else if (rpcResult.Result is not null)
-                    {
-                        if (_currentCall != rpcResult.Result.MessageId)
-                        {
-                            await webSocket.SendAsync(rpcResult.Result.ToByteArray(), WebSocketMessageType.Text, true, CancellationToken.None);
-                        }
-                        else
-                        {
-                            SetCurrentCall(string.Empty);
-                            _logger.LogInformation("Received response for {0} from {1}", rpcResult.Result.MessageId, clientIdentifier);
-                        }
-                    }
+                    await comms.SendMessage(channelName, payload.ToByteArray()).ConfigureAwait(false);
                 }
                 else
                 {

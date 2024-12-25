@@ -1,0 +1,16 @@
+{
+  "RabbitUri": "amqp://guest:guest@localhost:5672/",
+  "SignalChannel": "medinilla.ws.rabbit.signal",
+
+  "ConnectionStrings": {
+    "MedinillaCore": "Server=127.0.0.1;Port=5432;Database=MedinillaCore;User Id=postgres;Password=admin;"
+  },
+
+  "Medinilla": {
+    "DefaultUnit": {
+      "Name": "kWh",
+      "Price": 10.0
+    },
+    "DefaultAuthDetails": "{\"expiryCheck\":{\"flag\":true},\"evseCheck\":{\"evses\":[{\"evseId\":12345,\"allowed\":true},{\"evseId\":67890,\"allowed\":false},{\"evseId\":11223,\"allowed\":true}]},\"locationCheck\":{\"blockedLocations\":[\"LOC-001\",\"LOC-002\",\"LOC-003\"]},\"creditCheck\":null,\"dateRangeCheck\":{\"start\":\"2024-12-06T00:00:00\",\"end\":\"2024-12-07T00:00:00\"}}"
+  }
+}

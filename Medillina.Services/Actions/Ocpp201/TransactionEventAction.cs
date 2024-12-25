@@ -20,11 +20,11 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
     // quick access
     private sealed class EventTypes
     {
-        public static string Start = Enum.GetName(TransactionEventEnum.Started) ?? "Started";
+        public static string Start = nameof(TransactionEventEnum.Started) ?? "Started";
 
-        public static string End = Enum.GetName(TransactionEventEnum.Ended) ?? "Ended";
+        public static string End = nameof(TransactionEventEnum.Ended) ?? "Ended";
 
-        public static string Update = Enum.GetName(TransactionEventEnum.Updated) ?? "Updated";
+        public static string Update = nameof(TransactionEventEnum.Updated) ?? "Updated";
     }
 
     public string ActionName => "TransactionEvent";

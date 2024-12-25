@@ -1,6 +1,7 @@
 ﻿using Microsoft.Extensions.DependencyInjection;
 using Medinilla.RealTime.PubNub;
 using Microsoft.Extensions.Configuration;
+using Medinilla.RealTime.Rabbit;
 
 namespace Medinilla.RealTime;
 
@@ -10,14 +11,9 @@ public static class ServiceCollectionExtensions
     {
         // Load the embedded configuration first
         var builder = new ConfigurationBuilder();
-        using (var stream = typeof(ServiceCollectionExtensions).Assembly
-            .GetManifestResourceStream("Medinilla.RealTime.appsettings.json"))
-        {
-            if (stream is not null)
-            {
-                builder.AddJsonStream(stream);
-            }
-        }
+        using var stream = typeof(ServiceCollectionExtensions).Assembly.GetManifestResourceStream("Medinilla.RealTime.appsettings.json");
+
+        builder.AddJsonStream(stream);
         var config = builder.Build();
         
         // Fix: Configure options correctly by binding the section
@@ -28,7 +24,14 @@ public static class ServiceCollectionExtensions
             options.UserId = pubnubSection["UserId"];
         });
 
+        services.AddScoped<ICommunicationProvider, CommunicationProvider>();
+
         services.AddScoped<IRealTimeMessenger, PubNubClient>();
+        services.AddScoped<IRealTimeMessenger, RabbitMQMessenger>(provider =>
+        {
+            var connectionUri = config.GetSection("RabbitMQ")["Uri"] ?? "";
+            return new RabbitMQMessenger(connectionUri);
+        });
 
         return services;
     }

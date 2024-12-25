@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package medinilla.core.SharedContracts.comms;
+
+enum ChannelType {
+	OcppEvent = 0;
+	Other = 1;
+}
+
+message CommunicationChannelSignal {
+	string ChannelName = 1;
+	ChannelType ChannelType = 2;
+}

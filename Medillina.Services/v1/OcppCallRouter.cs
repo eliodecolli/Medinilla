@@ -1,5 +1,4 @@
 ﻿using Medinilla.DataTypes.WAMP;
-using Medinilla.Infrastructure.Tokenizer;
 using Medinilla.Services.Actions;
 using Medinilla.Services.Interfaces;
 using Microsoft.Extensions.Logging;
@@ -20,10 +19,7 @@ public class OcppCallRouter : IOcppCallRouter
 
     public async Task<RpcResult> RouteOcppCall(byte[] buffer, string? clientIdentifier)
     {
-        if (clientIdentifier is null)
-        {
-            throw new Exception("Invalid client identifier");
-        }
+        ArgumentNullException.ThrowIfNull(clientIdentifier, nameof(clientIdentifier));
 
         var messageString = Encoding.UTF8.GetString(buffer);
 

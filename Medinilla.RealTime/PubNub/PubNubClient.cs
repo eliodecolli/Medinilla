@@ -18,6 +18,23 @@ public class PubNubClient : IRealTimeMessenger
         });
     }
 
+    public string GetCommunicationProviderName() => "PubNub";
+
+    public Task RegisterChannel(string channelName)
+    {
+        throw new NotImplementedException();
+    }
+
+    public void RegisterHandler(Func<Task> handler)
+    {
+        throw new NotImplementedException();
+    }
+
+    public Task RegisterHandler(string channelName, Func<object, Task> handler)
+    {
+        throw new NotImplementedException();
+    }
+
     public async Task SendMessage(string channel, byte[] message)
     {
         await _pubnub.Publish()
