@@ -14,6 +14,23 @@ def compile_protos(type_format):
     print(f"Compiling with protoc as {type_format}")
     current_dir = os.getcwd()
     
+    # Check protoc path
+    protoc_path = "./tools/protoc/protoc.exe"
+    abs_protoc_path = os.path.abspath(protoc_path)
+    print(f"Looking for protoc at: {abs_protoc_path}")
+    
+    if not os.path.exists(abs_protoc_path):
+        print("Protoc not found! Listing directory contents:")
+        # List contents of current directory and tools directory if it exists
+        print("Current directory:", os.listdir(current_dir))
+        tools_dir = os.path.join(current_dir, "tools")
+        if os.path.exists(tools_dir):
+            print("Tools directory:", os.listdir(tools_dir))
+        sys.exit(1)
+    
+    # Make protoc executable
+    os.chmod(abs_protoc_path, 0o755)
+    
     # Create compiled directory if it doesn't exist
     compiled_dir = os.path.join(current_dir, "compiled")
     os.makedirs(compiled_dir, exist_ok=True)
@@ -29,7 +46,7 @@ def compile_protos(type_format):
                 
                 # Build the protoc command
                 cmd = [
-                    "./tools/protoc/protoc",
+                    abs_protoc_path,
                     f"--proto_path={proto_path}",
                     f"--{type_format}={compiled_dir}",
                     proto_file
