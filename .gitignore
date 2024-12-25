@@ -4,7 +4,7 @@
 ## Get latest from https://github.com/github/gitignore/blob/master/VisualStudio.gitignore
 
 # ignore compiled protobufs
-./Medinilla.Core.SharedContracts/compiled/
+/Medinilla.Core.SharedContracts/compiled/*
 
 # our own stuff
 **/bin/
