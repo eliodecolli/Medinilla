@@ -1,5 +1,4 @@
 ﻿#!/usr/bin/env python3
-
 import os
 import sys
 import subprocess
@@ -38,9 +37,13 @@ def compile_protos(type_format):
                 
                 # Run protoc
                 try:
-                    subprocess.run(cmd, check=True)
+                    process = subprocess.run(cmd, check=True, capture_output=True, text=True)
+                    if process.stderr:
+                        print(f"Warnings for {file}:")
+                        print(process.stderr)
                 except subprocess.CalledProcessError as e:
-                    print(f"Error compiling {file}: {e}")
+                    print(f"Error compiling {file}:")
+                    print(e.stderr)
                     sys.exit(1)
 
 def main():
