@@ -23,7 +23,7 @@ jobs:
     - name: Restore dependencies
       run: dotnet restore
     - name: Make protoc executable
-      run: chmod +x ./tools/protoc/bin/protoc
+      run: chmod +x ./tools/protoc/protoc
     - name: Build
       run: dotnet build --no-restore
     - name: Test
