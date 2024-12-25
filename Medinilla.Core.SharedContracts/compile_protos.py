@@ -2,7 +2,37 @@
 import os
 import sys
 import subprocess
+import shutil
 from pathlib import Path
+
+def get_protoc_path():
+    """
+    Check if protoc is in PATH, otherwise use local path.
+    Returns the path to use for protoc.
+    """
+    # Check if protoc is in PATH
+    protoc_in_path = shutil.which('protoc')
+    if protoc_in_path:
+        print(f"Found protoc in PATH: {protoc_in_path}")
+        return 'protoc'
+    
+    # Use local path
+    local_protoc = "./tools/protoc/protoc.exe"
+    abs_protoc_path = os.path.abspath(local_protoc)
+    print(f"Looking for local protoc at: {abs_protoc_path}")
+    
+    if not os.path.exists(abs_protoc_path):
+        print("Local protoc not found! Listing directory contents:")
+        current_dir = os.getcwd()
+        print("Current directory:", os.listdir(current_dir))
+        tools_dir = os.path.join(current_dir, "tools")
+        if os.path.exists(tools_dir):
+            print("Tools directory:", os.listdir(tools_dir))
+        sys.exit(1)
+        
+    # Make local protoc executable
+    os.chmod(abs_protoc_path, 0o755)
+    return abs_protoc_path
 
 def compile_protos(type_format):
     """
@@ -14,22 +44,8 @@ def compile_protos(type_format):
     print(f"Compiling with protoc as {type_format}")
     current_dir = os.getcwd()
     
-    # Check protoc path
-    protoc_path = "./tools/protoc/protoc.exe"
-    abs_protoc_path = os.path.abspath(protoc_path)
-    print(f"Looking for protoc at: {abs_protoc_path}")
-    
-    if not os.path.exists(abs_protoc_path):
-        print("Protoc not found! Listing directory contents:")
-        # List contents of current directory and tools directory if it exists
-        print("Current directory:", os.listdir(current_dir))
-        tools_dir = os.path.join(current_dir, "tools")
-        if os.path.exists(tools_dir):
-            print("Tools directory:", os.listdir(tools_dir))
-        sys.exit(1)
-    
-    # Make protoc executable
-    os.chmod(abs_protoc_path, 0o755)
+    # Get protoc path
+    protoc_path = get_protoc_path()
     
     # Create compiled directory if it doesn't exist
     compiled_dir = os.path.join(current_dir, "compiled")
@@ -46,7 +62,7 @@ def compile_protos(type_format):
                 
                 # Build the protoc command
                 cmd = [
-                    abs_protoc_path,
+                    protoc_path,
                     f"--proto_path={proto_path}",
                     f"--{type_format}={compiled_dir}",
                     proto_file
