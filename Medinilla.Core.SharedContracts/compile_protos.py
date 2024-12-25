@@ -29,7 +29,7 @@ def compile_protos(type_format):
                 
                 # Build the protoc command
                 cmd = [
-                    "./tools/protoc/bin/protoc",
+                    "./tools/protoc/protoc",
                     f"--proto_path={proto_path}",
                     f"--{type_format}={compiled_dir}",
                     proto_file
