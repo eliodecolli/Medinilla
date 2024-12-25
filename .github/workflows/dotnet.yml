@@ -27,6 +27,6 @@ jobs:
       with:
         version: "29.2"
     - name: Build
-      run: dotnet build -p:SkipProjects=Medinilla.Core.SharedContracts.csproj --no-restore
+      run: dotnet build --no-restore
     - name: Test
       run: dotnet test --no-build --verbosity normal
