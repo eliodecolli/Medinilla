@@ -29,6 +29,7 @@ jobs:
     - name: Build
       run: dotnet build --no-restore
     - name: Debug - List compiled files
+      if: always()
       run: |
         cd Medinilla.Core.SharedContracts/compiled
         ls -la
