@@ -26,6 +26,21 @@ namespace Medinilla.DataAccess.Migrations
 
             NpgsqlModelBuilderExtensions.UseIdentityByDefaultColumns(modelBuilder);
 
+            modelBuilder.Entity("Medinilla.DataAccess.Relational.Models.Account", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Name")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.ToTable("core_account", (string)null);
+                });
+
             modelBuilder.Entity("Medinilla.DataAccess.Relational.Models.Authorization.AuthorizationDetails", b =>
                 {
                     b.Property<Guid>("Id")
@@ -34,9 +49,7 @@ namespace Medinilla.DataAccess.Migrations
 
                     b.Property<JsonDocument>("AuthBlob")
                         .IsRequired()
-                        .ValueGeneratedOnAdd()
-                        .HasColumnType("json")
-                        .HasDefaultValue(System.Text.Json.JsonDocument.Parse("{\"expiryCheck\":{\"flag\":true},\"evseCheck\":{\"evses\":[{\"evseId\":12345,\"allowed\":true},{\"evseId\":67890,\"allowed\":false},{\"evseId\":11223,\"allowed\":true}]},\"locationCheck\":{\"blockedLocations\":[\"LOC-001\",\"LOC-002\",\"LOC-003\"]},\"creditCheck\":null,\"dateRangeCheck\":{\"start\":\"2024-12-06T00:00:00\",\"end\":\"2024-12-07T00:00:00\"}}", new System.Text.Json.JsonDocumentOptions()));
+                        .HasColumnType("jsonb");
 
                     b.Property<Guid>("ChargingStationId")
                         .HasColumnType("uuid");
@@ -127,6 +140,9 @@ namespace Medinilla.DataAccess.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uuid");
+
                     b.Property<string>("Alias")
                         .HasColumnType("text");
 
@@ -160,9 +176,11 @@ namespace Medinilla.DataAccess.Migrations
 
                     b.HasKey("Id");
 
+                    b.HasIndex("AccountId");
+
                     b.HasIndex("ClientIdentifier");
 
-                    b.ToTable("charging_station", (string)null);
+                    b.ToTable("core_charging_station", (string)null);
                 });
 
             modelBuilder.Entity("Medinilla.DataAccess.Relational.Models.EvseConnector", b =>
@@ -191,7 +209,7 @@ namespace Medinilla.DataAccess.Migrations
 
                     b.HasIndex("ChargingStationId");
 
-                    b.ToTable("evse_connector", (string)null);
+                    b.ToTable("core_evse_connector", (string)null);
                 });
 
             modelBuilder.Entity("Medinilla.DataAccess.Relational.Models.Tariff", b =>
@@ -214,7 +232,7 @@ namespace Medinilla.DataAccess.Migrations
 
                     b.HasIndex("ChargingStationId");
 
-                    b.ToTable("tariff", (string)null);
+                    b.ToTable("core_tariff", (string)null);
                 });
 
             modelBuilder.Entity("Medinilla.DataAccess.Relational.Models.TransactionEvent", b =>
@@ -277,7 +295,7 @@ namespace Medinilla.DataAccess.Migrations
 
                     b.HasIndex("ChargingStationId", "TransactionId");
 
-                    b.ToTable("transactions_event", (string)null);
+                    b.ToTable("core_transactions_event", (string)null);
                 });
 
             modelBuilder.Entity("Medinilla.DataAccess.Relational.Models.TransactionSnapshot", b =>
@@ -342,7 +360,7 @@ namespace Medinilla.DataAccess.Migrations
 
                     b.HasIndex("ChargingStationId", "TransactionId");
 
-                    b.ToTable("transactions_snapshot", (string)null);
+                    b.ToTable("core_transactions_snapshot", (string)null);
                 });
 
             modelBuilder.Entity("Medinilla.DataAccess.Relational.Models.Authorization.AuthorizationDetails", b =>
@@ -377,6 +395,17 @@ namespace Medinilla.DataAccess.Migrations
                     b.Navigation("ChargingStation");
 
                     b.Navigation("User");
+                });
+
+            modelBuilder.Entity("Medinilla.DataAccess.Relational.Models.ChargingStation", b =>
+                {
+                    b.HasOne("Medinilla.DataAccess.Relational.Models.Account", "Account")
+                        .WithMany("ChargingStations")
+                        .HasForeignKey("AccountId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Account");
                 });
 
             modelBuilder.Entity("Medinilla.DataAccess.Relational.Models.EvseConnector", b =>
@@ -447,6 +476,11 @@ namespace Medinilla.DataAccess.Migrations
                     b.Navigation("EvseConnector");
 
                     b.Navigation("IdToken");
+                });
+
+            modelBuilder.Entity("Medinilla.DataAccess.Relational.Models.Account", b =>
+                {
+                    b.Navigation("ChargingStations");
                 });
 
             modelBuilder.Entity("Medinilla.DataAccess.Relational.Models.Authorization.AuthorizationUser", b =>

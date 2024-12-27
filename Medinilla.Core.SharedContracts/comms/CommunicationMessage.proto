@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+package medinilla.core.SharedContracts.comms;
+
+enum CommsMessageType {
+	OcppRequest = 0;
+	OcppResponse = 1;
+}
+
+message Comms {
+	CommsMessageType MessageType = 1;
+	bytes Payload = 2;
+}

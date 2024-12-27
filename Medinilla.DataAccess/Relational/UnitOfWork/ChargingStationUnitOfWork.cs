@@ -11,6 +11,7 @@ public sealed class ChargingStationUnitOfWork(MedinillaOcppDbContext context, IC
     private IRepository<ChargingStation> repository = new GenericRepository<ChargingStation>(context);
     private IRepository<Tariff> tariffsRepo = new GenericRepository<Tariff>(context);
     private IRepository<AuthorizationDetails> authDetailsRepo = new GenericRepository<AuthorizationDetails>(context);
+    private IRepository<Account> accountRepo = new GenericRepository<Account>(context);
 
     public EvseUnitOfWork EvseConnectorSubUnit = new EvseUnitOfWork(context); 
 
@@ -22,6 +23,7 @@ public sealed class ChargingStationUnitOfWork(MedinillaOcppDbContext context, IC
         var entity = result.FirstOrDefault();
         if (entity == null)
         {
+            chargingStation.AccountId = Guid.Parse("6849f838-5cf4-4e1a-9502-e50dc17232c7");
             chargingStation.CreatedAt = DateTime.UtcNow;
             entity = await repository.Create(chargingStation);
         }

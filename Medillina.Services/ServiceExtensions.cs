@@ -6,6 +6,7 @@ using Medinilla.Services.Actions.Ocpp201;
 using Medinilla.Core.Interfaces;
 using Medinilla.Core.Logic.Authorization.Algorithms;
 using Medinilla.Core.Logic.Authorization;
+using Microsoft.Extensions.Configuration;
 
 namespace Medinilla.Services;
 

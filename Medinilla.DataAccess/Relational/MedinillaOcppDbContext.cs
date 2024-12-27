@@ -8,10 +8,6 @@ namespace Medinilla.DataAccess.Relational;
 
 public class MedinillaOcppDbContext(IConfiguration config) : DbContext
 {
-    public DbSet<TransactionEvent> TransactionEvents { get; set; }
-    public DbSet<ChargingStation> ChargingStations { get; set; }
-    public DbSet<EvseConnector> EvseConnectors { get; set; }
-
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
         optionsBuilder.UseLazyLoadingProxies();
@@ -23,11 +19,12 @@ public class MedinillaOcppDbContext(IConfiguration config) : DbContext
         base.OnModelCreating(modelBuilder);
 
         // configure table
-        modelBuilder.Entity<ChargingStation>().ToTable("charging_station");
-        modelBuilder.Entity<EvseConnector>().ToTable("evse_connector");
-        modelBuilder.Entity<Tariff>().ToTable("tariff");
-        modelBuilder.Entity<TransactionEvent>().ToTable("transactions_event");
-        modelBuilder.Entity<TransactionSnapshot>().ToTable("transactions_snapshot");
+        modelBuilder.Entity<Account>().ToTable("core_account");
+        modelBuilder.Entity<ChargingStation>().ToTable("core_charging_station");
+        modelBuilder.Entity<EvseConnector>().ToTable("core_evse_connector");
+        modelBuilder.Entity<Tariff>().ToTable("core_tariff");
+        modelBuilder.Entity<TransactionEvent>().ToTable("core_transactions_event");
+        modelBuilder.Entity<TransactionSnapshot>().ToTable("core_transactions_snapshot");
         modelBuilder.Entity<IdToken>().ToTable("core_id_token");
         modelBuilder.Entity<AuthorizationDetails>().ToTable("core_auth_details");
         modelBuilder.Entity<AuthorizationUser>().ToTable("core_auth_user");
@@ -44,6 +41,11 @@ public class MedinillaOcppDbContext(IConfiguration config) : DbContext
         modelBuilder.Entity<IdToken>().HasIndex(c => new { c.ChargingStationId, c.Token });
 
         modelBuilder.Entity<ChargingStation>().HasIndex(c => c.ClientIdentifier);
+
+        // configure account
+        modelBuilder.Entity<Account>().HasMany(c => c.ChargingStations)
+            .WithOne(c => c.Account)
+            .HasForeignKey(c => c.AccountId);
 
         // configure charging station
         modelBuilder.Entity<ChargingStation>().HasMany(c => c.EvseConnectors)

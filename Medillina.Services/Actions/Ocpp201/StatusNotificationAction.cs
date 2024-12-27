@@ -1,12 +1,16 @@
-﻿using Medinilla.DataAccess.Relational.Models;
+﻿using Medinilla.Core.Logic;
+using Medinilla.DataAccess.Relational.Models;
 using Medinilla.DataAccess.Relational.UnitOfWork;
 using Medinilla.DataTypes.Contracts;
 using Medinilla.DataTypes.WAMP;
+using Medinilla.RealTime;
 using Microsoft.Extensions.Logging;
 
 namespace Medinilla.Services.Actions.Ocpp201;
 
-public sealed class StatusNotificationAction(ChargingStationUnitOfWork unitOfWork, ILogger<StatusNotificationAction> logger) : IOcppAction
+public sealed class StatusNotificationAction(ChargingStationUnitOfWork unitOfWork,
+    ILogger<StatusNotificationAction> logger,
+    IRealTimeMessenger realTime) : IOcppAction
 {
     public string ActionName => "StatusNotification";
 
@@ -44,6 +48,9 @@ public sealed class StatusNotificationAction(ChargingStationUnitOfWork unitOfWor
 
         await unitOfWork.EvseConnectorSubUnit.ProcessStatusNotification(evseConnector);
         await unitOfWork.Save();
+
+        // throw this event whenever it's convenient
+        realTime.SendMessage("", []);
 
         return new RpcResult()
         {

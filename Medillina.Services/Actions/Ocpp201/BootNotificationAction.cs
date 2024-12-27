@@ -19,7 +19,7 @@ public sealed class BootNotificationAction(ChargingStationUnitOfWork unitOfWork,
             ClientIdentifier = clientIdentifier,
             Model = request.ChargingStation.Model,
             Vendor = request.ChargingStation.VendorName,
-            LatestBootNotificationReason = Enum.GetName(request.Reason)!
+            LatestBootNotificationReason = Enum.GetName(request.Reason)!,
         };
     }
 

@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+package medinilla.core.SharedContracts;
+
+message Evse {
+	string EvseId = 1;
+	string Status = 2;
+}
+
+message ChargingStation {
+	string Id = 1;
+	string ClientIdentification = 2;
+	optional string Alias = 3;
+	optional string Location = 4;
+	string Status = 5;
+
+	repeated Evse Evses = 6;
+}
