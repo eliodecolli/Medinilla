@@ -26,12 +26,19 @@ jobs:
       uses: arduino/setup-protoc@v3
       with:
         version: "29.2"
+        
+    - name: Build Shared Contracts
+      run: |
+        dotnet build Medinilla.Core.SharedContracts/Medinilla.Core.SharedContracts.csproj --no-restore -c Debug -o ./bin/Debug/net8.0
+
     - name: Build
       run: dotnet build --no-restore
+      
     - name: Debug - List compiled files
       if: always()
       run: |
         cd Medinilla.Core.SharedContracts/compiled
         ls -la
+        
     - name: Test
       run: dotnet test --no-build --verbosity normal
