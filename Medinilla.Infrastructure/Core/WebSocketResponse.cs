@@ -4,7 +4,7 @@ namespace Medinilla.Infrastructure.Core;
 
 public sealed class WebSocketResponse
 {
-    public WebSocketResponseStatus ResponseStatus { get; set;  }
+    public WebSocketResponseStatus ResponseStatus { get; set; }
 
     public OcppCallResult? OcppCallResult { get; set; }
 

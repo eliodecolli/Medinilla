@@ -1,5 +1,4 @@
 ﻿using Medinilla.Infrastructure.Tokenizer;
-using System.Reflection;
 using System.Text;
 
 namespace Medinilla.Infrastructure;
@@ -22,7 +21,7 @@ public class OcppMessageWriter
 
     public byte[] Serialize()
     {
-        if(!_close)
+        if (!_close)
         {
             _builder.Append("]");
             _close = true;
@@ -35,7 +34,7 @@ public class OcppMessageWriter
     {
         return Encoding.Unicode.GetBytes(value);
     }
-    
+
 
     private void WriteQuotationMark() => _builder.Append("\"");
 

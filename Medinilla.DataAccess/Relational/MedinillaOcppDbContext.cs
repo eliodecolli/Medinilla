@@ -70,7 +70,7 @@ public class MedinillaOcppDbContext(IConfiguration config) : DbContext
         // configure transaction snapshots
         modelBuilder.Entity<TransactionSnapshot>().HasOne(c => c.EvseConnector)
             .WithMany()
-            .HasForeignKey(c =>c.EvseConnectorId);
+            .HasForeignKey(c => c.EvseConnectorId);
 
         // configure auth
         modelBuilder.Entity<IdToken>().HasOne(c => c.ChargingStation)

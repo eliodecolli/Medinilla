@@ -1,8 +1,6 @@
-﻿using Microsoft.Extensions.DependencyInjection;
-using Medinilla.DataAccess.Relational;
+﻿using Medinilla.DataAccess.Relational;
 using Medinilla.DataAccess.Relational.UnitOfWork;
-using Microsoft.Extensions.Configuration;
-using Microsoft.EntityFrameworkCore;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Medinilla.DataAccess;
 

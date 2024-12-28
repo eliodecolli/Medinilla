@@ -1,13 +1,13 @@
-﻿using Medinilla.Core.Service.Interfaces;
+﻿using Google.Protobuf;
+using Medinilla.Core.Service.Interfaces;
 using Medinilla.Core.Service.Types;
 using Medinilla.Core.SharedContracts.Comms;
+using Medinilla.Core.SharedContracts.Comms.Ocpp;
+using Medinilla.Infrastructure.Interops;
+using Medinilla.Services.Interfaces;
 using Microsoft.Extensions.Logging;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
-using Medinilla.Services.Interfaces;
-using Medinilla.Core.SharedContracts.Comms.Ocpp;
-using Google.Protobuf;
-using Medinilla.Infrastructure.Interops;
 
 namespace Medinilla.Core.Service.Communication;
 

@@ -8,7 +8,7 @@ public class WSDigestionServiceCollection : IWSDigestionServiceCollection
 
     public IBasicWebSocketDigestionService? Get(string clientIdentifier)
     {
-        if(_table.TryGetValue(clientIdentifier, out var val))
+        if (_table.TryGetValue(clientIdentifier, out var val))
         {
             return val;
         }

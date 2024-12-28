@@ -39,7 +39,8 @@ public sealed class BootNotificationAction(ChargingStationUnitOfWork unitOfWork,
         // idk do something here..?
         return new RpcResult()
         {
-            Result = call.CreateResult(new BootNotificationResponse(1440, RegistrationStatusEnum.Accepted, new StatusInfo() {
+            Result = call.CreateResult(new BootNotificationResponse(1440, RegistrationStatusEnum.Accepted, new StatusInfo()
+            {
                 ReasonCode = "200",
                 AdditionalInfo = ""
             })),

@@ -1,5 +1,4 @@
-﻿using Medinilla.Core.Logic;
-using Medinilla.DataAccess.Relational.Models;
+﻿using Medinilla.DataAccess.Relational.Models;
 using Medinilla.DataAccess.Relational.UnitOfWork;
 using Medinilla.DataTypes.Contracts;
 using Medinilla.Infrastructure.WAMP;
@@ -32,7 +31,7 @@ public sealed class StatusNotificationAction(ChargingStationUnitOfWork unitOfWor
     public async Task<RpcResult> Execute(OcppCallRequest call, string clientIdentifier)
     {
         var request = call.As<StatusNotificationRequest>();
-       
+
         var chargingStation = await unitOfWork.GetChargingStation(clientIdentifier);
         if (chargingStation == null)
         {

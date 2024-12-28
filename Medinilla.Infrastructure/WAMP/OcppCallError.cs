@@ -1,13 +1,10 @@
-﻿using System;
-using System.Collections.Generic;
-using System.ComponentModel.DataAnnotations;
-using System.Linq;
+﻿using System.ComponentModel.DataAnnotations;
 using System.Text;
 using System.Text.Json;
 
 namespace Medinilla.Infrastructure.WAMP;
 
-public sealed class OcppCallError: BaseOcppMessage
+public sealed class OcppCallError : BaseOcppMessage
 {
     public static class ErrorCodes
     {
@@ -94,7 +91,7 @@ public sealed class OcppCallError: BaseOcppMessage
 
     public T? DetailsAs<T>() where T : class
     {
-        if(ErrorDetails is null)
+        if (ErrorDetails is null)
         {
             return null;
         }

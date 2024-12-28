@@ -2,7 +2,7 @@
 
 public sealed class OcspRequestData
 {
-    public string HashAlgorithm {  get; set; }
+    public string HashAlgorithm { get; set; }
 
     public string IssuerNameHash { get; set; }
 

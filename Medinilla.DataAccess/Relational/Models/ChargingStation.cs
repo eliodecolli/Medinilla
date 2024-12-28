@@ -12,17 +12,17 @@ public class ChargingStation
 
     public string ClientIdentifier { get; set; }
 
-    public string Model {  get; set; }
+    public string Model { get; set; }
 
     public string Vendor { get; set; }
 
-    public string LatestBootNotificationReason {  get; set; }
+    public string LatestBootNotificationReason { get; set; }
 
     public string? Location { get; set; }
 
     public string? Alias { get; set; }
 
-    public DateTime CreatedAt {  get; set; }
+    public DateTime CreatedAt { get; set; }
 
     public DateTime? ModifiedAt { get; set; }
 

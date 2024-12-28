@@ -1,7 +1,7 @@
-﻿using Microsoft.Extensions.DependencyInjection;
-using Medinilla.RealTime.PubNub;
-using Microsoft.Extensions.Configuration;
+﻿using Medinilla.RealTime.PubNub;
 using Medinilla.RealTime.Rabbit;
+using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Medinilla.RealTime;
 
@@ -15,10 +15,11 @@ public static class ServiceCollectionExtensions
 
         builder.AddJsonStream(stream);
         var config = builder.Build();
-        
+
         // Fix: Configure options correctly by binding the section
         var pubnubSection = config.GetSection("Pubnub");
-        services.Configure<PubnubConfiguration>(options => {
+        services.Configure<PubnubConfiguration>(options =>
+        {
             options.PublishKey = pubnubSection["PublishKey"];
             options.SubscribeKey = pubnubSection["SubscribeKey"];
             options.UserId = pubnubSection["UserId"];

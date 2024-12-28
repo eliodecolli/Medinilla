@@ -1,7 +1,7 @@
-﻿using Medinilla.Infrastructure.WAMP;
-using Medinilla.Infrastructure.Tokenizer.Interfaces;
+﻿using Medinilla.Infrastructure.Interfaces;
 using Medinilla.Infrastructure.Tokenizer;
-using Medinilla.Infrastructure.Interfaces;
+using Medinilla.Infrastructure.Tokenizer.Interfaces;
+using Medinilla.Infrastructure.WAMP;
 
 namespace Medinilla.Infrastructure;
 

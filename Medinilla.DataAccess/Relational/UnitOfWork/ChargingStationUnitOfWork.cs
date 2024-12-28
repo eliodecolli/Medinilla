@@ -13,7 +13,7 @@ public sealed class ChargingStationUnitOfWork(MedinillaOcppDbContext context, IC
     private IRepository<AuthorizationDetails> authDetailsRepo = new GenericRepository<AuthorizationDetails>(context);
     private IRepository<Account> accountRepo = new GenericRepository<Account>(context);
 
-    public EvseUnitOfWork EvseConnectorSubUnit = new EvseUnitOfWork(context); 
+    public EvseUnitOfWork EvseConnectorSubUnit = new EvseUnitOfWork(context);
 
     public TransactionsUnitOfWork TransactionsSubUnit = new TransactionsUnitOfWork(context);
 
@@ -58,7 +58,7 @@ public sealed class ChargingStationUnitOfWork(MedinillaOcppDbContext context, IC
                 ChargingStationId = entity.Id,
             });
         }
-        
+
     }
 
     public async Task<ChargingStation?> GetChargingStation(string id)

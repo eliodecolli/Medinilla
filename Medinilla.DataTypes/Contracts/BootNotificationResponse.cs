@@ -15,7 +15,7 @@ public sealed class BootNotificationResponse
     }
 
     public DateTime CurrentTime { get; private set; }
-    
+
     // TODO: This is related to the heartbeat interval and some other stuff so you gotta revisit it.
     public int Interval { get; private set; }
 

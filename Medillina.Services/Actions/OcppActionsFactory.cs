@@ -12,7 +12,7 @@ public class OcppActionsFactory : IOcppActionsFactory
     {
         _logger = logger;
         _registry = new Dictionary<string, IOcppAction>();
-        foreach(var action in registeredActions)
+        foreach (var action in registeredActions)
         {
             _registry.Add(action.ActionName, action);
         }
@@ -20,7 +20,7 @@ public class OcppActionsFactory : IOcppActionsFactory
 
     public IOcppAction? GetAction(string actionName)
     {
-        if(_registry.TryGetValue(actionName, out var action))
+        if (_registry.TryGetValue(actionName, out var action))
         {
             return action;
         }

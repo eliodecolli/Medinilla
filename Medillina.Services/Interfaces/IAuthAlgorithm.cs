@@ -1,5 +1,5 @@
-﻿using Medinilla.DataTypes.Contracts.Common;
-using Medinilla.Core.Logic.Authorization;
+﻿using Medinilla.Core.Logic.Authorization;
+using Medinilla.DataTypes.Contracts.Common;
 using Medinilla.Infrastructure.Core.Authorization;
 
 namespace Medinilla.Core.Interfaces;

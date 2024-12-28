@@ -3,7 +3,6 @@ using Medinilla.Core.Service.Communication;
 using Medinilla.Core.Service.Interfaces;
 using Medinilla.Core.Service.Types;
 using Medinilla.DataAccess;
-using Medinilla.DataAccess.Relational;
 using Medinilla.Infrastructure;
 using Medinilla.RealTime;
 using Medinilla.Services;
