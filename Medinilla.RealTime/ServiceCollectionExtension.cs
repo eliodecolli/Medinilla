@@ -24,7 +24,7 @@ public static class ServiceCollectionExtensions
             options.UserId = pubnubSection["UserId"];
         });
 
-        services.AddScoped<ICommunicationProvider, CommunicationProvider>();
+        services.AddTransient<ICommunicationProvider, CommunicationProvider>();
 
         services.AddScoped<IRealTimeMessenger, PubNubClient>();
         services.AddScoped<IRealTimeMessenger, RabbitMQMessenger>(provider =>

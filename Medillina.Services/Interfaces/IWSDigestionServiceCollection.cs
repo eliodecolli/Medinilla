@@ -6,4 +6,6 @@ public interface IWSDigestionServiceCollection
     IBasicWebSocketDigestionService? Get(string clientIdentifier);
 
     void Set(string clientIdentifier, IBasicWebSocketDigestionService service);
+
+    void Remove(string clientIdentifier);
 }

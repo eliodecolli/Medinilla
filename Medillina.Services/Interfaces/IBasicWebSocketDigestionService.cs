@@ -5,7 +5,7 @@ using System.Net.WebSockets;
 
 namespace Medinilla.Services.Interfaces;
 
-public interface IBasicWebSocketDigestionService
+public interface IBasicWebSocketDigestionService : IDisposable
 {
     Task Consume(WebSocket webSocket, string clientIdentifier);
 

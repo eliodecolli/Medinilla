@@ -16,6 +16,15 @@ public class WSDigestionServiceCollection : IWSDigestionServiceCollection
         return null;
     }
 
+    public void Remove(string clientIdentifier)
+    {
+        if (_table.TryGetValue(clientIdentifier, out var val))
+        {
+            val.Dispose();
+            _table.Remove(clientIdentifier);
+        }
+    }
+
     public void Set(string clientIdentifier, IBasicWebSocketDigestionService service)
     {
         _table[clientIdentifier] = service;

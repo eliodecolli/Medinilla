@@ -3,6 +3,7 @@ using Medinilla.Core.SharedContracts.Comms;
 using Medinilla.Core.SharedContracts.Comms.Ocpp;
 using Medinilla.DataTypes.Core;
 using Medinilla.DataTypes.WAMP;
+using Medinilla.Infrastructure.Interops;
 using Medinilla.RealTime;
 using Medinilla.Services.Interfaces;
 using Microsoft.Extensions.Configuration;
@@ -29,9 +30,16 @@ public class WebSocketDigestionService(IServiceProvider serviceProvider,
     private string _currentCall;
     private bool queueProcessRunning;
 
+    public void Dispose()
+    {
+        _queuedRequests.Clear();
+        _webSocket.Dispose();
+    }
+
+    #region Private Calls
     private void SetCurrentCall(string value)
     {
-        lock(_lock)
+        lock (_lock)
         {
             _currentCall = value;
         }
@@ -43,6 +51,11 @@ public class WebSocketDigestionService(IServiceProvider serviceProvider,
         {
             return !string.IsNullOrEmpty(_currentCall);
         }
+    }
+
+    private bool CanRun()
+    {
+        return !IsServiceBusy() && _webSocket.State == WebSocketState.Open;
     }
 
     private async Task<WebSocketResponse> DoSend(OcppCallRequest request)
@@ -63,7 +76,7 @@ public class WebSocketDigestionService(IServiceProvider serviceProvider,
                 var messageTextBlob = Encoding.UTF8.GetString(buffer);
                 parser.LoadRaw(messageTextBlob);
 
-                switch(parser.GetMessageType())
+                switch (parser.GetMessageType())
                 {
                     case OcppJMessageType.CALL_RESULT:
                         return new WebSocketResponse()
@@ -157,6 +170,7 @@ public class WebSocketDigestionService(IServiceProvider serviceProvider,
             return null;
         }
     }
+    #endregion
 
     public async Task<WebSocketResponse> Send(OcppCallRequest request)
     {
@@ -168,7 +182,7 @@ public class WebSocketDigestionService(IServiceProvider serviceProvider,
         {
             _logger.LogWarning("Trying to send a message to {0} but there's a pending request waiting for a response.", _clientIdentifier);
             var tsc = new TaskCompletionSource<WebSocketResponse>();
-            _queuedRequests.Enqueue(new (request, tsc));
+            _queuedRequests.Enqueue(new(request, tsc));
 
             StartQueueProcessor();
 
@@ -176,14 +190,20 @@ public class WebSocketDigestionService(IServiceProvider serviceProvider,
         }
     }
 
-    private string GetChannelName(string clientIdentification)
-    {
-        return $"ws.{clientIdentification}";
-    }
-
     private async Task RunCommsChannel(object state)
     {
-        var ea = (BasicDeliverEventArgs)state;
+        var args = (Dictionary<string, object>)state;
+        var ea = (BasicDeliverEventArgs)args["ea"];
+
+        if (_webSocket.State != WebSocketState.Open)
+        {
+            _logger.LogWarning($"Trying to consume response from channel {ea.RoutingKey} but the underlying websocket is not available.");
+            var channel = (args["model"] as AsyncEventingBasicConsumer)!.Channel;  // eww
+
+            await channel.BasicRejectAsync(ea.DeliveryTag, true).ConfigureAwait(false);
+            return;
+        }
+
         try
         {
             var result = ea.Body.ToArray();
@@ -208,7 +228,7 @@ public class WebSocketDigestionService(IServiceProvider serviceProvider,
                     break;
             }
         }
-        catch(Exception ex)
+        catch (Exception ex)
         {
             _logger.LogError($"Error from {ea.RoutingKey}: {ex.ToString()}");
 
@@ -234,14 +254,14 @@ public class WebSocketDigestionService(IServiceProvider serviceProvider,
             throw new Exception("Signal channel name is not set.");
         }
 
-        var channelName = GetChannelName(clientIdentifier);
+        var channelName = CommsUtils.GetChannelName(clientIdentifier);
 
         await comms.RegisterChannel(signalChannelName);
 
         await comms.RegisterChannel(channelName);
-        
+
         // handle response flow
-        var responseChannelName = $"{channelName}.response";
+        var responseChannelName = CommsUtils.GetResponseChannelName(channelName);
         await comms.RegisterChannel(responseChannelName);
         await comms.RegisterHandler(responseChannelName, RunCommsChannel);
 
@@ -253,8 +273,9 @@ public class WebSocketDigestionService(IServiceProvider serviceProvider,
 
         _logger.LogInformation($"Signaled client for {clientIdentifier} to start listening on {channelName} with response on {responseChannelName}.");
 
-        while (true) {
-           if(!IsServiceBusy() && _webSocket.State == WebSocketState.Open)
+        while (true)
+        {
+            if (!IsServiceBusy() && _webSocket.State == WebSocketState.Open)
             {
                 var received = await AwaitWebSocketResponse().ConfigureAwait(false);
 
@@ -274,6 +295,22 @@ public class WebSocketDigestionService(IServiceProvider serviceProvider,
                 {
                     _logger.LogWarning("Received EMPTY data from ws.");
                 }
+            }
+            else if (webSocket.CloseStatus.HasValue)
+            {
+                _logger.LogWarning("WS connection for {0} has been closed. {1}:{2}",
+                    _clientIdentifier, webSocket.CloseStatus.Value, webSocket.CloseStatusDescription);
+
+                await comms.SendMessage(signalChannelName, new CommunicationChannelSignal()
+                {
+                    ChannelName = channelName,
+                    ChannelType = ChannelType.Other,
+                    Flag = CommsFlag.Remove,
+                }.ToByteArray());
+
+                await comms.DestroyChannel(signalChannelName);
+
+                break;
             }
         }
     }

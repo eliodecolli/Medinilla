@@ -8,5 +8,7 @@ public interface IRealTimeMessenger
 
     Task RegisterChannel(string channelName);
 
+    Task DestroyChannel(string channelName);
+
     string GetCommunicationProviderName();
 }

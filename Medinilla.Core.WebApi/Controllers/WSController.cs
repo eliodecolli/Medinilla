@@ -72,6 +72,7 @@ namespace Medinilla.WebApi.Controllers
                 _wsDigestionServiceCollection.Set(clientIdentifier, _webSocketDigestionService);
 
                 await _webSocketDigestionService.Consume(webSocket, clientIdentifier);
+                _wsDigestionServiceCollection.Remove(clientIdentifier);
             }
             else
             {

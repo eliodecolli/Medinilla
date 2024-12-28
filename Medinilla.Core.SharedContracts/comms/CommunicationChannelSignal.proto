@@ -7,7 +7,13 @@ enum ChannelType {
 	Other = 1;
 }
 
+enum CommsFlag {
+	Set = 0;
+	Remove = 1;
+}
+
 message CommunicationChannelSignal {
 	string ChannelName = 1;
 	ChannelType ChannelType = 2;
+	optional CommsFlag Flag = 3;
 }
