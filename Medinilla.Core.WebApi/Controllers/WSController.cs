@@ -1,84 +1,61 @@
-﻿using Medinilla.DataTypes.WAMP;
-using Medinilla.Services.Interfaces;
+﻿using Medinilla.WebApi.Interfaces;
 using Microsoft.AspNetCore.Mvc;
-using System.Net.Mime;
 
-namespace Medinilla.WebApi.Controllers
+[ApiController]
+public class WSController : ControllerBase
 {
-    [ApiController]
-    public class WSController : ControllerBase
+    private readonly IBasicWebSocketDigestionService webSocketDigestionService;
+    private readonly IWSDigestionServiceCollection _wsDigestionServiceCollection;
+    private readonly ILogger<WSController> _logger;
+
+    public WSController(
+        IBasicWebSocketDigestionService webSocketDigestionService,
+        IWSDigestionServiceCollection wsDigestionServiceCollection,
+        ILogger<WSController> logger)
     {
-        private readonly IBasicWebSocketDigestionService _webSocketDigestionService;
+        this.webSocketDigestionService = webSocketDigestionService;
+        _wsDigestionServiceCollection = wsDigestionServiceCollection;
+        _logger = logger;
+    }
 
-        private readonly IWSDigestionServiceCollection _wsDigestionServiceCollection;
-
-        private readonly IOcppMessageParser _parser;
-        
-        public WSController(IBasicWebSocketDigestionService webSocketDigestionService, IWSDigestionServiceCollection _collection, IOcppMessageParser parser)
+    [HttpGet("/ws/{clientIdentifier}")]
+    public async Task Get(string? clientIdentifier)
+    {
+        if (!HttpContext.WebSockets.IsWebSocketRequest)
         {
-            _webSocketDigestionService = webSocketDigestionService;
-            _wsDigestionServiceCollection = _collection;
-            _parser = parser;
+            await WriteHttpResponse("Only websocket connections are allowed.", StatusCodes.Status400BadRequest);
+            return;
         }
 
-        private async Task WriteHttpResponse(string response, int code)
+        if (string.IsNullOrEmpty(clientIdentifier))
         {
-            HttpContext.Response.StatusCode = code;
-            await HttpContext.Response.WriteAsync(response);
+            await WriteHttpResponse("Client Identifier must be provided.", StatusCodes.Status400BadRequest);
+            return;
         }
 
-        [Consumes(MediaTypeNames.Text.Plain)]
-        [HttpPost("/ws/{clientIdentifier}")]
-        public async Task Post(string? clientIdentifier, [FromBody]string data)
+        using var webSocket = await HttpContext.WebSockets.AcceptWebSocketAsync(
+            new WebSocketAcceptContext
+            {
+                DangerousEnableCompression = true,
+                SubProtocol = "ocpp2.0.1"
+            });
+
+        _logger.LogInformation("Accepting connection from client {ClientId}", clientIdentifier);
+
+        try
         {
-            var service = _wsDigestionServiceCollection.Get(clientIdentifier ?? "");
-            if (service is not null)
-            {
-                _parser.LoadRaw(data);
-                if (_parser.GetMessageType() != OcppJMessageType.CALL)
-                {
-                    await WriteHttpResponse("Invalid OCPP Message: Only CALL types are supported for this operation.", StatusCodes.Status400BadRequest);
-                }
-                else
-                {
-                    await service.Send(_parser.ParseCall());
-                }
-            }
-            else
-            {
-                await WriteHttpResponse("Could not load service required to perform operation. Please check the provided client identifier or make sure the charging station is connected to the server",
-                    StatusCodes.Status400BadRequest);
-            }
+            _wsDigestionServiceCollection.Set(clientIdentifier, webSocketDigestionService);
+            await webSocketDigestionService.Consume(webSocket, clientIdentifier);
         }
-
-        [HttpGet("/ws/{clientIdentifier}")]
-        public async Task Get(string? clientIdentifier)
+        finally
         {
-            if (HttpContext.WebSockets.IsWebSocketRequest)
-            {
-                if (string.IsNullOrEmpty(clientIdentifier))
-                {
-                    await WriteHttpResponse("Client Identifier must be provided.", StatusCodes.Status400BadRequest);
-                    return;
-                }
-
-                using var webSocket = await HttpContext.WebSockets.AcceptWebSocketAsync(new WebSocketAcceptContext()
-                {
-                    DangerousEnableCompression = true,
-                    SubProtocol = "ocpp2.0.1"
-                });
-                
-                Console.WriteLine("Accepting connection from client {0}", clientIdentifier);
-                _wsDigestionServiceCollection.Set(clientIdentifier, _webSocketDigestionService);
-
-                await _webSocketDigestionService.Consume(webSocket, clientIdentifier);
-                _wsDigestionServiceCollection.Remove(clientIdentifier);
-            }
-            else
-            {
-                await WriteHttpResponse("Only websocket connections are allowed.", StatusCodes.Status400BadRequest);
-                return;
-            }
+            _wsDigestionServiceCollection.Remove(clientIdentifier);
         }
+    }
+
+    private async Task WriteHttpResponse(string response, int code)
+    {
+        HttpContext.Response.StatusCode = code;
+        await HttpContext.Response.WriteAsync(response);
     }
 }

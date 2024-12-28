@@ -2,7 +2,7 @@
 using Medinilla.DataAccess.Relational.Models;
 using Medinilla.DataAccess.Relational.UnitOfWork;
 using Medinilla.DataTypes.Contracts;
-using Medinilla.DataTypes.WAMP;
+using Medinilla.Infrastructure.WAMP;
 using Medinilla.RealTime;
 using Microsoft.Extensions.Logging;
 

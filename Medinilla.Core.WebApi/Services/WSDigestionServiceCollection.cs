@@ -1,6 +1,6 @@
-﻿using Medinilla.Services.Interfaces;
+﻿using Medinilla.WebApi.Interfaces;
 
-namespace Medinilla.Services.v1;
+namespace Medinilla.WebApi;
 
 public class WSDigestionServiceCollection : IWSDigestionServiceCollection
 {
@@ -20,7 +20,6 @@ public class WSDigestionServiceCollection : IWSDigestionServiceCollection
     {
         if (_table.TryGetValue(clientIdentifier, out var val))
         {
-            val.Dispose();
             _table.Remove(clientIdentifier);
         }
     }

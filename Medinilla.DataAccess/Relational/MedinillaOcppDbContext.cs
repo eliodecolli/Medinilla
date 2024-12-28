@@ -2,7 +2,6 @@
 using Medinilla.DataAccess.Relational.Models.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
-using System.Text.Json;
 
 namespace Medinilla.DataAccess.Relational;
 

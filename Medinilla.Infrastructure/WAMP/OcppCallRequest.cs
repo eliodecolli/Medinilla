@@ -3,7 +3,7 @@ using Medinilla.Infrastructure.Tokenizer;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
-namespace Medinilla.DataTypes.WAMP;
+namespace Medinilla.Infrastructure.WAMP;
 
 public sealed class OcppCallRequest : BaseOcppMessage
 {

@@ -1,4 +1,4 @@
-﻿namespace Medinilla.DataTypes.Core;
+﻿namespace Medinilla.Infrastructure.Core;
 
 public enum WebSocketResponseStatus
 {

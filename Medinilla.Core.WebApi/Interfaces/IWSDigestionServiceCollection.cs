@@ -1,4 +1,4 @@
-﻿namespace Medinilla.Services.Interfaces;
+﻿namespace Medinilla.WebApi.Interfaces;
 
 
 public interface IWSDigestionServiceCollection

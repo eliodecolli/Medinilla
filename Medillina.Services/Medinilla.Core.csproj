@@ -16,6 +16,7 @@
     <ProjectReference Include="..\Medinilla.Core.SharedContracts\Medinilla.Core.SharedContracts.csproj" />
     <ProjectReference Include="..\Medinilla.DataAccess\Medinilla.DataAccess.csproj" />
     <ProjectReference Include="..\Medinilla.DataTypes\Medinilla.DataTypes.csproj" />
+    <ProjectReference Include="..\Medinilla.Infrastructure\Medinilla.Infrastructure.csproj" />
     <ProjectReference Include="..\Medinilla.RealTime\Medinilla.RealTime.csproj" />
   </ItemGroup>
 

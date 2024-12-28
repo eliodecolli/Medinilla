@@ -1,4 +1,4 @@
-﻿namespace Medinilla.DataTypes.WAMP;
+﻿namespace Medinilla.Infrastructure.WAMP;
 
 public abstract class BaseOcppMessage
 {

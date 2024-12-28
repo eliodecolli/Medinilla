@@ -1,7 +1,7 @@
 ﻿using System.Text;
 using System.Text.Json;
 
-namespace Medinilla.DataTypes.WAMP;
+namespace Medinilla.Infrastructure.WAMP;
 
 public sealed class OcppCallResult : BaseOcppMessage
 {

@@ -23,7 +23,10 @@ public sealed class ChargingStationUnitOfWork(MedinillaOcppDbContext context, IC
         var entity = result.FirstOrDefault();
         if (entity == null)
         {
-            chargingStation.AccountId = Guid.Parse("6849f838-5cf4-4e1a-9502-e50dc17232c7");
+            var accountQuery = await accountRepo.Filter(c => c.Name == "Account 1").ConfigureAwait(false);
+            var account = accountQuery.First();
+            chargingStation.AccountId = account.Id;
+
             chargingStation.CreatedAt = DateTime.UtcNow;
             entity = await repository.Create(chargingStation);
         }

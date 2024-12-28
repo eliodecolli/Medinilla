@@ -14,7 +14,7 @@ public sealed class CommunicationSettings
         SignalChannel = signalChannel;
     }
 
-    public static CommunicationSettings FromSettignsFile(string settingsFile)
+    public static CommunicationSettings FromSettingsFile(string settingsFile)
     {
         using var fs = new FileStream(settingsFile, FileMode.Open, FileAccess.Read);
         var jsonDocument = JsonDocument.Parse(fs);

@@ -144,6 +144,8 @@ internal class CoreInterfaceCommunication : IInterfaceCommunication
 
         await channel.BasicConsumeAsync(_settings.SignalChannel, true, consumer);
 
+        _logger.LogDebug("Started core service...");
+
         await _runningTask.Task;
     }
 }

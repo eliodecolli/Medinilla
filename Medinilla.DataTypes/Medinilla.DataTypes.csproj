@@ -6,8 +6,4 @@
     <Nullable>enable</Nullable>
   </PropertyGroup>
 
-  <ItemGroup>
-    <ProjectReference Include="..\Medinilla.Infrastructure\Medinilla.Infrastructure.csproj" />
-  </ItemGroup>
-
 </Project>

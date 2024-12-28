@@ -6,7 +6,6 @@ using Medinilla.Services.Actions.Ocpp201;
 using Medinilla.Core.Interfaces;
 using Medinilla.Core.Logic.Authorization.Algorithms;
 using Medinilla.Core.Logic.Authorization;
-using Microsoft.Extensions.Configuration;
 
 namespace Medinilla.Services;
 
@@ -39,11 +38,8 @@ public static class ServiceExtensions
         AddOcppActions(serviceCollection);
         AddAuthAlgos(serviceCollection);
 
-        serviceCollection.AddSingleton<IWSDigestionServiceCollection, WSDigestionServiceCollection>();
-        serviceCollection.AddTransient<IOcppActionsFactory, OcppActionsFactory>();
-        serviceCollection.AddScoped<IOcppCallRouter, OcppCallRouter>();
-        serviceCollection.AddScoped<IBasicWebSocketDigestionService, WebSocketDigestionService>();
-        serviceCollection.AddScoped<IOcppMessageParser, OcppMessageParser>();
+        serviceCollection.AddScoped<IOcppActionsFactory, OcppActionsFactory>();
+        serviceCollection.AddSingleton<IOcppCallRouter, OcppCallRouter>();
         serviceCollection.AddScoped<AuthorizationAlgorithmFactory>();
     }
 }

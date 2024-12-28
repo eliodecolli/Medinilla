@@ -1,6 +1,6 @@
-﻿using Medinilla.DataTypes.WAMP;
+﻿using Medinilla.Infrastructure.WAMP;
 
-namespace Medinilla.DataTypes.Core;
+namespace Medinilla.Infrastructure.Core;
 
 public sealed class WebSocketResponse
 {

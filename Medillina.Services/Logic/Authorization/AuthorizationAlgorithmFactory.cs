@@ -1,7 +1,7 @@
 ﻿using Castle.Core.Logging;
 using Medinilla.Core.Interfaces;
 using Medinilla.DataTypes.Contracts.Common;
-using Medinilla.DataTypes.Core.Authorization;
+using Medinilla.Infrastructure.Core.Authorization;
 using Microsoft.Extensions.Logging;
 
 namespace Medinilla.Core.Logic.Authorization;

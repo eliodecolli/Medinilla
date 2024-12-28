@@ -17,7 +17,7 @@ internal class CoreServiceHost : IHostedService
     {
         _service = service;
         _logger = logger;
-        _settings = CommunicationSettings.FromSettignsFile("settings.json");
+        _settings = CommunicationSettings.FromSettingsFile("settings.json");
     }
 
     public async Task StartAsync(CancellationToken cancellationToken)
