@@ -1,7 +1,7 @@
 ﻿using Medinilla.DataAccess.Relational.UnitOfWork;
 using Medinilla.DataTypes.Contracts;
 using Medinilla.DataTypes.Contracts.Common;
-using Medinilla.DataTypes.WAMP;
+using Medinilla.Infrastructure.WAMP;
 using Microsoft.Extensions.Logging;
 
 using CS = Medinilla.DataAccess.Relational.Models.ChargingStation;
@@ -39,7 +39,8 @@ public sealed class BootNotificationAction(ChargingStationUnitOfWork unitOfWork,
         // idk do something here..?
         return new RpcResult()
         {
-            Result = call.CreateResult(new BootNotificationResponse(1440, RegistrationStatusEnum.Accepted, new StatusInfo() {
+            Result = call.CreateResult(new BootNotificationResponse(1440, RegistrationStatusEnum.Accepted, new StatusInfo()
+            {
                 ReasonCode = "200",
                 AdditionalInfo = ""
             })),

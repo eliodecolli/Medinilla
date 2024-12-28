@@ -1,6 +1,6 @@
 ﻿using Medinilla.Core.Interfaces;
 using Medinilla.DataTypes.Contracts.Common;
-using Medinilla.DataTypes.Core.Authorization;
+using Medinilla.Infrastructure.Core.Authorization;
 
 namespace Medinilla.Core.Logic.Authorization.Algorithms;
 

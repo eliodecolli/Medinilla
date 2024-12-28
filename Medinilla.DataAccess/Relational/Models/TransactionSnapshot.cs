@@ -18,7 +18,7 @@ public class TransactionSnapshot
 
     public decimal TotalMeteredValue { get; set; }
 
-    public string Unit {  get; set; }
+    public string Unit { get; set; }
 
     public decimal TotalCost { get; set; }
 

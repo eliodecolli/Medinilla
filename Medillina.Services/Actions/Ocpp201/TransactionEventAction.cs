@@ -1,14 +1,13 @@
-﻿using Medinilla.DataAccess.Relational.Models;
+﻿using Medinilla.Core.Logic.Authorization;
+using Medinilla.DataAccess.Relational.Models;
 using Medinilla.DataAccess.Relational.UnitOfWork;
 using Medinilla.DataTypes.Contracts;
 using Medinilla.DataTypes.Contracts.Common;
-using Medinilla.DataTypes.WAMP;
+using Medinilla.Infrastructure.WAMP;
 using Microsoft.Extensions.Logging;
-
-using DbTransaction = Medinilla.DataAccess.Relational.Models.TransactionEvent;
 using DbChargingStation = Medinilla.DataAccess.Relational.Models.ChargingStation;
+using DbTransaction = Medinilla.DataAccess.Relational.Models.TransactionEvent;
 using IdTokenDb = Medinilla.DataAccess.Relational.Models.Authorization.IdToken;
-using Medinilla.Core.Logic.Authorization;
 
 namespace Medinilla.Services.Actions.Ocpp201;
 
@@ -91,7 +90,7 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
 
         if (status == AuthorizeStatus.Accepted)
         {
-            status = request.EventType == TransactionEventEnum.Started && 
+            status = request.EventType == TransactionEventEnum.Started &&
                 context.IdToken is not null &&
                 context.IdToken.IsUnderTx ?
                 AuthorizeStatus.ConcurrentTx :
@@ -204,7 +203,7 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
                         Error = call.CreateErrorResult<TransactionEventResponse>(OcppCallError.ErrorCodes.PropertyConstraintViolation, $"Duplicate SeqNo='{request.SeqNo}' is not allowed.")
                     };
                 }
-                else if(currentTransactions.Any(c => (c.EventType != EventTypes.Update) && c.EventType == Enum.GetName(request.EventType)))
+                else if (currentTransactions.Any(c => (c.EventType != EventTypes.Update) && c.EventType == Enum.GetName(request.EventType)))
                 {
                     _logger.LogWarning($"{clientIdentifier}: Transaction {request.TransactionInfo.TransactionId} is trying to send a duplicate event of type EventType='{Enum.GetName(request.EventType) ?? "<UNKNOWN>"}'.");
                     return new RpcResult()
@@ -234,7 +233,7 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
                     }
 
                     await unitOfWork.TransactionsSubUnit.RegisterTransaction(transaction, context.IdToken);
-                    
+
                     if (request.EventType == TransactionEventEnum.Ended)
                     {
                         // first check for sanity

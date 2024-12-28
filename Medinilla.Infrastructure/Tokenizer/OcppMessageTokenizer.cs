@@ -7,7 +7,7 @@ public sealed class OcppMessageTokenizer : ITokenizer
     private string TokenizeStringValue(string input, int startIndex)
     {
         var currentValue = "";
-        for(int i = startIndex; i < input.Length; i++)
+        for (int i = startIndex; i < input.Length; i++)
         {
             if (i == input.Length - 1)
             {
@@ -44,7 +44,7 @@ public sealed class OcppMessageTokenizer : ITokenizer
             if (c == ',' || c == ']')
             {
                 // validate integer
-                if(int.TryParse(currentValue, out int _))
+                if (int.TryParse(currentValue, out int _))
                 {
                     // everything is ok
                     return currentValue;
@@ -83,17 +83,17 @@ public sealed class OcppMessageTokenizer : ITokenizer
         {
             var c = input[i];
 
-            if(openBrackets > 0 && closedBrackets > 0 && openBrackets == closedBrackets)
+            if (openBrackets > 0 && closedBrackets > 0 && openBrackets == closedBrackets)
             {
                 return currentValue;
             }
 
-            if(c == '{')
+            if (c == '{')
             {
                 openBrackets++;
             }
 
-            if(c == '}')
+            if (c == '}')
             {
                 closedBrackets++;
             }
@@ -103,25 +103,25 @@ public sealed class OcppMessageTokenizer : ITokenizer
 
         throw new Exception($"Invalid Tokenization: Expected JSON but got: {currentValue}.");
     }
-    
+
     public IEnumerable<IToken> Tokenize(string input)
     {
         var tokens = new List<IToken>();
         var idx = 0;
 
-        while(idx  < input.Length)
+        while (idx < input.Length)
         {
             var c = input[idx];
             var token = "";
             var tokenType = TokenType.Unknown;
 
-            if(char.IsDigit(c))
+            if (char.IsDigit(c))
             {
                 token = TokenizeInteger(input, idx);
                 tokenType = TokenType.Integer;
                 idx += token.Length;
-            } 
-            else if(c == '"')
+            }
+            else if (c == '"')
             {
                 token = TokenizeStringValue(input, idx + 1);
                 tokenType = TokenType.String;

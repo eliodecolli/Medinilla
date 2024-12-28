@@ -1,12 +1,13 @@
-﻿using Medinilla.Core.Service.Interfaces;
+﻿using Google.Protobuf;
+using Medinilla.Core.Service.Interfaces;
 using Medinilla.Core.Service.Types;
 using Medinilla.Core.SharedContracts.Comms;
+using Medinilla.Core.SharedContracts.Comms.Ocpp;
+using Medinilla.Infrastructure.Interops;
+using Medinilla.Services.Interfaces;
 using Microsoft.Extensions.Logging;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
-using Medinilla.Services.Interfaces;
-using Medinilla.Core.SharedContracts.Comms.Ocpp;
-using Google.Protobuf;
 
 namespace Medinilla.Core.Service.Communication;
 
@@ -39,7 +40,7 @@ internal class CoreInterfaceCommunication : IInterfaceCommunication
         _connection = await _connectionFactory.CreateConnectionAsync().ConfigureAwait(false);
     }
 
-    private async Task ConsumeOcppCall(BasicDeliverEventArgs ea, OcppMessage message)
+    private async Task ConsumeOcppCall(AsyncEventingBasicConsumer consumer, BasicDeliverEventArgs ea, OcppMessage message)
     {
         try
         {
@@ -59,25 +60,18 @@ internal class CoreInterfaceCommunication : IInterfaceCommunication
                 Payload = response.ToByteString()
             };
 
-            if (_channels.TryGetValue(ea.RoutingKey, out var channelSemaphore))
-            {
-                var channel = await channelSemaphore.GetChannelAsync().ConfigureAwait(false);
-                var responseChannel = $"{ea.RoutingKey}.response";
+            var channel = consumer.Channel;
+            var responseChannel = CommsUtils.GetResponseChannelName(ea.RoutingKey);
 
-                await channel.BasicPublishAsync(
-                    exchange: "",
-                    routingKey: responseChannel,
-                    body: finalResponse.ToByteArray()
-                ).ConfigureAwait(false);
+            await channel.BasicPublishAsync(
+                exchange: "",
+                routingKey: responseChannel,
+                body: finalResponse.ToByteArray()).ConfigureAwait(false);
 
-                channelSemaphore.ReleaseChannel();
-                _logger.LogInformation($"Sent response to {responseChannel}");
-            }
-            else
-            {
-                _logger.LogError($"Channel not found: {ea.RoutingKey}");
-            }
-        } catch (Exception ex)
+            _logger.LogInformation($"Sent response to {responseChannel}");
+
+        }
+        catch (Exception ex)
         {
             _logger.LogError($"Error processing message on queue {ea.RoutingKey}: {ex.ToString()}");
         }
@@ -90,11 +84,11 @@ internal class CoreInterfaceCommunication : IInterfaceCommunication
         switch (comms.MessageType)
         {
             case CommsMessageType.OcppRequest:
-                await ConsumeOcppCall(ea, OcppMessage.Parser.ParseFrom(ea.Body.ToArray()));
+                await ConsumeOcppCall((model as AsyncEventingBasicConsumer)!, ea, OcppMessage.Parser.ParseFrom(ea.Body.ToArray()));
                 break;
 
             case CommsMessageType.OcppResponse:
-                // implement
+            // implement
             default:
                 break;
         }
@@ -103,25 +97,41 @@ internal class CoreInterfaceCommunication : IInterfaceCommunication
     private async Task ConsumeCommunicationSignal(object model, BasicDeliverEventArgs ea)
     {
         var payload = CommunicationChannelSignal.Parser.ParseFrom(ea.Body.ToArray());
-        _logger.LogInformation($"Received signal: {payload.ChannelName}");
+        _logger.LogInformation($"Received signal: {payload.ChannelName} Flag: {payload.Flag}");
 
-        var channel = await _connection.CreateChannelAsync().ConfigureAwait(false);
-        await channel.QueueDeclareAsync(payload.ChannelName, exclusive: false);
-
-        var consumer = new AsyncEventingBasicConsumer(channel);
-        
-        switch (payload.ChannelType)
+        switch (payload.Flag)
         {
-            case ChannelType.OcppEvent:
-                consumer.ReceivedAsync += RunEvent;
+            case CommsFlag.Set:
+                var channel = await _connection.CreateChannelAsync().ConfigureAwait(false);
+                await channel.QueueDeclareAsync(payload.ChannelName, exclusive: false);
+
+                var consumer = new AsyncEventingBasicConsumer(channel);
+
+                switch (payload.ChannelType)
+                {
+                    case ChannelType.OcppEvent:
+                        consumer.ReceivedAsync += RunEvent;
+                        break;
+
+                    default:
+                        break;
+                }
+
+                _channels.Add(payload.ChannelName, new ChannelSemaphore(channel));
+                await channel.BasicConsumeAsync(payload.ChannelName, true, consumer);
                 break;
 
-            default:
+            case CommsFlag.Remove:
+                if (_channels.ContainsKey(payload.ChannelName))
+                {
+                    var recordedChannel = await _channels[payload.ChannelName].GetChannelAsync();
+                    await recordedChannel.CloseAsync();
+                    await recordedChannel.DisposeAsync();
+
+                    _channels.Remove(payload.ChannelName);
+                }
                 break;
         }
-
-        _channels.Add(payload.ChannelName, new ChannelSemaphore(channel));
-        await channel.BasicConsumeAsync(payload.ChannelName, true, consumer);
     }
 
     public async Task Run()
@@ -133,6 +143,8 @@ internal class CoreInterfaceCommunication : IInterfaceCommunication
         consumer.ReceivedAsync += ConsumeCommunicationSignal;
 
         await channel.BasicConsumeAsync(_settings.SignalChannel, true, consumer);
+
+        _logger.LogDebug("Started core service...");
 
         await _runningTask.Task;
     }

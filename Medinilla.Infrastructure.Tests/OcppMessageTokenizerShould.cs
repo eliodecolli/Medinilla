@@ -15,7 +15,7 @@ public class OcppMessageTokenizerShould
     public const string RawMessageInvalid =
         "[2     ,  \"123-abc-456-def\" , \"BootNotification\"  , {]";
 
-    public const string RawMessageError = 
+    public const string RawMessageError =
         "[4,\"46fec632-7413-4a12-935c-540337813301\",\"SecurityError\",\"\",{}]";
 
     class ChargingStation

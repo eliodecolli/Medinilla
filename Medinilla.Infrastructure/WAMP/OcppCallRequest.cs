@@ -1,9 +1,6 @@
-﻿using Medinilla.Infrastructure;
-using Medinilla.Infrastructure.Tokenizer;
-using System.Text.Json;
-using System.Text.Json.Serialization;
+﻿using System.Text.Json;
 
-namespace Medinilla.DataTypes.WAMP;
+namespace Medinilla.Infrastructure.WAMP;
 
 public sealed class OcppCallRequest : BaseOcppMessage
 {
@@ -22,7 +19,7 @@ public sealed class OcppCallRequest : BaseOcppMessage
     public T As<T>() where T : class
     {
         var result = JsonSerializer.Deserialize<T>(Payload, new JsonSerializerOptions() { PropertyNameCaseInsensitive = true });
-        if(result is not null)
+        if (result is not null)
         {
             return result;
         }
@@ -51,7 +48,7 @@ public sealed class OcppCallRequest : BaseOcppMessage
     }
 
     public OcppCallError CreateErrorResult<T>(string errorCode, string errorDescription = "", T? details = null)
-        where T: class
+        where T : class
     {
         return new OcppCallError(MessageId, errorCode, errorDescription, JsonSerializer.Serialize(details));
     }

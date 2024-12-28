@@ -1,9 +1,8 @@
-﻿using Medinilla.DataTypes.Core;
-using Medinilla.DataTypes.WAMP;
-using Medinilla.Services.v1;
+﻿using Medinilla.Infrastructure.Core;
+using Medinilla.Infrastructure.WAMP;
 using System.Net.WebSockets;
 
-namespace Medinilla.Services.Interfaces;
+namespace Medinilla.WebApi.Interfaces;
 
 public interface IBasicWebSocketDigestionService
 {

@@ -18,6 +18,11 @@ public class PubNubClient : IRealTimeMessenger
         });
     }
 
+    public Task DestroyChannel(string channelName)
+    {
+        throw new NotImplementedException();
+    }
+
     public string GetCommunicationProviderName() => "PubNub";
 
     public Task RegisterChannel(string channelName)

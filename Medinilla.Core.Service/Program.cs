@@ -1,6 +1,7 @@
 ﻿using Medinilla.Core.Service;
 using Medinilla.Core.Service.Communication;
 using Medinilla.Core.Service.Interfaces;
+using Medinilla.Core.Service.Types;
 using Medinilla.DataAccess;
 using Medinilla.Infrastructure;
 using Medinilla.RealTime;
@@ -18,6 +19,7 @@ using var stream = typeof(CoreServiceHost).Assembly.GetManifestResourceStream("M
 builder.AddJsonStream(stream);
 var config = builder.Build();
 
+hostApplicationBuilder.Services.AddSingleton<IConfiguration>(config);
 hostApplicationBuilder.Configuration.AddConfiguration(config);
 
 hostApplicationBuilder.Services.AddLogging();
@@ -29,8 +31,12 @@ hostApplicationBuilder.Services.AddMedinillaInfrastructure();
 hostApplicationBuilder.Services.AddMedinillaDataAccess();
 hostApplicationBuilder.Services.AddMedinillaServices();
 hostApplicationBuilder.Services.AddRealTimeServices();
-hostApplicationBuilder.Services.AddHostedService<CoreServiceHost>();
 hostApplicationBuilder.Services.AddScoped<IInterfaceCommunication, CoreInterfaceCommunication>();
 
 using var host = hostApplicationBuilder.Build();
+
+var interfaceComms = host.Services.GetRequiredService<IInterfaceCommunication>();
+await interfaceComms.Connect(CommunicationSettings.FromSettingsFile("settings.json"));
+await interfaceComms.Run();
+
 await host.RunAsync();

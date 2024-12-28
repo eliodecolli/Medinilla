@@ -1,6 +1,8 @@
-﻿using Medinilla.DataTypes.WAMP;
+﻿using Medinilla.Infrastructure;
+using Medinilla.Infrastructure.WAMP;
 using Medinilla.Services.Actions;
 using Medinilla.Services.Interfaces;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Text;
 
@@ -9,12 +11,18 @@ namespace Medinilla.Services.v1;
 public class OcppCallRouter : IOcppCallRouter
 {
     private readonly ILogger<OcppCallRouter> _logger;
-    private readonly IOcppActionsFactory _actionsFactory;
+    private readonly IServiceProvider provider;
 
-    public OcppCallRouter(ILogger<OcppCallRouter> logger, IOcppActionsFactory actionsFactory)
+    public OcppCallRouter(ILogger<OcppCallRouter> logger, IServiceProvider provider)
     {
         _logger = logger;
-        _actionsFactory = actionsFactory;
+        this.provider = provider;
+    }
+
+    private IOcppActionsFactory GetActionsFactory()
+    {
+        var scope = provider.CreateScope();
+        return scope.ServiceProvider.GetRequiredService<IOcppActionsFactory>();
     }
 
     public async Task<RpcResult> RouteOcppCall(byte[] buffer, string? clientIdentifier)
@@ -42,7 +50,7 @@ public class OcppCallRouter : IOcppCallRouter
                 }
 #endif
 
-                var ocppAction = _actionsFactory.GetAction(ocppCall.Action);
+                var ocppAction = GetActionsFactory().GetAction(ocppCall.Action);
                 if (ocppAction is null)
                 {
                     _logger.LogError($"Invalid action '{ocppCall.Action}'");

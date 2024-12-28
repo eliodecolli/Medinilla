@@ -2,7 +2,6 @@
 using Medinilla.DataAccess.Relational.Models.Authorization;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Configuration;
-using System.Text.Json;
 
 namespace Medinilla.DataAccess.Relational;
 
@@ -71,7 +70,7 @@ public class MedinillaOcppDbContext(IConfiguration config) : DbContext
         // configure transaction snapshots
         modelBuilder.Entity<TransactionSnapshot>().HasOne(c => c.EvseConnector)
             .WithMany()
-            .HasForeignKey(c =>c.EvseConnectorId);
+            .HasForeignKey(c => c.EvseConnectorId);
 
         // configure auth
         modelBuilder.Entity<IdToken>().HasOne(c => c.ChargingStation)

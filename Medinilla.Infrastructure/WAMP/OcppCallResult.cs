@@ -1,7 +1,7 @@
 ﻿using System.Text;
 using System.Text.Json;
 
-namespace Medinilla.DataTypes.WAMP;
+namespace Medinilla.Infrastructure.WAMP;
 
 public sealed class OcppCallResult : BaseOcppMessage
 {
@@ -16,7 +16,7 @@ public sealed class OcppCallResult : BaseOcppMessage
 
     public T? PayloadAs<T>() where T : class
     {
-        if(Payload is null)
+        if (Payload is null)
         {
             return null;
         }

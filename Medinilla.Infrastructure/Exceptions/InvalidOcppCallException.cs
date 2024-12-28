@@ -9,5 +9,5 @@ public sealed class InvalidOcppCallException : Exception
         _fieldName = fieldName;
     }
 
-    public override string Message => $"Could not parse {_fieldName} from OCPP CALL message."; 
+    public override string Message => $"Could not parse {_fieldName} from OCPP CALL message.";
 }

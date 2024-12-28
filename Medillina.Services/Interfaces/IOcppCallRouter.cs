@@ -1,4 +1,4 @@
-﻿using Medinilla.DataTypes.WAMP;
+﻿using Medinilla.Infrastructure.WAMP;
 
 namespace Medinilla.Services.Interfaces;
 

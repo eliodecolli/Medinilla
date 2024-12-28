@@ -6,7 +6,7 @@ public abstract class BaseUnitOfWork(MedinillaOcppDbContext context)
 
     public async Task Save()
     {
-        if(_disposed)
+        if (_disposed)
         {
             return;
         }

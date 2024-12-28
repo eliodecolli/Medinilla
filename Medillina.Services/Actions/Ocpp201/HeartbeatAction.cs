@@ -1,5 +1,5 @@
 ﻿using Medinilla.DataTypes.Contracts;
-using Medinilla.DataTypes.WAMP;
+using Medinilla.Infrastructure.WAMP;
 using Microsoft.Extensions.Logging;
 
 namespace Medinilla.Services.Actions.Ocpp201;

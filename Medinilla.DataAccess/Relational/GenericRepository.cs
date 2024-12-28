@@ -14,7 +14,7 @@ namespace Medinilla.DataAccess.Relational
         public async Task<bool> DeleteMany(Func<T, bool> predicate)
         {
             var items = context.Set<T>().Where(predicate);
-            if(!items.Any())
+            if (!items.Any())
             {
                 return await Task.FromResult(false);
             }

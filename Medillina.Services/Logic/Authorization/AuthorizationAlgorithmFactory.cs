@@ -1,7 +1,6 @@
-﻿using Castle.Core.Logging;
-using Medinilla.Core.Interfaces;
+﻿using Medinilla.Core.Interfaces;
 using Medinilla.DataTypes.Contracts.Common;
-using Medinilla.DataTypes.Core.Authorization;
+using Medinilla.Infrastructure.Core.Authorization;
 using Microsoft.Extensions.Logging;
 
 namespace Medinilla.Core.Logic.Authorization;
@@ -30,11 +29,11 @@ public sealed class AuthorizationAlgorithmFactory
     {
         var status = AuthorizeStatus.Accepted;
 
-        foreach(var algorithm in All())
+        foreach (var algorithm in All())
         {
             logger.LogInformation($"Running Authorization: {Enum.GetName(algorithm.Algorithm)}");
             status = await algorithm.Authorize(token, context);
-            if (status !=  AuthorizeStatus.Accepted)
+            if (status != AuthorizeStatus.Accepted)
             {
                 break;
             }

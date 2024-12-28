@@ -1,7 +1,9 @@
 using Medinilla.DataAccess;
 using Medinilla.Infrastructure;
 using Medinilla.RealTime;
-using Medinilla.Services;
+using Medinilla.WebApi;
+using Medinilla.WebApi.Interfaces;
+using Medinilla.WebApi.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -13,12 +15,14 @@ builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
 builder.Logging.ClearProviders();
-builder.Logging.AddConsole();
+builder.Logging.AddSimpleConsole();
 
 builder.Services.AddMedinillaInfrastructure();
 builder.Services.AddRealTimeServices();
 builder.Services.AddMedinillaDataAccess();
-builder.Services.AddMedinillaServices();
+
+builder.Services.AddScoped<IWSDigestionServiceCollection, WSDigestionServiceCollection>();
+builder.Services.AddScoped<IBasicWebSocketDigestionService, WebSocketDigestionService>();
 
 var app = builder.Build();
 
@@ -34,8 +38,6 @@ app.UseHttpsRedirection();
 app.UseAuthorization();
 
 app.UseAuthentication();
-
-//app.UseMiddleware<HttpBasicAuthMiddleware>();
 
 app.MapControllers();
 

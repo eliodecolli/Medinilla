@@ -15,7 +15,7 @@ public class MedinillaAuthentication : IMedinillaAuthentication
     public async Task<string?> ValidateCredentials(string base64EncodedCredentials)
     {
         var token = _fastAccessDataSource.GetValue<string>(base64EncodedCredentials);
-        if(!string.IsNullOrEmpty(token))
+        if (!string.IsNullOrEmpty(token))
         {
             return await Task.FromResult(token);
         }

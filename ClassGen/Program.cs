@@ -1,7 +1,4 @@
 ﻿using Scriban;
-using System.ComponentModel;
-using System.IO;
-using System.Text;
 
 public class Component
 {
@@ -64,7 +61,8 @@ public class Program
         var variables = reader.ReadToEnd().Split('\n')
             .Skip(1)
             .Where(x => !string.IsNullOrEmpty(x))
-            .Select(x => {
+            .Select(x =>
+            {
                 var tmp = x.Split(';');
                 return new ComponentVariable()
                 {
@@ -78,10 +76,10 @@ public class Program
             })
             .GroupBy(x => x.ComponentName);
 
-        foreach(var component in components)
+        foreach (var component in components)
         {
             var variablesTmp = variables.FirstOrDefault(x => x.Key == component.Name);
-            if(variablesTmp != null)
+            if (variablesTmp != null)
             {
                 component.Variables.AddRange(variablesTmp);
                 Console.WriteLine("Updated variables for component {0}", component.Name);
@@ -95,9 +93,9 @@ public class Program
         UpdateComponentVariables(components);
 
         var template = Template.Parse(File.ReadAllText("class_template.liquid"));
-        foreach(var component in components)
+        foreach (var component in components)
         {
-            if(component.Variables.Count > 0)
+            if (component.Variables.Count > 0)
             {
                 if (!Directory.Exists("output"))
                 {

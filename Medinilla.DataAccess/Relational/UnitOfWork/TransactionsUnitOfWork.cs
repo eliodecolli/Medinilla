@@ -14,7 +14,7 @@ public sealed class TransactionsUnitOfWork(MedinillaOcppDbContext context)
         if (idToken is not null)
         {
             transaction.IdTokenId = idToken.Id;
-            
+
             if (!idToken.IsUnderTx)
             {
                 idToken.IsUnderTx = true;

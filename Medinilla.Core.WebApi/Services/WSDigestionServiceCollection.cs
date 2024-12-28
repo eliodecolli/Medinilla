@@ -1,6 +1,6 @@
-﻿using Medinilla.Services.Interfaces;
+﻿using Medinilla.WebApi.Interfaces;
 
-namespace Medinilla.Services.v1;
+namespace Medinilla.WebApi;
 
 public class WSDigestionServiceCollection : IWSDigestionServiceCollection
 {
@@ -8,12 +8,20 @@ public class WSDigestionServiceCollection : IWSDigestionServiceCollection
 
     public IBasicWebSocketDigestionService? Get(string clientIdentifier)
     {
-        if(_table.TryGetValue(clientIdentifier, out var val))
+        if (_table.TryGetValue(clientIdentifier, out var val))
         {
             return val;
         }
 
         return null;
+    }
+
+    public void Remove(string clientIdentifier)
+    {
+        if (_table.TryGetValue(clientIdentifier, out var val))
+        {
+            _table.Remove(clientIdentifier);
+        }
     }
 
     public void Set(string clientIdentifier, IBasicWebSocketDigestionService service)

@@ -1,9 +1,9 @@
-﻿using Medinilla.DataTypes.WAMP;
-using Medinilla.Infrastructure.Tokenizer.Interfaces;
+﻿using Medinilla.Infrastructure.Interfaces;
 using Medinilla.Infrastructure.Tokenizer;
-using Medinilla.Services.Interfaces;
+using Medinilla.Infrastructure.Tokenizer.Interfaces;
+using Medinilla.Infrastructure.WAMP;
 
-namespace Medinilla.Services.v1;
+namespace Medinilla.Infrastructure;
 
 public sealed class OcppMessageParser : IOcppMessageParser
 {

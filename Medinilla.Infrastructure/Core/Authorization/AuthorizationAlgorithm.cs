@@ -1,4 +1,4 @@
-﻿namespace Medinilla.DataTypes.Core.Authorization;
+﻿namespace Medinilla.Infrastructure.Core.Authorization;
 
 public enum AuthorizationAlgorithm
 {

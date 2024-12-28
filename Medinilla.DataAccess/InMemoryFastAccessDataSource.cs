@@ -13,7 +13,7 @@ public sealed class InMemoryFastAccessDataSource : IFastAccessDataSource
 
     private T? SafeCast<T>(object value)
     {
-        if(value.GetType() == typeof(T))
+        if (value.GetType() == typeof(T))
         {
             return (T)value;
         }
@@ -23,7 +23,7 @@ public sealed class InMemoryFastAccessDataSource : IFastAccessDataSource
 
     public T? GetValue<T>(string key)
     {
-        if(_data.TryGetValue(key, out var value))
+        if (_data.TryGetValue(key, out var value))
         {
             return SafeCast<T>(value);
         }
