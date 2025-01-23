@@ -14,7 +14,7 @@ using Microsoft.Extensions.Logging;
 var hostApplicationBuilder = Host.CreateApplicationBuilder(args);
 
 var builder = new ConfigurationBuilder();
-using var stream = typeof(CoreServiceHost).Assembly.GetManifestResourceStream("Medinilla.Core.Service.settings.json");
+using var stream = typeof(Program).Assembly.GetManifestResourceStream("Medinilla.Core.Service.settings.json");
 
 builder.AddJsonStream(stream);
 var config = builder.Build();

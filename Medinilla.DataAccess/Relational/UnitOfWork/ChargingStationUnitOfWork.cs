@@ -17,7 +17,7 @@ public sealed class ChargingStationUnitOfWork(MedinillaOcppDbContext context, IC
 
     public TransactionsUnitOfWork TransactionsSubUnit = new TransactionsUnitOfWork(context);
 
-    public async Task ProcessBootNotification(ChargingStation chargingStation)
+    public async Task<ChargingStation> ProcessBootNotification(ChargingStation chargingStation)
     {
         var result = await repository.Filter(c => c.ClientIdentifier == chargingStation.ClientIdentifier);
         var entity = result.FirstOrDefault();
@@ -59,6 +59,7 @@ public sealed class ChargingStationUnitOfWork(MedinillaOcppDbContext context, IC
             });
         }
 
+        return entity;
     }
 
     public async Task<ChargingStation?> GetChargingStation(string id)
