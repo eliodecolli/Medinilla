@@ -3,7 +3,11 @@ import os
 import sys
 import subprocess
 import shutil
+import platform
 from pathlib import Path
+
+def is_linux():
+    return platform.platform().lower().startswith("linux")
 
 def get_protoc_path():
     """
@@ -17,7 +21,8 @@ def get_protoc_path():
         return 'protoc'
     
     # Use local path
-    local_protoc = "./tools/protoc/protoc.exe"
+    protoc_file_name = "linux/protoc" if is_linux() else "protoc.exe"
+    local_protoc = f"./tools/protoc/{protoc_file_name}"
     abs_protoc_path = os.path.abspath(local_protoc)
     print(f"Looking for local protoc at: {abs_protoc_path}")
     
