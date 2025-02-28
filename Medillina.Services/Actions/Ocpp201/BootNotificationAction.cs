@@ -33,6 +33,16 @@ public sealed class BootNotificationAction(ChargingStationUnitOfWork unitOfWork,
 
     private async Task PublishChargingStationToPubnub(CS chargingStation)
     {
+        var lastBootReason = BootReasonEnum.Unknown;
+        if (Enum.TryParse<BootReasonEnum>(chargingStation.LatestBootNotificationReason, out var reason))
+        {
+            lastBootReason = reason;
+        }
+        else
+        {
+            _logger.LogWarning($"Could not read boot reason for client identifier {chargingStation.ClientIdentifier}: Value {chargingStation.LatestBootNotificationReason}");
+        }
+
         var pubnubMessage = new PubnubMessage<ChargingStationDto>()
         {
             Header = PubnubMessageHeader.Set,
@@ -42,7 +52,7 @@ public sealed class BootNotificationAction(ChargingStationUnitOfWork unitOfWork,
                 ClientIdentifier = chargingStation.ClientIdentifier,
                 Location = chargingStation.Location,
                 Alias = chargingStation.Alias,
-                ChargingStatus = ChargingStatusEnum.Inactive,
+                ChargingStatus = lastBootReason,
             }
         };
 
@@ -56,7 +66,7 @@ public sealed class BootNotificationAction(ChargingStationUnitOfWork unitOfWork,
         var payload = JsonSerializer.Serialize(pubnubMessage, new JsonSerializerOptions()
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            Converters = { new JsonStringEnumConverter<ChargingStatusEnum>() }
+            Converters = { new JsonStringEnumConverter<BootReasonEnum>() }
         });
         var buffer = Encoding.UTF8.GetBytes(payload);
 

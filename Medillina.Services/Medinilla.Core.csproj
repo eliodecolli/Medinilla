@@ -13,6 +13,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Medinilla.Core.gRPC\Medinilla.Core.gRPC.csproj" />
     <ProjectReference Include="..\Medinilla.Core.SharedContracts\Medinilla.Core.SharedContracts.csproj" />
     <ProjectReference Include="..\Medinilla.DataAccess\Medinilla.DataAccess.csproj" />
     <ProjectReference Include="..\Medinilla.DataTypes\Medinilla.DataTypes.csproj" />

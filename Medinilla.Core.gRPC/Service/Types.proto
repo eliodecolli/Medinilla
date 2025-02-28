@@ -1,0 +1,32 @@
+syntax = "proto3";
+
+option csharp_namespace = "Medinilla.Core.gRPC.Service";
+
+import "Contracts/ChargingStation.proto";
+
+package medinilla.core.grpc;
+
+message Error {
+    bool has_error = 1;
+    string message = 2;
+}
+
+message GetChargingStationsQuery {
+    string account_id = 1;
+    optional string search_term = 2;
+}
+
+message GetChargingStationsResponse {
+    repeated medinilla.core.grpc.ChargingStation charging_stations = 1;
+    optional Error error = 2;
+}
+
+message GetChargingStationQuery {
+    string account_id = 1;
+    string charging_station_id = 2;
+}
+
+message GetChargingStationResponse {
+    medinilla.core.grpc.ChargingStation charging_station = 1;
+    optional Error error = 2;
+}

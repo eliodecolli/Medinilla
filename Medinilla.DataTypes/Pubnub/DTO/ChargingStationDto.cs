@@ -1,4 +1,6 @@
-﻿namespace Medinilla.DataTypes.Pubnub.DTO;
+﻿using Medinilla.DataTypes.Contracts.Common;
+
+namespace Medinilla.DataTypes.Pubnub.DTO;
 
 public sealed class ChargingStationDto
 {
@@ -10,5 +12,5 @@ public sealed class ChargingStationDto
 
     public string? Alias { get; set; }
 
-    public ChargingStatusEnum ChargingStatus { get; set; }
+    public BootReasonEnum ChargingStatus { get; set; }
 }

@@ -1,4 +1,5 @@
-﻿using Medinilla.DataAccess.Interfaces;
+﻿using Medinilla.DataAccess.Exceptions;
+using Medinilla.DataAccess.Interfaces;
 using Medinilla.DataAccess.Relational.Models;
 using Medinilla.DataAccess.Relational.Models.Authorization;
 using Microsoft.Extensions.Configuration;
@@ -13,9 +14,12 @@ public sealed class ChargingStationUnitOfWork(MedinillaOcppDbContext context, IC
     private IRepository<AuthorizationDetails> authDetailsRepo = new GenericRepository<AuthorizationDetails>(context);
     private IRepository<Account> accountRepo = new GenericRepository<Account>(context);
 
-    public EvseUnitOfWork EvseConnectorSubUnit = new EvseUnitOfWork(context);
+    private EvseUnitOfWork _evseUnitOfWork = new EvseUnitOfWork(context);
+    private TransactionsUnitOfWork _transactionsUnitOfWork = new TransactionsUnitOfWork(context);
 
-    public TransactionsUnitOfWork TransactionsSubUnit = new TransactionsUnitOfWork(context);
+    public EvseUnitOfWork EvseConnectorSubUnit => _evseUnitOfWork;
+
+    public TransactionsUnitOfWork TransactionsSubUnit => _transactionsUnitOfWork;
 
     public async Task<ChargingStation> ProcessBootNotification(ChargingStation chargingStation)
     {
@@ -66,5 +70,17 @@ public sealed class ChargingStationUnitOfWork(MedinillaOcppDbContext context, IC
     {
         var result = await repository.Filter(c => c.ClientIdentifier == id);
         return result.FirstOrDefault();
+    }
+
+    public async Task<IEnumerable<ChargingStation>> GetChargingStations(string accountId)
+    {
+        if(Guid.TryParse(accountId, out var guid))
+        {
+            return await repository.Filter(c => c.AccountId == guid);
+        }
+        else
+        {
+            throw new OcppCrudException($"Invalid account id: {accountId}");
+        }
     }
 }

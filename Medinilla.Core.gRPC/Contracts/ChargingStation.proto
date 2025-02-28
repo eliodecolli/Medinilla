@@ -1,0 +1,13 @@
+syntax = "proto3";
+
+option csharp_namespace = "Medinilla.Core.gRPC.Contracts";
+
+package medinilla.core.grpc;
+
+message ChargingStation {
+    string id = 1;
+    string account_id = 2;
+    string alias = 3;
+    string location = 4;
+    string last_status = 5;
+}

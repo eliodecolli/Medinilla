@@ -69,7 +69,6 @@ internal class CoreInterfaceCommunication : IInterfaceCommunication
                 body: finalResponse.ToByteArray()).ConfigureAwait(false);
 
             _logger.LogInformation($"Sent response to {responseChannel}");
-
         }
         catch (Exception ex)
         {
