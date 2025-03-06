@@ -20,8 +20,9 @@ public sealed class AuthorizeAction(ChargingStationUnitOfWork unitOfWork,
             IdTokenInfo = new IdTokenInfo()
             {
                 Status = status,
+                CacheExpiryDateTime = DateTime.Now,
             },
-
+            CertificateStatus  = AuthorizeCertificateStatus.NoCertificateAvailable
         };
     }
 

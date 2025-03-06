@@ -74,7 +74,7 @@ public class MedinillaOcppDbContext(IConfiguration config) : DbContext
 
         // configure auth
         modelBuilder.Entity<IdToken>().HasOne(c => c.ChargingStation)
-            .WithMany()
+            .WithMany(c => c.IdTokens)
             .HasForeignKey(c => c.ChargingStationId);
 
         modelBuilder.Entity<IdToken>().HasOne(c => c.User)

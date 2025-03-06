@@ -15,7 +15,7 @@ public sealed class IdTokenInfo
     /// <summary>
     /// Between [-9; 9]. The chargingPriority in TransactionEventResponse overrules this one.
     /// </summary>
-    public int? ChargingPriority { get; set; }
+    public int ChargingPriority { get; set; }
 
     /// <summary>
     /// Preferred user interface language of identifier user.Contains a language code as defined in RFC5646.

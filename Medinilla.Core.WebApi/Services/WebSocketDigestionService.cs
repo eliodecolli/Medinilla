@@ -268,7 +268,7 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService, IAsync
             return null;
         }
 
-        var buffer = new byte[1024];
+        var buffer = new byte[5000];
         var segment = new ArraySegment<byte>(buffer);
 
         try

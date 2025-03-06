@@ -32,12 +32,20 @@ public class OcppCallRouter : IOcppCallRouter
         var messageString = Encoding.UTF8.GetString(buffer);
 
         var parser = new OcppMessageParser();
-        parser.LoadRaw(messageString);
+        try
+        {
+            parser.LoadRaw(messageString);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError($"Error while parsing OCPP message: {ex.Message} {Environment.NewLine} Payload: {messageString}");
+        }
 
         switch (parser.GetMessageType())
         {
             case OcppJMessageType.CALL:
                 var ocppCall = parser.ParseCall();
+                _logger.LogInformation($"Received OCPP Call: {ocppCall.Action}");
 #if DEBUG
                 var salt = new Random().Next().ToString("X");
                 if (!Directory.Exists("logs"))
