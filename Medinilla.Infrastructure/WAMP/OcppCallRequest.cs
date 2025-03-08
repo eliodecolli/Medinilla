@@ -19,7 +19,11 @@ public sealed class OcppCallRequest : BaseOcppMessage
 
     public T As<T>() where T : class
     {
-        var result = JsonSerializer.Deserialize<T>(Payload, new JsonSerializerOptions() { PropertyNameCaseInsensitive = true });
+        var result = JsonSerializer.Deserialize<T>(Payload, new JsonSerializerOptions()
+        { 
+            PropertyNameCaseInsensitive = true,
+            Converters = { new DottedEnumJsonConverter() }
+        });
         if (result is not null)
         {
             return result;

@@ -270,19 +270,30 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService, IAsync
 
         var buffer = new byte[5000];
         var segment = new ArraySegment<byte>(buffer);
+        var messageBuffer = new List<byte>(); // To store the complete message
 
         try
         {
-            var result = await _webSocket.ReceiveAsync(segment, _cts.Token);
-
-            if (result.CloseStatus.HasValue)
+            WebSocketReceiveResult result;
+            do
             {
-                _logger.LogWarning("WS connection for {ClientId} has been closed. {Status}:{Description}",
-                    _clientIdentifier, result.CloseStatus.Value, result.CloseStatusDescription);
-                return null;
-            }
+                // Receive a frame
+                result = await _webSocket.ReceiveAsync(segment, _cts.Token);
 
-            return segment.AsSpan(0, result.Count).ToArray();
+                if (result.CloseStatus.HasValue)
+                {
+                    _logger.LogWarning("WS connection for {ClientId} has been closed. {Status}:{Description}",
+                        _clientIdentifier, result.CloseStatus.Value, result.CloseStatusDescription);
+                    return null;
+                }
+
+                // Add the received data to our message buffer
+                messageBuffer.AddRange(segment.AsSpan(0, result.Count).ToArray());
+
+                // Continue until we've received the entire message
+            } while (!result.EndOfMessage);
+
+            return messageBuffer.ToArray();
         }
         catch (OperationCanceledException)
         {
