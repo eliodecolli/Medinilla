@@ -85,7 +85,7 @@ public class MedinillaOcppDbContext(IConfiguration config) : DbContext
             .HasDefaultValue(false);
 
         modelBuilder.Entity<IdToken>().HasMany(c => c.TransactionSnapshots)
-            .WithOne()
+            .WithOne(c => c.IdToken)
             .HasForeignKey(c => c.IdTokenId);
 
         modelBuilder.Entity<IdToken>().HasMany(c => c.TransactionEvents)

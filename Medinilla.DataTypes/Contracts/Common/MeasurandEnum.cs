@@ -1,6 +1,4 @@
-﻿using Medinilla.DataTypes.Interops;
-using System.Text.Json.Serialization;
-
+﻿
 namespace Medinilla.DataTypes.Contracts.Common;
 
 /// <summary>

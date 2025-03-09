@@ -52,9 +52,9 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
 
     private decimal ScaleToKW(SampledValue value)
     {
-        if (value.UnitOfMeasure.Unit.ToLower() == "wh" && value.UnitOfMeasure.Multiplier == 1)
+        if (value.UnitOfMeasure.Unit.ToLower() == "wh")
         {
-            return 1000 / value.Value;
+            return value.Value / 1000;
         }
         else
         {
@@ -149,7 +149,6 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
             EndedAt = finalTx.Timestamp,
             TotalMeteredValue = totalValueMetered,
             TotalCost = CalculateTotalCosts(totalValueMetered, cs, unit),
-            TokenId = request.IdToken?.Token ?? "",
             EvseConnectorId = connector?.Id ?? null,
             TransactionId = request.TransactionInfo.TransactionId,
             Unit = unit,

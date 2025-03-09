@@ -26,8 +26,6 @@ public class TransactionSnapshot
 
     public DateTime EndedAt { get; set; }
 
-    public string TokenId { get; set; }
-
     public Guid? EvseConnectorId { get; set; }
 
     public virtual ChargingStation ChargingStation { get; set; }
