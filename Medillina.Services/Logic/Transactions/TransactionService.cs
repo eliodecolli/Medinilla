@@ -1,5 +1,4 @@
-﻿using Medinilla.Core.Logic.Exceptions;
-using Medinilla.DataTypes.Contracts.Common;
+﻿using Medinilla.DataTypes.Contracts.Common;
 using Medinilla.DataTypes.Core;
 using Medinilla.DataTypes.Core.Enums;
 
