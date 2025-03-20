@@ -10,7 +10,7 @@ public class MedinillaOcppDbContext(IConfiguration config) : DbContext
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
         optionsBuilder.UseLazyLoadingProxies();
-        optionsBuilder.UseNpgsql(config.GetConnectionString("MedinillaCore"));
+        optionsBuilder.UseNpgsql(config.GetConnectionString("MedinillaCore"), b => b.MigrationsAssembly("Medinilla.Core.Service"));
     }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -66,6 +66,10 @@ public class MedinillaOcppDbContext(IConfiguration config) : DbContext
         modelBuilder.Entity<ChargingStation>().HasOne(c => c.AuthorizationDetails)
             .WithOne(c => c.ChargingStation)
             .HasForeignKey<AuthorizationDetails>(c => c.ChargingStationId);
+
+        // configure transaction events
+        modelBuilder.Entity<TransactionEvent>().Property(c => c.ConsumptionType)
+            .HasConversion<string>();
 
         // configure transaction snapshots
         modelBuilder.Entity<TransactionSnapshot>().HasOne(c => c.EvseConnector)

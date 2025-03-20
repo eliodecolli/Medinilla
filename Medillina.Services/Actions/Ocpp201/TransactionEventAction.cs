@@ -62,8 +62,9 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
         }
     }
 
-    private decimal CalculateTotalMeteredValue(IEnumerable<MeterValue>? meters)
+    private decimal CalculateTotalMeteredValue(TransactionEventRequest request)
     {
+        var meters = request.MeterValue;
         if (meters is null)
         {
             return 0.0M;
@@ -72,7 +73,8 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
         decimal total = 0.0M;
         foreach (var meter in meters)
         {
-            total += meter.SampledValue.Select(ScaleToKW).Sum();
+            var sampledValues = meter.SampledValue.Where(s => s.Measurand == MeasurandEnum.EnergyActiveImportInterval || s.Measurand == MeasurandEnum.EnergyActiveImportRegister);
+            total += sampledValues.Where(t => t.Measurand == MeasurandEnum.EnergyActiveImportInterval).Select(ScaleToKW).Sum();
         }
         return total;
     }
@@ -82,6 +84,64 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
         var unitPrice = !string.IsNullOrEmpty(unit) ? cs.Tariffs?.Where(t => t.UnitName == unit).FirstOrDefault()?.UnitPrice ?? 1.0M : 1.0M;
         var total = totalValue * unitPrice;
         return total;
+    }
+
+    private decimal? TryGetTotalEnergyImport(IEnumerable<SampledValue> sampled)
+    {
+        var result = sampled.Where(s => s.Phase is null).FirstOrDefault();
+        if (result is not null)
+        {
+            return result.Value;
+        }
+        else
+        {
+            // apparently we have phases?
+            var phasesSamples = sampled.Where(s => s.Phase is not null);
+            if (phasesSamples.Count() > 0)
+            {
+                // we have multiple phases
+                // let's sum them all
+                return phasesSamples.Select(s => s.Value).Sum();
+            }
+            else
+            {
+                // wat?
+                return null;
+            }
+        }
+    }
+
+    private decimal GetTotalEnergyImport(IEnumerable<TransactionEvent> transactions, TransactionEventRequest lastRequest)
+    {
+        var lastMetered = lastRequest.MeterValue?.OrderByDescending(m => m.Timestamp).FirstOrDefault();
+        var firstMetered = lastRequest.MeterValue?.OrderBy(m => m.Timestamp).FirstOrDefault();
+
+        // try to get the last metered value
+        // then check if there's an Energy.Active.Import.Register payload
+        // if there is, check if it's not phase-dependant, otherwise sum all of the phases
+        if (lastMetered is not null)
+        {
+            var energyActiveImport = lastMetered.SampledValue.Where(s => s.Measurand == MeasurandEnum.EnergyActiveImportRegister);
+            if (energyActiveImport.Count() > 1)
+            {
+                // apparently there are multiple phases
+                // before we do that let's check if there's a non-phase-dependent value
+                var result = TryGetTotalEnergyImport(energyActiveImport);
+                if (result is not null)
+                {
+                    return result.Value;  // not sure why without .Value it's not working
+                }
+            }
+            else
+            {
+                var firstResult = energyActiveImport.FirstOrDefault()?.Value;
+                if (firstResult is not null)
+                {
+                    return firstResult.Value;
+                }
+            }
+        }
+        return transactions.Select(t => t.MeteredValue).Sum();
     }
 
     private async Task<string> PerformAuthorization(DbChargingStation cs, TransactionEventRequest request, AuthorizationContext context)
@@ -100,7 +160,7 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
         return status;
     }
 
-    private async Task<bool> PerformTokenCleanUp(DbChargingStation cs, IdToken token)
+    private bool PerformTokenCleanUp(DbChargingStation cs, IdToken token)
     {
         var contextIdToken = cs.IdTokens.FirstOrDefault(t => t.Token == token.Token);
         if (contextIdToken is not null)
@@ -121,7 +181,7 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
             EVSEId = request.Evse?.Id,
             Offline = request.Offline,
             ChargingStationId = cs.Id,
-            MeteredValue = CalculateTotalMeteredValue(request.MeterValue),
+            MeteredValue = CalculateTotalMeteredValue(request),
             UnitName = TryGetUnit(request.MeterValue),
             TriggerReason = Enum.GetName(request.TriggerReason) ?? "UNKNOWN",
             EventType = Enum.GetName(request.EventType) ?? "UNKNOWN"
@@ -137,7 +197,7 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
         // generate a snapshot of the transaction here
         // calculate the total costs
         // send it back to the charging station
-        var totalValueMetered = currentTransactions.Select(c => c.MeteredValue).Sum();
+        var totalValueMetered = GetTotalEnergyImport(currentTransactions, request);
         var unit = currentTransactions.Where(t => !string.IsNullOrEmpty(t.UnitName)).FirstOrDefault()?.UnitName ?? "";
 
         var connector = cs.EvseConnectors?.Where(c => c.ConnectorId == (request.Evse?.ConnectorId ?? 1) && c.EvseId == (request.Evse?.Id ?? 1)).FirstOrDefault();
@@ -250,7 +310,7 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
 
                         if (request.IdToken?.Type == IdTokenType.Central)
                         {
-                            if (await PerformTokenCleanUp(chargingStation, request.IdToken).ConfigureAwait(false))
+                            if (PerformTokenCleanUp(chargingStation, request.IdToken))
                             {
                                 _logger.LogInformation($"{clientIdentifier}: Removed temporary token {request.IdToken.Token} because transaction is done.");
                             }
