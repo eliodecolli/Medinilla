@@ -11,6 +11,8 @@ public class TransactionEvent
 
     public Guid? IdTokenId { get; set; }
 
+    public Guid? TransactionSnapshotId { get; set; }
+
     public string TransactionId { get; set; }
 
     public int SeqNo { get; set; }
@@ -21,15 +23,17 @@ public class TransactionEvent
 
     public bool? Offline { get; set; }
 
-    public decimal MeteredValue { get; set; }
+    public decimal TotalConsuption { get; set; }
 
-    public ConsumptionType ConsumptionType { get; set; }
+    public ConsumptionType? ConsumptionType { get; set; }
 
     public string UnitName { get; set; }
 
     public string TriggerReason { get; set; }
 
     public string EventType { get; set; }
+
+    public virtual TransactionSnapshot? TransactionSnapshot { get; set; }
 
     public virtual ChargingStation ChargingStation { get; set; }
 

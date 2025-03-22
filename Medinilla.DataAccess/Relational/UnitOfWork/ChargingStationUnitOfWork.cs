@@ -24,7 +24,7 @@ public sealed class ChargingStationUnitOfWork(MedinillaOcppDbContext context,
 
     public EvseUnitOfWork EvseConnectorSubUnit => _evseUnitOfWork;
 
-    public TransactionsUnitOfWork TransactionsSubUnit => _transactionsUnitOfWork;
+    public TransactionsUnitOfWork TransactionSubUnit => _transactionsUnitOfWork;
 
     public async Task<ChargingStation> ProcessBootNotification(ChargingStation chargingStation)
     {

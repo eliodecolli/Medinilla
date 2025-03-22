@@ -1,6 +1,7 @@
 ﻿using Medinilla.Core.Interfaces;
 using Medinilla.Core.Logic.Authorization;
 using Medinilla.Core.Logic.Authorization.Algorithms;
+using Medinilla.Core.Logic.Transactions;
 using Medinilla.Services.Actions;
 using Medinilla.Services.Actions.Ocpp201;
 using Medinilla.Services.Interfaces;
@@ -41,5 +42,6 @@ public static class ServiceExtensions
         serviceCollection.AddScoped<IOcppActionsFactory, OcppActionsFactory>();
         serviceCollection.AddSingleton<IOcppCallRouter, OcppCallRouter>();
         serviceCollection.AddScoped<AuthorizationAlgorithmFactory>();
+        serviceCollection.AddScoped<TransactionService>();
     }
 }

@@ -1,6 +1,8 @@
 ﻿using Medinilla.DataAccess.Interfaces;
 using Medinilla.DataAccess.Relational.Models;
 using Medinilla.DataAccess.Relational.Models.Authorization;
+using Medinilla.DataTypes.Core;
+using Medinilla.DataTypes.Core.Enums;
 
 namespace Medinilla.DataAccess.Relational.UnitOfWork;
 
@@ -8,6 +10,26 @@ public sealed class TransactionsUnitOfWork(MedinillaOcppDbContext context)
 {
     private IRepository<TransactionEvent> _transactionRepository = new GenericRepository<TransactionEvent>(context);
     private IRepository<TransactionSnapshot> _snapshotRepository = new GenericRepository<TransactionSnapshot>(context);
+
+    private decimal GetTotalConsumption(decimal currentConsumption, TransactionConsumption? consumption)
+    {
+        if (consumption is null)
+        {
+            return currentConsumption;
+        }
+
+        var result = currentConsumption;
+        if (consumption.ConsumptionType == ConsumptionType.Cumulative)
+        {
+            result = consumption.Consumption;
+        }
+        else if (consumption.ConsumptionType == ConsumptionType.Periodic)
+        {
+            result += consumption.Consumption;
+        }
+
+        return result;
+    }
 
     public async Task RegisterTransaction(TransactionEvent transaction, IdToken? idToken)
     {
@@ -22,6 +44,12 @@ public sealed class TransactionsUnitOfWork(MedinillaOcppDbContext context)
         }
 
         await _transactionRepository.Create(transaction);
+    }
+
+    public async Task<string?> GetTransactionUnit(string transactionId)
+    {
+        var relatedTransactions = await _transactionRepository.Filter(x => x.TransactionId == transactionId);
+        return relatedTransactions.FirstOrDefault()?.UnitName;
     }
 
     public async Task<TransactionEvent?> TryGetLatestTransaction(string transactionId)
@@ -51,8 +79,50 @@ public sealed class TransactionsUnitOfWork(MedinillaOcppDbContext context)
         return [.. retval];
     }
 
-    public async Task<TransactionSnapshot> RegisterFinalSnapshot(TransactionSnapshot snapshot)
+    public async Task<TransactionSnapshot> GetOrCreateSnapshot(TransactionEvent @event)
     {
-        return await _snapshotRepository.Create(snapshot);
+        var snapshots = await _snapshotRepository.Filter(s => s.TransactionEvents.Where(e => e.TransactionId == @event.TransactionId).Any()).ConfigureAwait(false);
+        var snapshot = snapshots.FirstOrDefault();
+
+        if (snapshot is not null)
+        {
+            return snapshot;
+        }
+        else
+        {
+            var newSnapshot = new TransactionSnapshot
+            {
+                ChargingStationId = @event.ChargingStationId,
+                TransactionId = @event.TransactionId,
+                StartedAt = @event.Timestamp,
+                LastEvent = @event.Timestamp,
+                StartReason = @event.TriggerReason,
+            };
+
+            return await _snapshotRepository.Create(newSnapshot);
+        }
+    }
+
+    public async Task<TransactionSnapshot> UpdateSnapshot(TransactionEvent @event, TransactionConsumption? consumption, TransactionSnapshot snapshot)
+    {
+        snapshot.TotalMeteredValue = GetTotalConsumption(snapshot.TotalMeteredValue, consumption);
+        snapshot.LastEvent = @event.Timestamp;
+        @event.TransactionSnapshotId = snapshot.Id;
+
+        await _transactionRepository.Update(@event);
+
+        return await _snapshotRepository.Update(snapshot);
+    }
+
+    public async Task<TransactionSnapshot> FinalizeSnapshot(TransactionEvent @event, TransactionSnapshot snapshot, TransactionConsumption? consumption)
+    {
+        snapshot.EndedAt = @event.Timestamp;
+        snapshot.EndReason = @event.TriggerReason;
+        snapshot.TotalCost = GetTotalConsumption(snapshot.TotalMeteredValue, consumption);
+
+        @event.TransactionSnapshotId = snapshot.Id;
+        await _transactionRepository.Update(@event);
+
+        return await _snapshotRepository.Update(snapshot);
     }
 }

@@ -4,6 +4,7 @@ using System.Text.Json;
 using Medinilla.DataAccess.Relational;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Medinilla.Core.Service.Migrations
 {
     [DbContext(typeof(MedinillaOcppDbContext))]
-    partial class MedinillaOcppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20250321231154_TransactionsSnapshots")]
+    partial class TransactionsSnapshots
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -240,6 +243,7 @@ namespace Medinilla.Core.Service.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<string>("ConsumptionType")
+                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<int?>("EVSEId")
@@ -255,6 +259,9 @@ namespace Medinilla.Core.Service.Migrations
                     b.Property<Guid?>("IdTokenId1")
                         .HasColumnType("uuid");
 
+                    b.Property<decimal>("MeteredValue")
+                        .HasColumnType("numeric");
+
                     b.Property<bool?>("Offline")
                         .HasColumnType("boolean");
 
@@ -263,9 +270,6 @@ namespace Medinilla.Core.Service.Migrations
 
                     b.Property<DateTime>("Timestamp")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<decimal>("TotalConsuption")
-                        .HasColumnType("numeric");
 
                     b.Property<string>("TransactionId")
                         .IsRequired()
@@ -323,9 +327,6 @@ namespace Medinilla.Core.Service.Migrations
                     b.Property<Guid?>("IdTokenId")
                         .HasColumnType("uuid");
 
-                    b.Property<DateTime>("LastEvent")
-                        .HasColumnType("timestamp with time zone");
-
                     b.Property<string>("StartReason")
                         .IsRequired()
                         .HasColumnType("text");
@@ -340,6 +341,10 @@ namespace Medinilla.Core.Service.Migrations
                         .HasColumnType("numeric");
 
                     b.Property<string>("TransactionId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Unit")
                         .IsRequired()
                         .HasColumnType("text");
 

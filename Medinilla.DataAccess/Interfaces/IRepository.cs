@@ -11,4 +11,6 @@ public interface IRepository<T>
     Task<bool> DeleteMany(Func<T, bool> predicate);
 
     Task<T> Create(T entity);
+
+    Task<T> Update(T entity);
 }

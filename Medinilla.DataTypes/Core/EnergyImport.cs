@@ -2,11 +2,8 @@
 
 namespace Medinilla.DataTypes.Core;
 
-public sealed class TransactionConsumption
+public sealed class EnergyImport
 {
+    public decimal EnergyImportValue { get; set; }
     public ConsumptionType ConsumptionType { get; set; }
-
-    public decimal Consumption { get; set; }
-
-    public DateTime Timestamp { get; set; }
 }

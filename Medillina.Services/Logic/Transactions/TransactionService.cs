@@ -6,61 +6,98 @@ namespace Medinilla.Core.Logic.Transactions;
 
 public sealed class TransactionService
 {
-    private bool TryGetTotalEnergyRegister(IEnumerable<SampledValue> collection, out SampledValue? sample)
+    private readonly List<MeasurandEnum> _energyImportMeasurands = new()
     {
-        sample = collection.FirstOrDefault(s => s.Measurand == MeasurandEnum.EnergyActiveImportRegister && s.Phase is null);
-        return sample != null;
+        MeasurandEnum.EnergyActiveImportRegister,
+        MeasurandEnum.EnergyActiveImportInterval
+    };
+
+    private decimal ScaleToKW(SampledValue value)
+    {
+        if (value.UnitOfMeasure.Unit.ToLower() == "wh")
+        {
+            return value.Value / 1000;
+        }
+        else
+        {
+            return value.Value * (decimal)Math.Pow(10, value.UnitOfMeasure.Multiplier);
+        }
     }
 
-    private decimal? GetTransactionBeginConsumption(IEnumerable<SampledValue> samples)
+    private EnergyImport GetTotalEnergyImport(IEnumerable<SampledValue> samples)
     {
-        var transactionBeginSamples = samples.Where(s => s.Context == ReadingContextEnum.TransactionBegin);
-        if (transactionBeginSamples.Any())
+        // we assume that in order to generate a collection of sampled values, we've ordered the meter values by timestamp descending
+
+        var total = 0.0M;
+        var latestConsumptionType = ConsumptionType.Cumulative;
+
+        foreach (var sample in samples)
         {
-            if (TryGetTotalEnergyRegister(transactionBeginSamples, out var transactionBeginSample))
+            var value = ScaleToKW(sample);
+            if (sample.Measurand == MeasurandEnum.EnergyActiveImportInterval)
             {
-                // TODO: Handle signed values as well
-                return transactionBeginSample!.Value;
+                total += value;
+                latestConsumptionType = ConsumptionType.Periodic;
             }
+            else if (sample.Measurand == MeasurandEnum.EnergyActiveImportRegister)
+            {
+                total = value;
+                latestConsumptionType = ConsumptionType.Cumulative;
+            }
+        }
+
+        return new EnergyImport
+        {
+            EnergyImportValue = total,
+            ConsumptionType = latestConsumptionType
+        };
+    }
+
+    private TransactionConsumption? GetMeterValueConsumption(MeterValue meter)
+    {
+        var samples = meter.SampledValue.Where(s => s.Measurand.HasValue ? _energyImportMeasurands.Contains(s.Measurand.Value) : false);
+        if (samples.Any())
+        {
+            var samplesConsumption = GetTotalEnergyImport(samples);
+            return new TransactionConsumption
+            {
+                Consumption = samplesConsumption.EnergyImportValue,
+                ConsumptionType = samplesConsumption.ConsumptionType,
+                Timestamp = meter.Timestamp
+            };
         }
 
         return null;
     }
 
-    private decimal? GetTransactionEndConsumption(IEnumerable<SampledValue> samples)
+    public TransactionConsumption GetTransactionConsumption(IEnumerable<MeterValue> meters, DateTime lastMeterTimestamp)
     {
-        var transactionEndSamples = samples.Where(s => s.Context == ReadingContextEnum.TransactionEnd);
-        if (transactionEndSamples.Any())
+        var latestTransactionConsumptions = meters.Where(m => m.Timestamp > lastMeterTimestamp)
+                                                  .Select(GetMeterValueConsumption)
+                                                  .Where(c => c is not null)
+                                                  .OrderBy(c => c!.Timestamp);
+
+        var consumption = 0.0M;
+        var lastConsumptionType = ConsumptionType.Cumulative;
+
+        foreach (var transactionConsumption in latestTransactionConsumptions)
         {
-            if (TryGetTotalEnergyRegister(transactionEndSamples, out var transactionEndSample))
+            if (transactionConsumption?.ConsumptionType == ConsumptionType.Cumulative)
             {
-                return transactionEndSample!.Value;
+                consumption = transactionConsumption.Consumption;
             }
+            else if (transactionConsumption?.ConsumptionType == ConsumptionType.Periodic)
+            {
+                consumption += transactionConsumption.Consumption;
+            }
+            lastConsumptionType = transactionConsumption?.ConsumptionType ?? lastConsumptionType;
         }
 
-        return null;
-    }
-
-    private TransactionConsumption? GetTransactionLatestMeterValueConsumption(IEnumerable<MeterValue> meters)
-    {
-        var latestMeterValue = meters.OrderByDescending(m => m.Timestamp).FirstOrDefault();
-        if (latestMeterValue != null)
+        return new TransactionConsumption
         {
-            if (TryGetTotalEnergyRegister(latestMeterValue.SampledValue, out var consumption))
-            {
-                return new TransactionConsumption
-                {
-                    ConsumptionType = ConsumptionType.Cumulative,
-                    Consumption = consumption!.Value
-                };
-            }
-        }
-
-        return null;
-    }
-
-    public IEnumerable<SampledValue> FlatSamples(IEnumerable<MeterValue> meters)
-    {
-        return meters.SelectMany(m => m.SampledValue);
+            ConsumptionType = lastConsumptionType,
+            Consumption = consumption,
+            Timestamp = latestTransactionConsumptions.LastOrDefault()?.Timestamp ?? DateTime.MinValue  // we've already filtered out the nulls here, so this is a bit redundand but the compiler likes it so ¯\_(ツ)_/¯
+        };
     }
 }

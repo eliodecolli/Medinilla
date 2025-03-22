@@ -76,6 +76,10 @@ public class MedinillaOcppDbContext(IConfiguration config) : DbContext
             .WithMany()
             .HasForeignKey(c => c.EvseConnectorId);
 
+        modelBuilder.Entity<TransactionSnapshot>().HasMany(c => c.TransactionEvents)
+            .WithOne(c => c.TransactionSnapshot)
+            .HasForeignKey(c => c.TransactionSnapshotId);
+
         // configure auth
         modelBuilder.Entity<IdToken>().HasOne(c => c.ChargingStation)
             .WithMany(c => c.IdTokens)
