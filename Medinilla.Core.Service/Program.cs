@@ -1,5 +1,4 @@
-﻿using Medinilla.Core.Service;
-using Medinilla.Core.Service.Communication;
+﻿using Medinilla.Core.Service.Communication;
 using Medinilla.Core.Service.Interfaces;
 using Medinilla.Core.Service.Types;
 using Medinilla.DataAccess;

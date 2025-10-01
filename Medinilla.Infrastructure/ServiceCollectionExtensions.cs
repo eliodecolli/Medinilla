@@ -9,7 +9,7 @@ public static class ServiceCollectionExtensions
 {
     public static void AddMedinillaInfrastructure(this IServiceCollection services)
     {
-        services.AddScoped<ITokenizer, OcppMessageTokenizer>();
+        services.AddScoped<ITokenizer, OcppMessageTokenizerJson>();
         services.AddScoped<IOcppMessageParser, OcppMessageParser>();
     }
 }
