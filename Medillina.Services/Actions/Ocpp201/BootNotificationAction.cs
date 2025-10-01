@@ -1,4 +1,7 @@
 ﻿using Medinilla.Core.Logic;
+using Medinilla.Core.Logic.Configuration;
+using Medinilla.DataAccess.Relational.Models;
+using Medinilla.DataAccess.Relational.Models.Authorization;
 using Medinilla.DataAccess.Relational.UnitOfWork;
 using Medinilla.DataTypes.Contracts;
 using Medinilla.DataTypes.Contracts.Common;
@@ -11,6 +14,7 @@ using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 using CS = Medinilla.DataAccess.Relational.Models.ChargingStation;
+using IdTokenDb = Medinilla.DataAccess.Relational.Models.Authorization.IdToken;
 
 namespace Medinilla.Services.Actions.Ocpp201;
 
@@ -31,6 +35,7 @@ public sealed class BootNotificationAction(ChargingStationUnitOfWork unitOfWork,
         };
     }
 
+    #region PubNub
     private async Task PublishChargingStationToPubnub(CS chargingStation)
     {
         var lastBootReason = BootReasonEnum.Unknown;
@@ -75,6 +80,81 @@ public sealed class BootNotificationAction(ChargingStationUnitOfWork unitOfWork,
         _logger.LogInformation($"Publishing charging station event to PubNub channel {channel}");
         await pubnub.SendMessage(channel, buffer);
     }
+    #endregion
+
+
+    #region BusinessLogic
+
+    // TODO: This should ONLY cover the regular boot notification processing, not creating default values
+    private async Task<CS> ProcessBootNotification(CS chargingStation)
+    {
+        var result = await unitOfWork.ChargingStationRepository.Filter(c => c.ClientIdentifier == chargingStation.ClientIdentifier);
+        var entity = result.FirstOrDefault();
+        if (entity == null)
+        {
+            var accountQuery = await unitOfWork.AccountRepository.Filter(c => c.Name == "Account 1").ConfigureAwait(false);
+            var account = accountQuery.First();
+            chargingStation.AccountId = account.Id;
+
+            chargingStation.CreatedAt = DateTime.UtcNow;
+            entity = await unitOfWork.ChargingStationRepository.Create(chargingStation);
+        }
+        else
+        {
+            entity.LatestBootNotificationReason = chargingStation.LatestBootNotificationReason;
+            entity.ModifiedAt = DateTime.UtcNow;
+        }
+
+        var medinillaSettings = CentralConfig.GetMedinillaConfiguration();
+
+        if (entity.Tariffs is null || entity.Tariffs.Count == 0)
+        {
+            // get default unit price
+            var defaultUnit = medinillaSettings.DefaultUnit;
+
+            await unitOfWork.TariffsRepository.Create(new Tariff()
+            {
+                Id = Guid.NewGuid(),
+                ChargingStationId = entity.Id,
+                UnitName = defaultUnit.Name,
+                UnitPrice = (decimal)defaultUnit.Price,
+            });
+        }
+
+        if (entity.AuthorizationDetails is null)
+        {
+            await unitOfWork.AuthDetailsRepository.Create(new AuthorizationDetails()
+            {
+                AuthBlob = JsonDocument.Parse(medinillaSettings.DefaultAuthDetails ?? "{}"),
+                ChargingStationId = entity.Id,
+            });
+        }
+
+        if (entity.IdTokens.Count == 0 && medinillaSettings.UseDefaultUser)
+        {
+            var defaultUser = medinillaSettings.DefaultUser;
+            var entityUser = await unitOfWork.AuthorizationUserRepository.Create(new AuthorizationUser()
+            {
+                ChargingStationId = entity.Id,
+                ActiveCredit = (decimal)defaultUser.ActiveCredit,
+                DisplayName = defaultUser.DisplayName,
+                IsActive = true
+            });
+            await unitOfWork.IdTokenRepository.Create(new IdTokenDb()
+            {
+                ChargingStationId = entity.Id,
+                AuthorizationUserId = entityUser.Id,
+                Token = defaultUser.DisplayName,
+                CreatedDate = DateTime.UtcNow,
+                ExpiryDate = DateTime.UtcNow.AddDays(100000),
+                IdType = "ISO14443"
+            });
+        }
+
+        return entity;
+    }
+
+    #endregion
 
     public async Task<RpcResult> Execute(OcppCallRequest call, string clientIdentifier)
     {
@@ -85,7 +165,7 @@ public sealed class BootNotificationAction(ChargingStationUnitOfWork unitOfWork,
             notification.ChargingStation is not null ? notification.ChargingStation.Model : "UNDEFINED",
             clientIdentifier);
 
-        var chargingStation = await unitOfWork.ProcessBootNotification(GetChargingStation(clientIdentifier, notification));
+        var chargingStation = await ProcessBootNotification(GetChargingStation(clientIdentifier, notification));
         await unitOfWork.Save();
 
         await PublishChargingStationToPubnub(chargingStation);

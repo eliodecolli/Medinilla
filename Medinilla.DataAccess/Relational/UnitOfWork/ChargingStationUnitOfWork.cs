@@ -26,73 +26,17 @@ public sealed class ChargingStationUnitOfWork(MedinillaOcppDbContext context,
 
     public TransactionsUnitOfWork TransactionSubUnit => _transactionsUnitOfWork;
 
-    public async Task<ChargingStation> ProcessBootNotification(ChargingStation chargingStation)
-    {
-        var result = await repository.Filter(c => c.ClientIdentifier == chargingStation.ClientIdentifier);
-        var entity = result.FirstOrDefault();
-        if (entity == null)
-        {
-            var accountQuery = await accountRepo.Filter(c => c.Name == "Account 1").ConfigureAwait(false);
-            var account = accountQuery.First();
-            chargingStation.AccountId = account.Id;
+    public IRepository<ChargingStation> ChargingStationRepository => repository;
 
-            chargingStation.CreatedAt = DateTime.UtcNow;
-            entity = await repository.Create(chargingStation);
-        }
-        else
-        {
-            entity.LatestBootNotificationReason = chargingStation.LatestBootNotificationReason;
-            entity.ModifiedAt = DateTime.UtcNow;
-        }
+    public IRepository<Tariff> TariffsRepository => tariffsRepo;
 
-        var medinillaSettings = config.GetSection("Medinilla");
+    public IRepository<AuthorizationDetails> AuthDetailsRepository => authDetailsRepo;
 
-        if (entity.Tariffs is null || entity.Tariffs.Count == 0)
-        {
-            // get default unit price
-            var defaultUnit = medinillaSettings.GetSection("DefaultUnit");
+    public IRepository<Account> AccountRepository => accountRepo;
 
-            await tariffsRepo.Create(new Tariff()
-            {
-                Id = Guid.NewGuid(),
-                ChargingStationId = entity.Id,
-                UnitName = defaultUnit["Name"],
-                UnitPrice = decimal.Parse(defaultUnit["Price"])
-            });
-        }
+    public IRepository<AuthorizationUser> AuthorizationUserRepository => authUsersRepo;
 
-        if (entity.AuthorizationDetails is null)
-        {
-            await authDetailsRepo.Create(new AuthorizationDetails()
-            {
-                AuthBlob = JsonDocument.Parse(medinillaSettings["DefaultAuthDetails"] ?? "{}"),
-                ChargingStationId = entity.Id,
-            });
-        }
-
-        if (entity.IdTokens.Count == 0 && bool.TryParse(medinillaSettings["UseDefaultUser"], out bool useDefaultUser) && useDefaultUser)
-        {
-            var defaultUser = medinillaSettings.GetSection("DefaultUser");
-            var entityUser = await authUsersRepo.Create(new AuthorizationUser()
-            {
-                ChargingStationId = entity.Id,
-                ActiveCredit = int.Parse(defaultUser["ActiveCredit"] ?? "10000"),
-                DisplayName = defaultUser["DisplayName"] ?? "Dummy Display Name (Not Found in Config)",
-                IsActive = true
-            });
-            await idTokensRepo.Create(new IdToken()
-            {
-                ChargingStationId = entity.Id,
-                AuthorizationUserId = entityUser.Id,
-                Token = defaultUser["Token"] ?? "DEADBEEF",
-                CreatedDate = DateTime.UtcNow,
-                ExpiryDate = DateTime.UtcNow.AddDays(100000),
-                IdType = "ISO14443"
-            });
-        }
-
-        return entity;
-    }
+    public IRepository<IdToken> IdTokenRepository => idTokensRepo;
 
     public async Task<ChargingStation?> GetChargingStation(string id)
     {

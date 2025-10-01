@@ -8,6 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="config.json" />
     <None Remove="settings.json" />
   </ItemGroup>
 
@@ -31,6 +32,12 @@
     <ProjectReference Include="..\Medillina.Services\Medinilla.Core.csproj" />
     <ProjectReference Include="..\Medinilla.Core.SharedContracts\Medinilla.Core.SharedContracts.csproj" />
     <ProjectReference Include="..\Medinilla.RealTime\Medinilla.RealTime.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="config.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
 </Project>
