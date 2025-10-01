@@ -28,6 +28,24 @@ public sealed class StatusNotificationAction(ChargingStationUnitOfWork unitOfWor
         };
     }
 
+    private async Task ProcessStatusNotification(EvseConnector evseConnector)
+    {
+        var result = await unitOfWork.EvseConnectorSubUnit.EvseConnectorRepository.Filter(c => c.ChargingStationId == evseConnector.ChargingStationId &&
+            c.EvseId == evseConnector.EvseId && c.ConnectorId == evseConnector.ConnectorId);
+        var connector = result.FirstOrDefault();
+
+        if (connector == null)
+        {
+            // oopsies, create a new one
+            await unitOfWork.EvseConnectorSubUnit.EvseConnectorRepository.Create(evseConnector);
+        }
+        else
+        {
+            connector.ConnectorStatus = evseConnector.ConnectorStatus;
+            connector.ModifiedAt = evseConnector.ModifiedAt;
+        }
+    }
+
     public async Task<RpcResult> Execute(OcppCallRequest call, string clientIdentifier)
     {
         var request = call.As<StatusNotificationRequest>();
@@ -45,7 +63,7 @@ public sealed class StatusNotificationAction(ChargingStationUnitOfWork unitOfWor
 
         var evseConnector = GetEvseConnector(chargingStation, request);
 
-        await unitOfWork.EvseConnectorSubUnit.ProcessStatusNotification(evseConnector);
+        await ProcessStatusNotification(evseConnector);
         await unitOfWork.Save();
 
         // throw this event whenever it's convenient
