@@ -1,9 +1,11 @@
-﻿using Google.Protobuf;
+﻿using Akka.Actor;
+using Akka.Hosting;
+using Medinilla.Core.Service.Communication.Actors;
 using Medinilla.Core.Service.Interfaces;
 using Medinilla.Core.Service.Types;
 using Medinilla.Core.SharedContracts.Comms;
 using Medinilla.Core.SharedContracts.Comms.Ocpp;
-using Medinilla.Infrastructure.Interops;
+using Medinilla.Core.SharedContracts.ActorPayloads;
 using Medinilla.Services.Interfaces;
 using Microsoft.Extensions.Logging;
 using RabbitMQ.Client;
@@ -13,67 +15,32 @@ namespace Medinilla.Core.Service.Communication;
 
 internal class CoreInterfaceCommunication : IInterfaceCommunication
 {
-    private readonly TaskCompletionSource _runningTask;
-
     private CommunicationSettings _settings;
     private ConnectionFactory _connectionFactory;
     private IConnection _connection;
     private ILogger<CoreInterfaceCommunication> _logger;
 
-    private IOcppCallRouter _ocppCallRouter;
+    private IRequiredActor<Coordinator> _coordinator;
+    private IActorRef _dispatcher;
 
-    private Dictionary<string, ChannelSemaphore> _channels;
+    private readonly ActorSystem _system;
 
-    public CoreInterfaceCommunication(ILogger<CoreInterfaceCommunication> logger, IOcppCallRouter router)
+    private IChannel _responseChannel;
+
+    public CoreInterfaceCommunication(ILogger<CoreInterfaceCommunication> logger, IOcppCallRouter router, IRequiredActor<Coordinator> coordinator, ActorSystem system)
     {
         _connectionFactory = new ConnectionFactory();
         _logger = logger;
-        _ocppCallRouter = router;
-        _channels = new();
-        _runningTask = new(TaskCreationOptions.RunContinuationsAsynchronously);
+
+        _coordinator = coordinator;
+        _system = system;
     }
 
-    public async Task Connect(CommunicationSettings settings)
+    private async Task Connect(CommunicationSettings settings)
     {
         _settings = settings;
         _connectionFactory.Uri = new Uri(settings.RabbitUri);
         _connection = await _connectionFactory.CreateConnectionAsync().ConfigureAwait(false);
-    }
-
-    private async Task ConsumeOcppCall(AsyncEventingBasicConsumer consumer, BasicDeliverEventArgs ea, OcppMessage message)
-    {
-        try
-        {
-            _logger.LogInformation($"Received message on channel {ea.RoutingKey}");
-
-            var result = await _ocppCallRouter.RouteOcppCall(message.Payload.ToByteArray(), message.ClientIdentifier);
-            var response = new WampResult()
-            {
-                Result = result.Result is not null ? ByteString.CopyFrom(result.Result.ToByteArray()) : ByteString.Empty,
-                Error = result.Error is not null ? ByteString.CopyFrom(result.Error.ToByteArray()) : ByteString.Empty,
-                ReturnToCS = result.ReturnToCS
-            };
-
-            var finalResponse = new Comms()
-            {
-                MessageType = CommsMessageType.OcppResponse,
-                Payload = response.ToByteString()
-            };
-
-            var channel = consumer.Channel;
-            var responseChannel = CommsUtils.GetResponseChannelName(ea.RoutingKey);
-
-            await channel.BasicPublishAsync(
-                exchange: "",
-                routingKey: responseChannel,
-                body: finalResponse.ToByteArray()).ConfigureAwait(false);
-
-            _logger.LogInformation($"Sent response to {responseChannel}");
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError($"Error processing message on queue {ea.RoutingKey}: {ex.ToString()}");
-        }
     }
 
     private async Task RunEvent(object model, BasicDeliverEventArgs ea)
@@ -83,7 +50,12 @@ internal class CoreInterfaceCommunication : IInterfaceCommunication
         switch (comms.MessageType)
         {
             case CommsMessageType.OcppRequest:
-                await ConsumeOcppCall((model as AsyncEventingBasicConsumer)!, ea, OcppMessage.Parser.ParseFrom(ea.Body.ToArray()));
+                var message = OcppMessage.Parser.ParseFrom(ea.Body.ToArray());
+                _coordinator.ActorRef.Tell(new OcppConsumerMessage()
+                {
+                    ClientIdentifier = message.ClientIdentifier,
+                    Payload = message.Payload.ToByteArray()
+                }, _dispatcher);
                 break;
 
             case CommsMessageType.OcppResponse:
@@ -93,58 +65,23 @@ internal class CoreInterfaceCommunication : IInterfaceCommunication
         }
     }
 
-    private async Task ConsumeCommunicationSignal(object model, BasicDeliverEventArgs ea)
+    public async Task Run(CommunicationSettings settings)
     {
-        var payload = CommunicationChannelSignal.Parser.ParseFrom(ea.Body.ToArray());
-        _logger.LogInformation($"Received signal: {payload.ChannelName} Flag: {payload.Flag}");
+        await Connect(settings);
 
-        switch (payload.Flag)
-        {
-            case CommsFlag.Set:
-                var channel = await _connection.CreateChannelAsync().ConfigureAwait(false);
-                await channel.QueueDeclareAsync(payload.ChannelName, exclusive: false);
-
-                var consumer = new AsyncEventingBasicConsumer(channel);
-
-                switch (payload.ChannelType)
-                {
-                    case ChannelType.OcppEvent:
-                        consumer.ReceivedAsync += RunEvent;
-                        break;
-
-                    default:
-                        break;
-                }
-
-                _channels.Add(payload.ChannelName, new ChannelSemaphore(channel));
-                await channel.BasicConsumeAsync(payload.ChannelName, true, consumer);
-                break;
-
-            case CommsFlag.Remove:
-                if (_channels.ContainsKey(payload.ChannelName))
-                {
-                    var recordedChannel = await _channels[payload.ChannelName].GetChannelAsync();
-                    await recordedChannel.CloseAsync();
-                    await recordedChannel.DisposeAsync();
-
-                    _channels.Remove(payload.ChannelName);
-                }
-                break;
-        }
-    }
-
-    public async Task Run()
-    {
         var channel = await _connection.CreateChannelAsync().ConfigureAwait(false);
-        await channel.QueueDeclareAsync(_settings.SignalChannel, exclusive: false);
+        await channel.QueueDeclareAsync(_settings.RequestQueue, exclusive: false);
 
         var consumer = new AsyncEventingBasicConsumer(channel);
-        consumer.ReceivedAsync += ConsumeCommunicationSignal;
+        consumer.ReceivedAsync += RunEvent;
 
-        await channel.BasicConsumeAsync(_settings.SignalChannel, true, consumer);
+        await channel.BasicConsumeAsync(_settings.RequestQueue, true, consumer);
+
+        _responseChannel = await _connection.CreateChannelAsync().ConfigureAwait(false);
+        await _responseChannel.QueueDeclareAsync(settings.ResponseQueue);
+
+        _dispatcher = _system.ActorOf(Props.Create<Dispatcher>(_responseChannel, settings.ResponseQueue), "ocpp-dispatcher");
 
         _logger.LogDebug("Started core service...");
-
-        await _runningTask.Task;
     }
 }
