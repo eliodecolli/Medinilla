@@ -70,7 +70,20 @@ public class OcppCallRouter : IOcppCallRouter
                     };
                 }
 
-                return await ocppAction.Execute(ocppCall, clientIdentifier);
+                try
+                {
+                    return await ocppAction.Execute(ocppCall, clientIdentifier);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError($"Error while trying to handle OCPP CALL: Client {clientIdentifier}:: {ex.Message}");
+                    return new RpcResult()
+                    {
+                        Error = OcppCallError.InternalError(ocppCall.MessageId),
+                        Result = null,
+                        ReturnToCS = true,
+                    };
+                }
 
             case OcppJMessageType.CALL_RESULT:
                 return new RpcResult()
@@ -80,9 +93,13 @@ public class OcppCallRouter : IOcppCallRouter
                 };
 
             case OcppJMessageType.CALL_ERROR:
+                var error = parser.ParseError();
+
+                _logger.LogInformation($"Received OCPP Call Error from {clientIdentifier}: [{error.ErrorCode}]:: {error.ErrorDescription}\n\t-> Details:: {error.ErrorDetails}");
+
                 return new RpcResult()
                 {
-                    Error = parser.ParseError(),
+                    Error = error,
                     Result = null
                 };
 

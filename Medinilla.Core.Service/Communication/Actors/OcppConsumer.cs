@@ -16,32 +16,17 @@ public sealed class OcppConsumer : ReceiveActor
 
     private async Task ConsumeOcppCall(OcppConsumerMessage message)
     {
-       try
+        _logger.LogInformation($"Received OCPP Message from: {message.ClientIdentifier}");
+        var result = await _router.RouteOcppCall(message.Payload, message.ClientIdentifier);
+        var messageResult = new WampResultMessage()
         {
-            _logger.LogInformation($"Received OCPP Message from: ${message.ClientIdentifier}");
-            var result = await _router.RouteOcppCall(message.Payload, message.ClientIdentifier);
-            var messageResult = new WampResultMessage()
-            {
-                ClientIdentifier = message.ClientIdentifier,
-                Result = result.Result?.ToByteArray(),
-                Error = result.Error?.ToByteArray(),
-                ReturnToCS = result.ReturnToCS,
-            };
+            ClientIdentifier = message.ClientIdentifier,
+            Result = result.Result?.ToByteArray(),
+            Error = result.Error?.ToByteArray(),
+            ReturnToCS = result.ReturnToCS,
+        };
 
-            Sender.Tell(messageResult, Self);
-        }
-        catch(Exception ex)
-        {
-            _logger.LogError($"Error processing message from ${message.ClientIdentifier}: ${ex.Message}");
-            var errorMessage = new WampResultMessage()
-            {
-                ClientIdentifier = message.ClientIdentifier,
-                Error = OcppCallError.InternalError.ToByteArray(),
-                ReturnToCS = true
-            };
-
-            Sender.Tell(errorMessage);  // let the charger know
-        }
+        Sender.Tell(messageResult, Self);
     }
 
     public OcppConsumer(IServiceProvider sp)

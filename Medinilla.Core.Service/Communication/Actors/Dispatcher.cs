@@ -1,6 +1,7 @@
 ﻿using Akka.Actor;
 using Google.Protobuf;
 using Medinilla.Core.SharedContracts.ActorPayloads;
+using Medinilla.Core.SharedContracts.Comms;
 using Medinilla.Core.SharedContracts.Comms.Ocpp;
 using RabbitMQ.Client;
 
@@ -21,7 +22,13 @@ public class Dispatcher : ReceiveActor
             ReturnToCS = result.ReturnToCS,
         };
 
-        await _channel.BasicPublishAsync("", _responseChannel, protoWampResult.ToByteArray());
+        var response = new Comms()
+        {
+            MessageType = CommsMessageType.OcppResponse,
+            Payload = protoWampResult.ToByteString(),
+        };
+
+        await _channel.BasicPublishAsync("", _responseChannel, response.ToByteArray());
     }
 
     public Dispatcher(IChannel channel, string responseChannel)

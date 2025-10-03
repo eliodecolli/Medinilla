@@ -10,6 +10,7 @@ using Medinilla.DataTypes.Pubnub.DTO;
 using Medinilla.Infrastructure.WAMP;
 using Medinilla.RealTime;
 using Microsoft.Extensions.Logging;
+using System.Diagnostics;
 using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
@@ -92,7 +93,7 @@ public sealed class BootNotificationAction(ChargingStationUnitOfWork unitOfWork,
         var entity = result.FirstOrDefault();
         if (entity == null)
         {
-            var accountQuery = await unitOfWork.AccountRepository.Filter(c => c.Name == "Account 1").ConfigureAwait(false);
+            var accountQuery = await unitOfWork.AccountRepository.Filter(c => c.Name == "Main Test Account").ConfigureAwait(false);
             var account = accountQuery.First();
             chargingStation.AccountId = account.Id;
 
@@ -130,7 +131,7 @@ public sealed class BootNotificationAction(ChargingStationUnitOfWork unitOfWork,
             });
         }
 
-        if (entity.IdTokens.Count == 0 && medinillaSettings.UseDefaultUser)
+        if ((entity.IdTokens is null || entity.IdTokens.Count == 0) && medinillaSettings.UseDefaultUser)
         {
             var defaultUser = medinillaSettings.DefaultUser;
             var entityUser = await unitOfWork.AuthorizationUserRepository.Create(new AuthorizationUser()
@@ -140,11 +141,12 @@ public sealed class BootNotificationAction(ChargingStationUnitOfWork unitOfWork,
                 DisplayName = defaultUser.DisplayName,
                 IsActive = true
             });
+
             await unitOfWork.IdTokenRepository.Create(new IdTokenDb()
             {
                 ChargingStationId = entity.Id,
                 AuthorizationUserId = entityUser.Id,
-                Token = defaultUser.DisplayName,
+                Token = defaultUser.Token,
                 CreatedDate = DateTime.UtcNow,
                 ExpiryDate = DateTime.UtcNow.AddDays(100000),
                 IdType = "ISO14443"
@@ -165,10 +167,24 @@ public sealed class BootNotificationAction(ChargingStationUnitOfWork unitOfWork,
             notification.ChargingStation is not null ? notification.ChargingStation.Model : "UNDEFINED",
             clientIdentifier);
 
-        var chargingStation = await ProcessBootNotification(GetChargingStation(clientIdentifier, notification));
-        await unitOfWork.Save();
-
-        await PublishChargingStationToPubnub(chargingStation);
+        try
+        {
+            var chargingStation = await ProcessBootNotification(GetChargingStation(clientIdentifier, notification));
+            await unitOfWork.Save();
+        }
+        catch (Exception ex)
+        {
+            return new RpcResult()
+            {
+                Result = call.CreateResult(new BootNotificationResponse(1440, RegistrationStatusEnum.Rejected, new StatusInfo()
+                {
+                    ReasonCode = "500",
+                    AdditionalInfo = "Internal System Error",
+                })),
+                Error = null,
+                ReturnToCS = true,
+            };
+        }
 
         // idk do something here..?
         return new RpcResult()

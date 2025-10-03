@@ -3,9 +3,10 @@ using Akka.Hosting;
 using Medinilla.Core.Service.Communication.Actors;
 using Medinilla.Core.Service.Interfaces;
 using Medinilla.Core.Service.Types;
+using Medinilla.Core.SharedContracts.ActorPayloads;
 using Medinilla.Core.SharedContracts.Comms;
 using Medinilla.Core.SharedContracts.Comms.Ocpp;
-using Medinilla.Core.SharedContracts.ActorPayloads;
+using Medinilla.RealTime;
 using Medinilla.Services.Interfaces;
 using Microsoft.Extensions.Logging;
 using RabbitMQ.Client;
@@ -16,8 +17,6 @@ namespace Medinilla.Core.Service.Communication;
 internal class CoreInterfaceCommunication : IInterfaceCommunication
 {
     private CommunicationSettings _settings;
-    private ConnectionFactory _connectionFactory;
-    private IConnection _connection;
     private ILogger<CoreInterfaceCommunication> _logger;
 
     private IRequiredActor<Coordinator> _coordinator;
@@ -27,24 +26,29 @@ internal class CoreInterfaceCommunication : IInterfaceCommunication
 
     private IChannel _responseChannel;
 
-    public CoreInterfaceCommunication(ILogger<CoreInterfaceCommunication> logger, IOcppCallRouter router, IRequiredActor<Coordinator> coordinator, ActorSystem system)
+    private IRealTimeMessenger _comms;
+
+    public CoreInterfaceCommunication(ICommunicationProvider commsProvider, ILogger<CoreInterfaceCommunication> logger, IOcppCallRouter router, IRequiredActor<Coordinator> coordinator, ActorSystem system)
     {
-        _connectionFactory = new ConnectionFactory();
         _logger = logger;
 
         _coordinator = coordinator;
         _system = system;
+
+        _comms = commsProvider.GetMessenger("RabbitMQ") ?? throw new InvalidOperationException("Could not load RabbitMQ messenger interface");
     }
 
-    private async Task Connect(CommunicationSettings settings)
+    private Task RunEvent(object state)
     {
-        _settings = settings;
-        _connectionFactory.Uri = new Uri(settings.RabbitUri);
-        _connection = await _connectionFactory.CreateConnectionAsync().ConfigureAwait(false);
-    }
+        if (state is not Dictionary<string, object> args)
+        {
+            return Task.CompletedTask;
+        }
 
-    private async Task RunEvent(object model, BasicDeliverEventArgs ea)
-    {
+        if (args["ea"] is not BasicDeliverEventArgs ea)
+        {
+            return Task.CompletedTask;
+        }
         var comms = Comms.Parser.ParseFrom(ea.Body.ToArray());
 
         switch (comms.MessageType)
@@ -63,22 +67,19 @@ internal class CoreInterfaceCommunication : IInterfaceCommunication
             default:
                 break;
         }
+
+        return Task.CompletedTask;
     }
 
     public async Task Run(CommunicationSettings settings)
     {
-        await Connect(settings);
+        // set up request channel
+        await _comms.RegisterChannel(settings.RequestQueue);
+        await _comms.RegisterHandler(settings.RequestQueue, RunEvent);
 
-        var channel = await _connection.CreateChannelAsync().ConfigureAwait(false);
-        await channel.QueueDeclareAsync(_settings.RequestQueue, exclusive: false);
-
-        var consumer = new AsyncEventingBasicConsumer(channel);
-        consumer.ReceivedAsync += RunEvent;
-
-        await channel.BasicConsumeAsync(_settings.RequestQueue, true, consumer);
-
-        _responseChannel = await _connection.CreateChannelAsync().ConfigureAwait(false);
-        await _responseChannel.QueueDeclareAsync(settings.ResponseQueue);
+        // set up response channel
+        await _comms.RegisterChannel(settings.ResponseQueue);
+        _responseChannel = (IChannel)_comms.GetChannel(settings.ResponseQueue);
 
         _dispatcher = _system.ActorOf(Props.Create<Dispatcher>(_responseChannel, settings.ResponseQueue), "ocpp-dispatcher");
 

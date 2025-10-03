@@ -1,25 +1,33 @@
-﻿using RabbitMQ.Client;
+﻿using PubnubApi.EventEngine.Core;
+using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
+using System;
 
 namespace Medinilla.RealTime.Rabbit;
 
 public sealed class RabbitMQMessenger : IRealTimeMessenger
 {
-    private ConnectionFactory _connectionFactory;
     private IConnection _connection;
+    private ConnectionFactory _factory;
 
     // eventually we need to set a max limit for concurrent channels.
     // to do this, we need to offload channel storage and retrieval to a separate class,
     // let's be fancy and call it ChannelPool.
     private Dictionary<string, IChannel> _channels;
 
-    public RabbitMQMessenger(string connectionUri)
+    public RabbitMQMessenger(string connectionString)
     {
-        _connectionFactory = new ConnectionFactory();
-        _channels = new();
+        _channels = new Dictionary<string, IChannel>();
 
-        _connectionFactory.Uri = new Uri(connectionUri);
-        _connection = _connectionFactory.CreateConnectionAsync().Result;
+        _factory = new ConnectionFactory();
+        _factory.Uri = new Uri(connectionString);
+
+        _connection = _factory.CreateConnectionAsync().Result;
+    }
+
+    public object GetChannel(string channelName)
+    {
+        return _channels[channelName];
     }
 
     public async Task DestroyChannel(string channelName)
@@ -37,7 +45,7 @@ public sealed class RabbitMQMessenger : IRealTimeMessenger
     public async Task RegisterChannel(string channelName)
     {
         var channel = await _connection.CreateChannelAsync(new CreateChannelOptions(true, false)).ConfigureAwait(false);
-        await channel.QueueDeclareAsync(channelName, exclusive: false);
+        await channel.QueueDeclareAsync(channelName, exclusive: false, durable: true, autoDelete: false);
 
         _channels.Add(channelName, channel);
     }

@@ -11,4 +11,6 @@ public interface IRealTimeMessenger
     Task DestroyChannel(string channelName);
 
     string GetCommunicationProviderName();
+
+    object GetChannel(string channelName);
 }
