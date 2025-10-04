@@ -11,6 +11,7 @@ using DbTransaction = Medinilla.DataAccess.Relational.Models.TransactionEvent;
 using IdTokenDb = Medinilla.DataAccess.Relational.Models.Authorization.IdToken;
 using ConsumptionTypeDb = Medinilla.DataAccess.Relational.Enums.ConsumptionType;
 using Medinilla.DataTypes.Core;
+using System.Threading.Tasks;
 
 namespace Medinilla.Services.Actions.Ocpp201;
 
@@ -66,10 +67,11 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
         return true;
     }
 
-    private DbTransaction MapOcppTransaction(DbChargingStation cs, TransactionEventRequest request)
+    private DbTransaction MapOcppTransaction(DbChargingStation cs, TransactionEventRequest request, IdTokenDb? idToken)
     {
         var unitName = request.MeterValue?.SelectMany(c => c.SampledValue).FirstOrDefault(s => s.Measurand == MeasurandEnum.EnergyActiveImportRegister ||
                                                                                                s.Measurand == MeasurandEnum.EnergyActiveImportInterval)?.UnitOfMeasure?.Unit ?? "UNKNOWN";
+
         return new DbTransaction()
         {
             TransactionId = request.TransactionInfo.TransactionId,
@@ -80,17 +82,34 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
             ChargingStationId = cs.Id,
             UnitName = unitName,
             TriggerReason = Enum.GetName(request.TriggerReason) ?? "UNKNOWN",
-            EventType = Enum.GetName(request.EventType) ?? "UNKNOWN"
+            EventType = Enum.GetName(request.EventType) ?? "UNKNOWN",
+            IdTokenId = idToken?.Id,
         };
     }
 
-    private TransactionConsumption? GetTransactionConsumption(TransactionEventRequest request, TransactionEvent transaction, TransactionSnapshot snapshot)
+    private TransactionConsumption? GetTransactionConsumption(TransactionEventRequest request, TransactionEvent transaction)
     {
-        return request.MeterValue is not null ? transactionService.GetTransactionConsumption(request.MeterValue, snapshot.LastEvent) : null;
+        return transactionService.GetTransactionConsumption(request.MeterValue);
     }
+
+#if DEBUG
+    private void SaveTxLocally(OcppCallRequest req)
+    {
+        if (!Directory.Exists("transactions"))
+        {
+            Directory.CreateDirectory("transactions");
+        }
+
+        var path = Path.Combine("transactions", $"{req.MessageId}.json");
+        File.WriteAllText(path, req.Payload);
+    }
+#endif
 
     public async Task<RpcResult> Execute(OcppCallRequest call, string clientIdentifier)
     {
+#if DEBUG
+        SaveTxLocally(call);
+#endif
         var request = call.As<TransactionEventRequest>();
 
         var chargingStation = await unitOfWork.GetChargingStation(clientIdentifier);
@@ -106,7 +125,14 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
         }
         else
         {
-            var transaction = MapOcppTransaction(chargingStation, request);
+            var idToken = await unitOfWork.TryGetIdToken(request.TransactionInfo.TransactionId, request.IdToken?.Token ?? "");
+            if (idToken is null)
+            {
+                _logger.LogWarning($"IdToken for transaction {request.TransactionInfo.TransactionId}, event '{Enum.GetName(request.EventType)}' not found ('{request.IdToken?.Token}' was found in request)");
+            }
+
+            var transaction = MapOcppTransaction(chargingStation, request, idToken);
+
             if (transaction is null)
             {
                 _logger.LogError($"{clientIdentifier}: Could not map incoming request: {call.Payload} to relational transaction type.");
@@ -117,9 +143,28 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
             }
             else
             {
+                var context = AuthUtils.GenerateAuthContext(chargingStation, request.Evse?.Id, true);
+                var authStatus = await PerformAuthorization(chargingStation, request, context);
+
+                var response = new TransactionEventResponse()
+                {
+                    IdTokenInfo = new IdTokenInfo()
+                    {
+                        Status = authStatus,
+                    }
+                };
+
+                if (authStatus != AuthorizeStatus.Accepted)
+                {
+                    return new RpcResult()
+                    {
+                        Result = call.CreateResult(response)
+                    };
+                }
+
                 var currentTransactions = chargingStation.TransactionEvents is not null ? chargingStation.TransactionEvents
                     .Where(t => t.TransactionId == request.TransactionInfo.TransactionId)
-                    .OrderBy(t => t.SeqNo).AsEnumerable() : [];
+                    .OrderBy(t => t.SeqNo).ToArray() : [];
 
                 if (currentTransactions.Any(c => (c.SeqNo == request.SeqNo)))
                 {
@@ -127,7 +172,7 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
 
                     return new RpcResult()
                     {
-                        Error = call.CreateErrorResult<TransactionEventResponse>(OcppCallError.ErrorCodes.PropertyConstraintViolation, $"Duplicate SeqNo='{request.SeqNo}' is not allowed.")
+                        Result = call.CreateResult(response),
                     };
                 }
                 else if (currentTransactions.Any(c => (c.EventType != EventTypes.Update) && c.EventType == Enum.GetName(request.EventType)))
@@ -140,33 +185,12 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
                 }
                 else
                 {
-                    var context = AuthUtils.GenerateAuthContext(chargingStation, request.Evse?.Id, true);
-                    var authStatus = await PerformAuthorization(chargingStation, request, context);
-
-                    var response = new TransactionEventResponse()
-                    {
-                        IdTokenInfo = new IdTokenInfo()
-                        {
-                            Status = authStatus,
-                        }
-                    };
-
-                    if (authStatus != AuthorizeStatus.Accepted)
-                    {
-                        return new RpcResult()
-                        {
-                            Result = call.CreateResult(response)
-                        };
-                    }
-
-                    var snapshot = await unitOfWork.TransactionSubUnit.GetOrCreateSnapshot(transaction);
-
-                    var consumption = GetTransactionConsumption(request, transaction, snapshot);
+                    var consumption = GetTransactionConsumption(request, transaction);
 
                     transaction.TotalConsuption = consumption?.Consumption ?? 0.0M;
                     transaction.ConsumptionType = (ConsumptionTypeDb?)consumption?.ConsumptionType;
 
-                    await unitOfWork.TransactionSubUnit.RegisterTransaction(transaction, context.IdToken);
+                    transaction = await unitOfWork.TransactionSubUnit.RegisterTransaction(transaction, context.IdToken);
 
                     if (request.EventType == TransactionEventEnum.Ended)
                     {
@@ -181,10 +205,20 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
                             };
                         }
 
-                        snapshot = await unitOfWork.TransactionSubUnit.FinalizeSnapshot(transaction, snapshot, consumption);
+                        // do we need to keep a coherent snapshot after each tx event?
+                        if (currentTransactions.Length > 0)
+                        {
+                            var firstTransaction = currentTransactions.FirstOrDefault(tx => tx.EventType == Enum.GetName(TransactionEventEnum.Started));
+                            if (firstTransaction is null)
+                            {
+                                _logger.LogWarning($"Partially finalizing tx snapshot for {request.TransactionInfo.TransactionId}: No 'Started' event was found.");
+                            }
+                            await unitOfWork.TransactionSubUnit.FinalizeSnapshot(firstTransaction, transaction, consumption);
+                        }
+
                         var unitName = await unitOfWork.TransactionSubUnit.GetTransactionUnit(transaction.TransactionId);
 
-                        response.TotalCost = CalculateTotalCosts(snapshot.TotalMeteredValue, chargingStation, unitName ?? "UNKNOWN");
+                        response.TotalCost = CalculateTotalCosts(consumption?.Consumption ?? 0.0M, chargingStation, unitName ?? "UNKNOWN");
 
                         if (request.IdToken?.Type == IdTokenType.Central)
                         {
@@ -197,10 +231,12 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
                                 _logger.LogWarning($"{clientIdentifier}: Temp token {request.IdToken.Token} couldn't be removed.");
                             }
                         }
-                    }
-                    else
-                    {
-                        await unitOfWork.TransactionSubUnit.UpdateSnapshot(transaction, consumption, snapshot);
+
+                        if (idToken is not null)
+                        {
+                            await unitOfWork.ReleaseToken(idToken);
+                            _logger.LogInformation($"Released token {idToken.Token}");
+                        }
                     }
 
                     switch (request.EventType)

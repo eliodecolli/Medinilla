@@ -24,11 +24,7 @@ public class TransactionSnapshot
 
     public DateTime EndedAt { get; set; }
 
-    public DateTime LastEvent { get; set; }
-
     public Guid? EvseConnectorId { get; set; }
-
-    public virtual IEnumerable<TransactionEvent> TransactionEvents { get; set; }
 
     public virtual ChargingStation? ChargingStation { get; set; }
 

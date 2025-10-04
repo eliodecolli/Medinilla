@@ -9,15 +9,16 @@ namespace Medinilla.Core.Service.Communication.Actors;
 
 public sealed class OcppConsumer : ReceiveActor
 {
-    private IOcppCallRouter _router;
-    private ILogger<OcppConsumer> _logger;
-
-    private IServiceScope _scope;
+    private IServiceProvider _serviceProvider;
 
     private async Task ConsumeOcppCall(OcppConsumerMessage message)
     {
-        _logger.LogInformation($"Received OCPP Message from: {message.ClientIdentifier}");
-        var result = await _router.RouteOcppCall(message.Payload, message.ClientIdentifier);
+        // setup context - each new message should run under its own scope, so that we get a new DbContext, and Action for each one
+        using var scope = _serviceProvider.CreateScope();
+        var router = scope.ServiceProvider.GetRequiredService<IOcppCallRouter>();
+        var logger = scope.ServiceProvider.GetRequiredService<ILogger<OcppConsumer>>();
+
+        var result = await router.RouteOcppCall(message.Payload, message.ClientIdentifier);
         var messageResult = new WampResultMessage()
         {
             ClientIdentifier = message.ClientIdentifier,
@@ -31,16 +32,8 @@ public sealed class OcppConsumer : ReceiveActor
 
     public OcppConsumer(IServiceProvider sp)
     {
-        _scope = sp.CreateScope();
-        _router = _scope.ServiceProvider.GetRequiredService<IOcppCallRouter>();
-        _logger = _scope.ServiceProvider.GetRequiredService<ILogger<OcppConsumer>>();
+        _serviceProvider = sp;
 
         ReceiveAsync<OcppConsumerMessage>(ConsumeOcppCall);  // remember: this message is being forwarded to us
-    }
-
-    protected override void PostStop()
-    {
-        _scope.Dispose();
-        base.PostStop();
     }
 }

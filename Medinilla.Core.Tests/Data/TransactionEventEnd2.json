@@ -1,0 +1,155 @@
+[
+  2,
+  "d57fca68-1971-460d-ae2e-0c2f6a51cea9",
+  "TransactionEvent",
+  {
+    "eventType": "Ended",
+    "meterValue": [
+      {
+        "sampledValue": [
+          {
+            "context": "Transaction.Begin",
+            "location": "Outlet",
+            "measurand": "Energy.Active.Import.Register",
+            "unitOfMeasure": { "unit": "Wh" },
+            "value": 0.0
+          },
+          {
+            "context": "Transaction.Begin",
+            "location": "Outlet",
+            "measurand": "Energy.Active.Import.Register",
+            "phase": "L1",
+            "unitOfMeasure": { "unit": "Wh" },
+            "value": 0.0
+          },
+          {
+            "context": "Transaction.Begin",
+            "location": "Outlet",
+            "measurand": "Energy.Active.Import.Register",
+            "phase": "L2",
+            "unitOfMeasure": { "unit": "Wh" },
+            "value": 0.0
+          },
+          {
+            "context": "Transaction.Begin",
+            "location": "Outlet",
+            "measurand": "Energy.Active.Import.Register",
+            "phase": "L3",
+            "unitOfMeasure": { "unit": "Wh" },
+            "value": 0.0
+          },
+          {
+            "context": "Transaction.Begin",
+            "location": "Outlet",
+            "measurand": "Current.Import",
+            "phase": "L1",
+            "unitOfMeasure": { "unit": "A" },
+            "value": 0.0
+          },
+          {
+            "context": "Transaction.Begin",
+            "location": "Outlet",
+            "measurand": "Current.Import",
+            "phase": "L2",
+            "unitOfMeasure": { "unit": "A" },
+            "value": 0.0
+          },
+          {
+            "context": "Transaction.Begin",
+            "location": "Outlet",
+            "measurand": "Current.Import",
+            "phase": "L3",
+            "unitOfMeasure": { "unit": "A" },
+            "value": 0.0
+          },
+          {
+            "context": "Transaction.Begin",
+            "location": "Outlet",
+            "measurand": "Current.Import",
+            "phase": "N",
+            "unitOfMeasure": { "unit": "A" },
+            "value": 0.0
+          }
+        ],
+        "timestamp": "2025-10-04T18:00:28.740Z"
+      },
+      {
+        "sampledValue": [
+          {
+            "context": "Transaction.End",
+            "location": "Outlet",
+            "measurand": "Energy.Active.Import.Register",
+            "unitOfMeasure": { "unit": "Wh" },
+            "value": 41.0
+          },
+          {
+            "context": "Transaction.End",
+            "location": "Outlet",
+            "measurand": "Energy.Active.Import.Register",
+            "phase": "L1",
+            "unitOfMeasure": { "unit": "Wh" },
+            "value": 41.0
+          },
+          {
+            "context": "Transaction.End",
+            "location": "Outlet",
+            "measurand": "Energy.Active.Import.Register",
+            "phase": "L2",
+            "unitOfMeasure": { "unit": "Wh" },
+            "value": 0.0
+          },
+          {
+            "context": "Transaction.End",
+            "location": "Outlet",
+            "measurand": "Energy.Active.Import.Register",
+            "phase": "L3",
+            "unitOfMeasure": { "unit": "Wh" },
+            "value": 0.0
+          },
+          {
+            "context": "Transaction.End",
+            "location": "Outlet",
+            "measurand": "Current.Import",
+            "phase": "L1",
+            "unitOfMeasure": { "unit": "A" },
+            "value": 30.754657745361328
+          },
+          {
+            "context": "Transaction.End",
+            "location": "Outlet",
+            "measurand": "Current.Import",
+            "phase": "L2",
+            "unitOfMeasure": { "unit": "A" },
+            "value": 30.754657745361328
+          },
+          {
+            "context": "Transaction.End",
+            "location": "Outlet",
+            "measurand": "Current.Import",
+            "phase": "L3",
+            "unitOfMeasure": { "unit": "A" },
+            "value": 0.0
+          },
+          {
+            "context": "Transaction.End",
+            "location": "Outlet",
+            "measurand": "Current.Import",
+            "phase": "N",
+            "unitOfMeasure": { "unit": "A" },
+            "value": 0.20166988670825958
+          }
+        ],
+        "timestamp": "2025-10-04T18:00:53.783Z"
+      }
+    ],
+    "offline": false,
+    "seqNo": 2,
+    "timestamp": "2025-10-04T18:00:54.342Z",
+    "transactionInfo": {
+      "chargingState": "Idle",
+      "stoppedReason": "EVDisconnected",
+      "transactionId": "d6b55d4d-a96a-4c39-b7b5-9f0018ccef00"
+    },
+    "triggerReason": "EVCommunicationLost"
+  }
+]

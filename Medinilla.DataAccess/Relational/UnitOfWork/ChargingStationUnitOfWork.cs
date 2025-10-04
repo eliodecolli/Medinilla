@@ -55,4 +55,25 @@ public sealed class ChargingStationUnitOfWork(MedinillaOcppDbContext context,
             throw new OcppCrudException($"Invalid account id: {accountId}");
         }
     }
+
+    public async Task<IdToken?> TryGetIdToken(string transactionId, string token)
+    {
+        // first check by request
+        var idTokenQuery = await idTokensRepo.Filter(t => t.Token == token).ConfigureAwait(false);
+        var idToken = idTokenQuery.FirstOrDefault();
+
+        if (idToken is not null)
+        {
+            return idToken;
+        }
+
+        // try by tx
+        return await _transactionsUnitOfWork.TryGetIdTokenForTransaction(transactionId); ;
+    }
+
+    public async Task ReleaseToken(IdToken idToken)
+    {
+        idToken.IsUnderTx = false;
+        await idTokensRepo.Update(idToken);
+    }
 }

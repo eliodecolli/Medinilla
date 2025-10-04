@@ -71,14 +71,14 @@ public class MedinillaOcppDbContext(IConfiguration config) : DbContext
         modelBuilder.Entity<TransactionEvent>().Property(c => c.ConsumptionType)
             .HasConversion<string>();
 
+        modelBuilder.Entity<TransactionEvent>().HasOne(c => c.IdToken)
+            .WithMany(i => i.TransactionEvents)
+            .HasForeignKey(c => c.IdTokenId);
+
         // configure transaction snapshots
         modelBuilder.Entity<TransactionSnapshot>().HasOne(c => c.EvseConnector)
             .WithMany()
             .HasForeignKey(c => c.EvseConnectorId);
-
-        modelBuilder.Entity<TransactionSnapshot>().HasMany(c => c.TransactionEvents)
-            .WithOne(c => c.TransactionSnapshot)
-            .HasForeignKey(c => c.TransactionSnapshotId);
 
         // configure auth
         modelBuilder.Entity<IdToken>().HasOne(c => c.ChargingStation)
@@ -94,10 +94,6 @@ public class MedinillaOcppDbContext(IConfiguration config) : DbContext
 
         modelBuilder.Entity<IdToken>().HasMany(c => c.TransactionSnapshots)
             .WithOne(c => c.IdToken)
-            .HasForeignKey(c => c.IdTokenId);
-
-        modelBuilder.Entity<IdToken>().HasMany(c => c.TransactionEvents)
-            .WithOne()
             .HasForeignKey(c => c.IdTokenId);
     }
 }

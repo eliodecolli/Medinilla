@@ -6,12 +6,6 @@ namespace Medinilla.Core.Logic.Transactions;
 
 public sealed class TransactionService
 {
-    private readonly List<MeasurandEnum> _energyImportMeasurands = new()
-    {
-        MeasurandEnum.EnergyActiveImportRegister,
-        MeasurandEnum.EnergyActiveImportInterval
-    };
-
     private decimal ScaleToKW(SampledValue value)
     {
         if (value.UnitOfMeasure.Unit.ToLower() == "wh")
@@ -24,80 +18,121 @@ public sealed class TransactionService
         }
     }
 
-    private EnergyImport GetTotalEnergyImport(IEnumerable<SampledValue> samples)
+    private EnergyImport? GetTotalEnergyImportForContextPhases(IEnumerable<SampledValue> samples, ReadingContextEnum context, bool checkPhases)
     {
-        // we assume that in order to generate a collection of sampled values, we've ordered the meter values by timestamp descending
+        // first we check for total cumulative consumption
+        decimal? total = null;
 
-        var total = 0.0M;
-        var latestConsumptionType = ConsumptionType.Cumulative;
-
-        foreach (var sample in samples)
+        if (!checkPhases)
         {
-            var value = ScaleToKW(sample);
-            if (sample.Measurand == MeasurandEnum.EnergyActiveImportInterval)
+            var first = samples.FirstOrDefault(s => s.Context == context &&
+               (s.Phase is not null) == checkPhases &&
+                s.Measurand == MeasurandEnum.EnergyActiveImportRegister);
+
+            if (first is not null)
             {
-                total += value;
-                latestConsumptionType = ConsumptionType.Periodic;
-            }
-            else if (sample.Measurand == MeasurandEnum.EnergyActiveImportRegister)
-            {
-                total = value;
-                latestConsumptionType = ConsumptionType.Cumulative;
+                total = ScaleToKW(first);
             }
         }
-
-        return new EnergyImport
+        else
         {
-            EnergyImportValue = total,
-            ConsumptionType = latestConsumptionType
-        };
-    }
+            // when checking phases we need the sum of total phases
+            total = samples.Where(s => s.Context == context &&
+               (s.Phase is not null) == checkPhases &&
+                s.Measurand == MeasurandEnum.EnergyActiveImportRegister).Select(ScaleToKW).Sum();
+        }
 
-    private TransactionConsumption? GetMeterValueConsumption(MeterValue meter)
-    {
-        var samples = meter.SampledValue.Where(s => s.Measurand.HasValue ? _energyImportMeasurands.Contains(s.Measurand.Value) : false);
-        if (samples.Any())
+        if (total is not null)
         {
-            var samplesConsumption = GetTotalEnergyImport(samples);
-            return new TransactionConsumption
+            return new EnergyImport
             {
-                Consumption = samplesConsumption.EnergyImportValue,
-                ConsumptionType = samplesConsumption.ConsumptionType,
-                Timestamp = meter.Timestamp
+                EnergyImportValue = total.Value,
+                ConsumptionType = ConsumptionType.Cumulative,
+            };
+        }
+
+
+        var sum = samples.Where(s => s.Context == context && 
+            (s.Phase is not null) == checkPhases && 
+            s.Measurand == MeasurandEnum.EnergyActiveImportInterval)
+            .Sum(ScaleToKW);
+
+        if (sum > 0)
+        {
+            return new EnergyImport
+            {
+                EnergyImportValue = sum,
+                ConsumptionType = context == ReadingContextEnum.SamplePeriodic ? ConsumptionType.Periodic : ConsumptionType.Cumulative,
             };
         }
 
         return null;
     }
 
-    public TransactionConsumption GetTransactionConsumption(IEnumerable<MeterValue> meters, DateTime lastMeterTimestamp)
+    private EnergyImport GetTotalEnergyImport(IEnumerable<SampledValue> samples)
     {
-        var latestTransactionConsumptions = meters.Where(m => m.Timestamp > lastMeterTimestamp)
-                                                  .Select(GetMeterValueConsumption)
-                                                  .Where(c => c is not null)
-                                                  .OrderBy(c => c!.Timestamp);
-
-        var consumption = 0.0M;
-        var lastConsumptionType = ConsumptionType.Cumulative;
-
-        foreach (var transactionConsumption in latestTransactionConsumptions)
+        // first we try to get the total phase for the begging and end
+        var totalBegin = GetTotalEnergyImportForContextPhases(samples, ReadingContextEnum.TransactionBegin, false);
+        var totalEnd = GetTotalEnergyImportForContextPhases(samples, ReadingContextEnum.TransactionEnd, false);
+        if (totalEnd is not null)
         {
-            if (transactionConsumption?.ConsumptionType == ConsumptionType.Cumulative)
+            return new EnergyImport
             {
-                consumption = transactionConsumption.Consumption;
-            }
-            else if (transactionConsumption?.ConsumptionType == ConsumptionType.Periodic)
+                EnergyImportValue = totalEnd.EnergyImportValue - totalBegin?.EnergyImportValue ?? 0.0M,
+                ConsumptionType = ConsumptionType.Cumulative
+            };
+        }
+        else
+        {
+            var totalPhaseBegin = GetTotalEnergyImportForContextPhases(samples, ReadingContextEnum.TransactionBegin, true);
+            var totalPhaseEnd = GetTotalEnergyImportForContextPhases(samples, ReadingContextEnum.TransactionEnd, true);
+            if (totalPhaseEnd is not null)
             {
-                consumption += transactionConsumption.Consumption;
+                return new EnergyImport
+                {
+                    EnergyImportValue = totalPhaseEnd.EnergyImportValue - totalPhaseBegin?.EnergyImportValue ?? 0.0M,
+                    ConsumptionType = ConsumptionType.Cumulative
+                };
             }
-            lastConsumptionType = transactionConsumption?.ConsumptionType ?? lastConsumptionType;
         }
 
-        return new TransactionConsumption
+        // try checking for periodic samples
+        var totalConsumptionPeriodic = GetTotalEnergyImportForContextPhases(samples, ReadingContextEnum.SamplePeriodic, false);
+        if (totalConsumptionPeriodic is not null)
         {
-            ConsumptionType = lastConsumptionType,
-            Consumption = consumption,
-            Timestamp = latestTransactionConsumptions.LastOrDefault()?.Timestamp ?? DateTime.MinValue  // we've already filtered out the nulls here, so this is a bit redundand but the compiler likes it so ¯\_(ツ)_/¯
+            return totalConsumptionPeriodic;
+        }
+
+        var totalConsumptionPeriodicPhases = GetTotalEnergyImportForContextPhases(samples, ReadingContextEnum.SamplePeriodic, true);
+        if (totalConsumptionPeriodicPhases is not null)
+        {
+            return totalConsumptionPeriodicPhases;
+        }
+
+        throw new InvalidOperationException("Could not determine transaction consumption");
+    }
+
+    public TransactionConsumption GetTransactionConsumption(IEnumerable<MeterValue>? meters)
+    {
+        if (meters is null)
+        {
+            return new TransactionConsumption()
+            {
+                Timestamp = DateTime.UtcNow,
+                ConsumptionType = ConsumptionType.Periodic,
+                Consumption = 0.0M
+            };
+        }
+
+        var latestTransactionConsumptions = meters.OrderBy(c => c.Timestamp)
+                                                  .SelectMany(t => t.SampledValue);
+
+        var total = GetTotalEnergyImport(latestTransactionConsumptions);
+        return new TransactionConsumption()
+        {
+            Timestamp = DateTime.UtcNow,
+            ConsumptionType = ConsumptionType.Cumulative,
+            Consumption = total.EnergyImportValue
         };
     }
 }

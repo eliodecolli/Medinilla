@@ -11,8 +11,6 @@ public class TransactionEvent
 
     public Guid? IdTokenId { get; set; }
 
-    public Guid? TransactionSnapshotId { get; set; }
-
     public string TransactionId { get; set; }
 
     public int SeqNo { get; set; }
@@ -32,8 +30,6 @@ public class TransactionEvent
     public string TriggerReason { get; set; }
 
     public string EventType { get; set; }
-
-    public virtual TransactionSnapshot? TransactionSnapshot { get; set; }
 
     public virtual ChargingStation ChargingStation { get; set; }
 

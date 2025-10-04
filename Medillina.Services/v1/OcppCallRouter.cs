@@ -8,23 +8,8 @@ using System.Text;
 
 namespace Medinilla.Services.v1;
 
-public class OcppCallRouter : IOcppCallRouter
+public class OcppCallRouter(ILogger<OcppCallRouter> _logger, IOcppActionsFactory _factory) : IOcppCallRouter
 {
-    private readonly ILogger<OcppCallRouter> _logger;
-    private readonly IServiceProvider provider;
-
-    public OcppCallRouter(ILogger<OcppCallRouter> logger, IServiceProvider provider)
-    {
-        _logger = logger;
-        this.provider = provider;
-    }
-
-    private IOcppActionsFactory GetActionsFactory()
-    {
-        var scope = provider.CreateScope();
-        return scope.ServiceProvider.GetRequiredService<IOcppActionsFactory>();
-    }
-
     public async Task<RpcResult> RouteOcppCall(byte[] buffer, string? clientIdentifier)
     {
         ArgumentNullException.ThrowIfNull(clientIdentifier, nameof(clientIdentifier));
@@ -45,7 +30,7 @@ public class OcppCallRouter : IOcppCallRouter
         {
             case OcppJMessageType.CALL:
                 var ocppCall = parser.ParseCall();
-                _logger.LogInformation($"Received OCPP Call: {ocppCall.Action}");
+                _logger.LogInformation($"Received OCPP Call: {ocppCall.Action} - from {clientIdentifier}");
 #if DEBUG
                 var salt = new Random().Next().ToString("X");
                 if (!Directory.Exists("logs"))
@@ -58,7 +43,7 @@ public class OcppCallRouter : IOcppCallRouter
                 }
 #endif
 
-                var ocppAction = GetActionsFactory().GetAction(ocppCall.Action);
+                var ocppAction = _factory.GetAction(ocppCall.Action);
                 if (ocppAction is null)
                 {
                     _logger.LogError($"Invalid action '{ocppCall.Action}'");

@@ -7,7 +7,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 namespace Medinilla.Core.Service.Migrations
 {
     /// <inheritdoc />
-    public partial class TransactionsStuff2 : Migration
+    public partial class Initial : Migration
     {
         /// <inheritdoc />
         protected override void Up(MigrationBuilder migrationBuilder)
@@ -170,12 +170,11 @@ namespace Medinilla.Core.Service.Migrations
                     EVSEId = table.Column<int>(type: "integer", nullable: true),
                     Timestamp = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     Offline = table.Column<bool>(type: "boolean", nullable: true),
-                    MeteredValue = table.Column<decimal>(type: "numeric", nullable: false),
-                    ConsumptionType = table.Column<string>(type: "text", nullable: false),
+                    TotalConsuption = table.Column<decimal>(type: "numeric", nullable: false),
+                    ConsumptionType = table.Column<string>(type: "text", nullable: true),
                     UnitName = table.Column<string>(type: "text", nullable: false),
                     TriggerReason = table.Column<string>(type: "text", nullable: false),
-                    EventType = table.Column<string>(type: "text", nullable: false),
-                    IdTokenId1 = table.Column<Guid>(type: "uuid", nullable: true)
+                    EventType = table.Column<string>(type: "text", nullable: false)
                 },
                 constraints: table =>
                 {
@@ -191,11 +190,6 @@ namespace Medinilla.Core.Service.Migrations
                         column: x => x.IdTokenId,
                         principalTable: "core_id_token",
                         principalColumn: "Id");
-                    table.ForeignKey(
-                        name: "FK_core_transactions_event_core_id_token_IdTokenId1",
-                        column: x => x.IdTokenId1,
-                        principalTable: "core_id_token",
-                        principalColumn: "Id");
                 });
 
             migrationBuilder.CreateTable(
@@ -209,7 +203,6 @@ namespace Medinilla.Core.Service.Migrations
                     StartReason = table.Column<string>(type: "text", nullable: false),
                     EndReason = table.Column<string>(type: "text", nullable: false),
                     TotalMeteredValue = table.Column<decimal>(type: "numeric", nullable: false),
-                    Unit = table.Column<string>(type: "text", nullable: false),
                     TotalCost = table.Column<decimal>(type: "numeric", nullable: false),
                     StartedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
                     EndedAt = table.Column<DateTime>(type: "timestamp with time zone", nullable: false),
@@ -286,11 +279,6 @@ namespace Medinilla.Core.Service.Migrations
                 name: "IX_core_transactions_event_IdTokenId",
                 table: "core_transactions_event",
                 column: "IdTokenId");
-
-            migrationBuilder.CreateIndex(
-                name: "IX_core_transactions_event_IdTokenId1",
-                table: "core_transactions_event",
-                column: "IdTokenId1");
 
             migrationBuilder.CreateIndex(
                 name: "IX_core_transactions_event_SeqNo",

@@ -40,7 +40,7 @@ public static class ServiceExtensions
         AddAuthAlgos(serviceCollection);
 
         serviceCollection.AddScoped<IOcppActionsFactory, OcppActionsFactory>();
-        serviceCollection.AddSingleton<IOcppCallRouter, OcppCallRouter>();
+        serviceCollection.AddScoped<IOcppCallRouter, OcppCallRouter>();
         serviceCollection.AddScoped<AuthorizationAlgorithmFactory>();
         serviceCollection.AddScoped<TransactionService>();
     }

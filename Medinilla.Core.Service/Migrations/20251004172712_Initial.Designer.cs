@@ -13,8 +13,8 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Medinilla.Core.Service.Migrations
 {
     [DbContext(typeof(MedinillaOcppDbContext))]
-    [Migration("20250321231359_TransactionEvennts2")]
-    partial class TransactionEvennts2
+    [Migration("20251004172712_Initial")]
+    partial class Initial
     {
         /// <inheritdoc />
         protected override void BuildTargetModel(ModelBuilder modelBuilder)
@@ -243,7 +243,6 @@ namespace Medinilla.Core.Service.Migrations
                         .HasColumnType("uuid");
 
                     b.Property<string>("ConsumptionType")
-                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<int?>("EVSEId")
@@ -254,9 +253,6 @@ namespace Medinilla.Core.Service.Migrations
                         .HasColumnType("text");
 
                     b.Property<Guid?>("IdTokenId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("IdTokenId1")
                         .HasColumnType("uuid");
 
                     b.Property<bool?>("Offline")
@@ -275,9 +271,6 @@ namespace Medinilla.Core.Service.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<Guid?>("TransactionSnapshotId")
-                        .HasColumnType("uuid");
-
                     b.Property<string>("TriggerReason")
                         .IsRequired()
                         .HasColumnType("text");
@@ -292,13 +285,9 @@ namespace Medinilla.Core.Service.Migrations
 
                     b.HasIndex("IdTokenId");
 
-                    b.HasIndex("IdTokenId1");
-
                     b.HasIndex("SeqNo");
 
                     b.HasIndex("TransactionId");
-
-                    b.HasIndex("TransactionSnapshotId");
 
                     b.HasIndex("ChargingStationId", "TransactionId");
 
@@ -341,10 +330,6 @@ namespace Medinilla.Core.Service.Migrations
                         .HasColumnType("numeric");
 
                     b.Property<string>("TransactionId")
-                        .IsRequired()
-                        .HasColumnType("text");
-
-                    b.Property<string>("Unit")
                         .IsRequired()
                         .HasColumnType("text");
 
@@ -432,23 +417,13 @@ namespace Medinilla.Core.Service.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Medinilla.DataAccess.Relational.Models.Authorization.IdToken", null)
+                    b.HasOne("Medinilla.DataAccess.Relational.Models.Authorization.IdToken", "IdToken")
                         .WithMany("TransactionEvents")
                         .HasForeignKey("IdTokenId");
-
-                    b.HasOne("Medinilla.DataAccess.Relational.Models.Authorization.IdToken", "IdToken")
-                        .WithMany()
-                        .HasForeignKey("IdTokenId1");
-
-                    b.HasOne("Medinilla.DataAccess.Relational.Models.TransactionSnapshot", "TransactionSnapshot")
-                        .WithMany("TransactionEvents")
-                        .HasForeignKey("TransactionSnapshotId");
 
                     b.Navigation("ChargingStation");
 
                     b.Navigation("IdToken");
-
-                    b.Navigation("TransactionSnapshot");
                 });
 
             modelBuilder.Entity("Medinilla.DataAccess.Relational.Models.TransactionSnapshot", b =>
@@ -505,11 +480,6 @@ namespace Medinilla.Core.Service.Migrations
                     b.Navigation("TransactionEvents");
 
                     b.Navigation("TransactionSnapshots");
-                });
-
-            modelBuilder.Entity("Medinilla.DataAccess.Relational.Models.TransactionSnapshot", b =>
-                {
-                    b.Navigation("TransactionEvents");
                 });
 #pragma warning restore 612, 618
         }

@@ -252,9 +252,6 @@ namespace Medinilla.Core.Service.Migrations
                     b.Property<Guid?>("IdTokenId")
                         .HasColumnType("uuid");
 
-                    b.Property<Guid?>("IdTokenId1")
-                        .HasColumnType("uuid");
-
                     b.Property<bool?>("Offline")
                         .HasColumnType("boolean");
 
@@ -271,9 +268,6 @@ namespace Medinilla.Core.Service.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<Guid?>("TransactionSnapshotId")
-                        .HasColumnType("uuid");
-
                     b.Property<string>("TriggerReason")
                         .IsRequired()
                         .HasColumnType("text");
@@ -288,13 +282,9 @@ namespace Medinilla.Core.Service.Migrations
 
                     b.HasIndex("IdTokenId");
 
-                    b.HasIndex("IdTokenId1");
-
                     b.HasIndex("SeqNo");
 
                     b.HasIndex("TransactionId");
-
-                    b.HasIndex("TransactionSnapshotId");
 
                     b.HasIndex("ChargingStationId", "TransactionId");
 
@@ -322,9 +312,6 @@ namespace Medinilla.Core.Service.Migrations
 
                     b.Property<Guid?>("IdTokenId")
                         .HasColumnType("uuid");
-
-                    b.Property<DateTime>("LastEvent")
-                        .HasColumnType("timestamp with time zone");
 
                     b.Property<string>("StartReason")
                         .IsRequired()
@@ -427,23 +414,13 @@ namespace Medinilla.Core.Service.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Medinilla.DataAccess.Relational.Models.Authorization.IdToken", null)
+                    b.HasOne("Medinilla.DataAccess.Relational.Models.Authorization.IdToken", "IdToken")
                         .WithMany("TransactionEvents")
                         .HasForeignKey("IdTokenId");
-
-                    b.HasOne("Medinilla.DataAccess.Relational.Models.Authorization.IdToken", "IdToken")
-                        .WithMany()
-                        .HasForeignKey("IdTokenId1");
-
-                    b.HasOne("Medinilla.DataAccess.Relational.Models.TransactionSnapshot", "TransactionSnapshot")
-                        .WithMany("TransactionEvents")
-                        .HasForeignKey("TransactionSnapshotId");
 
                     b.Navigation("ChargingStation");
 
                     b.Navigation("IdToken");
-
-                    b.Navigation("TransactionSnapshot");
                 });
 
             modelBuilder.Entity("Medinilla.DataAccess.Relational.Models.TransactionSnapshot", b =>
@@ -500,11 +477,6 @@ namespace Medinilla.Core.Service.Migrations
                     b.Navigation("TransactionEvents");
 
                     b.Navigation("TransactionSnapshots");
-                });
-
-            modelBuilder.Entity("Medinilla.DataAccess.Relational.Models.TransactionSnapshot", b =>
-                {
-                    b.Navigation("TransactionEvents");
                 });
 #pragma warning restore 612, 618
         }
