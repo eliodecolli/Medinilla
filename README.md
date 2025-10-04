@@ -2,10 +2,6 @@
   <img src="/third_party/medinilla-flowers-1024x683.jpg" width=70% height=70%>
 </p>
 
-##
-### 🔴 OCA has announced OCPP 2.1, which is set to replace 2.0.1 while maintaining backward compatibility. 🔴
-##
-
 # Medinilla - An OCPP Compliant Management System
 ![DOTNET CI](https://github.com/eliodecolli/Medinilla/actions/workflows/dotnet.yml/badge.svg)
 
@@ -19,9 +15,21 @@ Currently implemented OCPP messages:
 - Authorize
 - Transaction Event
 
+## Medinilla - Architecture
+The most fundamental idea behind the architectural decisions on this project was scalability, and fault tolerance. The core logic of Medinilla runs in Akka Actors, which are assigned per-client connection.
+One thing to note is that response to websockets is dispatched on the thread pool directly, since we don't expect it to grow that much (us sending data back to a ws is essentially 'fire-and-forget').
+
+<p align="center">
+  <img src="/third_party/core-arch.jpg" width=70% height=70%>
+</p>
+
+### Roadmap
+Some of the future features in the pipeline for Medinilla are:
+- **Transaction Graphs**. These are an optimized way of computing transaction consumption, by generating and keeping track of a graph with sampled values based on measurand, context, etc.
+- **Custom hardware logic plugin**. While OCPP is a detailed protocol, actual implementations by charging harware firmwares seem to be quite nuanced. Medinilla will be able to support easy plug-and-play modules, used to extend or modify OCPP event handlers. One can create a "plugin" for a specific firmware implementation, or reuse somebody's else.
+
 ## Work overview
-Actions have been implemented using the following two Charging Station emulators:
+Actions have been implemented using the following Charging Station emulators:
 1. https://github.com/extrawest/Charge-Point-Simulator-via-OCPP-2.0.1
 2. https://evlab.i4b.pl/
-
-I wish I could use more, but most reliable emulators are for 1.6, meanwhile 2.0.1 is lacking a lot in this area. Maybe I should consider just running EVerest and simulating scenarios there.
+3. [EVerest](https://github.com/everest)
