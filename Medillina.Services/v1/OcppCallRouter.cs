@@ -8,23 +8,8 @@ using System.Text;
 
 namespace Medinilla.Services.v1;
 
-public class OcppCallRouter : IOcppCallRouter
+public class OcppCallRouter(ILogger<OcppCallRouter> _logger, IOcppActionsFactory _factory) : IOcppCallRouter
 {
-    private readonly ILogger<OcppCallRouter> _logger;
-    private readonly IServiceProvider provider;
-
-    public OcppCallRouter(ILogger<OcppCallRouter> logger, IServiceProvider provider)
-    {
-        _logger = logger;
-        this.provider = provider;
-    }
-
-    private IOcppActionsFactory GetActionsFactory()
-    {
-        var scope = provider.CreateScope();
-        return scope.ServiceProvider.GetRequiredService<IOcppActionsFactory>();
-    }
-
     public async Task<RpcResult> RouteOcppCall(byte[] buffer, string? clientIdentifier)
     {
         ArgumentNullException.ThrowIfNull(clientIdentifier, nameof(clientIdentifier));
@@ -32,12 +17,20 @@ public class OcppCallRouter : IOcppCallRouter
         var messageString = Encoding.UTF8.GetString(buffer);
 
         var parser = new OcppMessageParser();
-        parser.LoadRaw(messageString);
+        try
+        {
+            parser.LoadRaw(messageString);
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError($"Error while parsing OCPP message: {ex.Message} {Environment.NewLine} Payload: {messageString}");
+        }
 
         switch (parser.GetMessageType())
         {
             case OcppJMessageType.CALL:
                 var ocppCall = parser.ParseCall();
+                _logger.LogInformation($"Received OCPP Call: {ocppCall.Action} - from {clientIdentifier}");
 #if DEBUG
                 var salt = new Random().Next().ToString("X");
                 if (!Directory.Exists("logs"))
@@ -50,7 +43,7 @@ public class OcppCallRouter : IOcppCallRouter
                 }
 #endif
 
-                var ocppAction = GetActionsFactory().GetAction(ocppCall.Action);
+                var ocppAction = _factory.GetAction(ocppCall.Action);
                 if (ocppAction is null)
                 {
                     _logger.LogError($"Invalid action '{ocppCall.Action}'");
@@ -62,7 +55,20 @@ public class OcppCallRouter : IOcppCallRouter
                     };
                 }
 
-                return await ocppAction.Execute(ocppCall, clientIdentifier);
+                try
+                {
+                    return await ocppAction.Execute(ocppCall, clientIdentifier);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError($"Error while trying to handle OCPP CALL: Client {clientIdentifier}:: {ex.Message}");
+                    return new RpcResult()
+                    {
+                        Error = OcppCallError.InternalError(ocppCall.MessageId),
+                        Result = null,
+                        ReturnToCS = true,
+                    };
+                }
 
             case OcppJMessageType.CALL_RESULT:
                 return new RpcResult()
@@ -72,9 +78,13 @@ public class OcppCallRouter : IOcppCallRouter
                 };
 
             case OcppJMessageType.CALL_ERROR:
+                var error = parser.ParseError();
+
+                _logger.LogInformation($"Received OCPP Call Error from {clientIdentifier}: [{error.ErrorCode}]:: {error.ErrorDescription}\n\t-> Details:: {error.ErrorDetails}");
+
                 return new RpcResult()
                 {
-                    Error = parser.ParseError(),
+                    Error = error,
                     Result = null
                 };
 

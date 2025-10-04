@@ -4,7 +4,5 @@ namespace Medinilla.Core.Service.Interfaces;
 
 internal interface IInterfaceCommunication
 {
-    Task Connect(CommunicationSettings settings);
-
-    Task Run();
+    Task Run(CommunicationSettings settings);
 }

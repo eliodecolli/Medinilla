@@ -6,7 +6,6 @@ namespace Medinilla.DataTypes.Contracts.Common;
 /// Type of detail value: start, end or sample
 /// Default = "Sample.Periodic"
 /// </summary>
-[JsonConverter(typeof(JsonStringEnumConverter))]
 public enum ReadingContextEnum
 {
     /// <summary>

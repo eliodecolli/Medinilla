@@ -1,9 +1,12 @@
-﻿namespace Medinilla.DataTypes.Contracts.Common;
+﻿using System.Text.Json.Serialization;
+
+namespace Medinilla.DataTypes.Contracts.Common;
 
 /// <summary>
 /// Indicates where the measured value has been sampled
 /// Default = "Outlet"
 /// </summary>
+[JsonConverter(typeof(JsonStringEnumConverter))]
 public enum LocationEnum
 {
     /// <summary>

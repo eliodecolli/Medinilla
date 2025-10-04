@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+option csharp_namespace = "Medinilla.Core.gRPC.Service";
+
+import "Service/Types.proto";
+
+package medinilla.core.grpc;
+
+service OcppService {
+    rpc GetChargingStations (GetChargingStationsQuery) returns (GetChargingStationsResponse) {}
+    rpc GetChargingStation (GetChargingStationQuery) returns (GetChargingStationResponse) {}
+}

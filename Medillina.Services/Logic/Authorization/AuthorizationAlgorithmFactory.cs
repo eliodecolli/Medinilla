@@ -31,10 +31,10 @@ public sealed class AuthorizationAlgorithmFactory
 
         foreach (var algorithm in All())
         {
-            logger.LogInformation($"Running Authorization: {Enum.GetName(algorithm.Algorithm)}");
             status = await algorithm.Authorize(token, context);
             if (status != AuthorizeStatus.Accepted)
             {
+                logger.LogError($"Running Authorization: {Enum.GetName(algorithm.Algorithm)}...FAIL");
                 break;
             }
         }

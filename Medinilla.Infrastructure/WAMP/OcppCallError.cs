@@ -71,7 +71,7 @@ public sealed class OcppCallError : BaseOcppMessage
 
     public static OcppCallError InvalidMessageIdError = new OcppCallError("-1", ErrorCodes.RpcFrameworkError, "Couldn't parse MessageId");
 
-    public static OcppCallError InternalError = new OcppCallError("-1", ErrorCodes.InternalError, "Internal RPC error.");
+    public static OcppCallError InternalError(string messageId) => new OcppCallError(messageId, ErrorCodes.InternalError, "Internal RPC error.", "{}");
 
     public OcppCallError(string messageId, string errorCode, string errorDescription, string? errorDetails = null)
     {
@@ -103,9 +103,6 @@ public sealed class OcppCallError : BaseOcppMessage
     {
         var details = string.Compare(ErrorDetails, "null") != 0 ? ErrorDetails : "{}";
         var responseString = $"[{(int)MessageType},\"{MessageId}\",\"{ErrorCode}\",\"{ErrorDescription}\",{details}]";
-#if DEBUG
-        Console.WriteLine("-------------{0}OCPP Error Response: {1}{0}{2}{0}-------------", Environment.NewLine, responseString, details);
-#endif
         return Encoding.UTF8.GetBytes(responseString);
     }
 }

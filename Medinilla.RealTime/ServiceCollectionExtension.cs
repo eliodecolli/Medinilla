@@ -27,7 +27,7 @@ public static class ServiceCollectionExtensions
 
         services.AddTransient<ICommunicationProvider, CommunicationProvider>();
 
-        services.AddScoped<IRealTimeMessenger, PubNubClient>();
+        services.AddSingleton<IRealTimeMessenger, PubNubClient>();
         services.AddScoped<IRealTimeMessenger, RabbitMQMessenger>(provider =>
         {
             var connectionUri = config.GetSection("RabbitMQ")["Uri"] ?? "";

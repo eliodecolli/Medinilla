@@ -18,7 +18,7 @@ public sealed class OcppMessageParser : IOcppMessageParser
 
     public void LoadRaw(string input)
     {
-        _tokens = _tokenizer.Tokenize(input).ToList();
+       _tokens = _tokenizer.Tokenize(input).ToList();
     }
 
     private void AssertLoadFirst()

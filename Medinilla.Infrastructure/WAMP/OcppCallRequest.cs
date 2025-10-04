@@ -1,4 +1,5 @@
 ﻿using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Medinilla.Infrastructure.WAMP;
 
@@ -18,7 +19,11 @@ public sealed class OcppCallRequest : BaseOcppMessage
 
     public T As<T>() where T : class
     {
-        var result = JsonSerializer.Deserialize<T>(Payload, new JsonSerializerOptions() { PropertyNameCaseInsensitive = true });
+        var result = JsonSerializer.Deserialize<T>(Payload, new JsonSerializerOptions()
+        { 
+            PropertyNameCaseInsensitive = true,
+            Converters = { new DottedEnumJsonConverter() }
+        });
         if (result is not null)
         {
             return result;
@@ -33,6 +38,8 @@ public sealed class OcppCallRequest : BaseOcppMessage
         return new OcppCallResult(MessageId, JsonSerializer.Serialize(payload, new JsonSerializerOptions()
         {
             PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            Converters = { new JsonStringEnumConverter() },
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
         }));
     }
 

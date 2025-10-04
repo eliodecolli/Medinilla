@@ -1,0 +1,177 @@
+{
+  "main": {
+    "id": "2bd47a951a4e8a4e",
+    "type": "split",
+    "children": [
+      {
+        "id": "3bd46df7afbebd40",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "898d4e5d87eaa4c8",
+            "type": "leaf",
+            "state": {
+              "type": "excalidraw",
+              "state": {
+                "file": "Excalidraw/Core - Library Skeleton.md"
+              },
+              "icon": "excalidraw-icon",
+              "title": "Core - Library Skeleton"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "vertical"
+  },
+  "left": {
+    "id": "d86a39a742582060",
+    "type": "split",
+    "children": [
+      {
+        "id": "6527a304665ea59f",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "a55cdfa49193933f",
+            "type": "leaf",
+            "state": {
+              "type": "file-explorer",
+              "state": {
+                "sortOrder": "alphabetical",
+                "autoReveal": false
+              },
+              "icon": "lucide-folder-closed",
+              "title": "Files"
+            }
+          },
+          {
+            "id": "615c5697f07a423c",
+            "type": "leaf",
+            "state": {
+              "type": "search",
+              "state": {
+                "query": "",
+                "matchingCase": false,
+                "explainSearch": false,
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical"
+              },
+              "icon": "lucide-search",
+              "title": "Search"
+            }
+          },
+          {
+            "id": "0a04b130a5ecdc35",
+            "type": "leaf",
+            "state": {
+              "type": "bookmarks",
+              "state": {},
+              "icon": "lucide-bookmark",
+              "title": "Bookmarks"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300
+  },
+  "right": {
+    "id": "b3393563ca10f3df",
+    "type": "split",
+    "children": [
+      {
+        "id": "36271452a00871c2",
+        "type": "tabs",
+        "children": [
+          {
+            "id": "095401c0058c8197",
+            "type": "leaf",
+            "state": {
+              "type": "backlink",
+              "state": {
+                "file": "Excalidraw/Core - Library Skeleton.md",
+                "collapseAll": false,
+                "extraContext": false,
+                "sortOrder": "alphabetical",
+                "showSearch": false,
+                "searchQuery": "",
+                "backlinkCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-coming-in",
+              "title": "Backlinks for Core - Library Skeleton"
+            }
+          },
+          {
+            "id": "50c00622914960d1",
+            "type": "leaf",
+            "state": {
+              "type": "outgoing-link",
+              "state": {
+                "file": "Excalidraw/Core - Library Skeleton.md",
+                "linksCollapsed": false,
+                "unlinkedCollapsed": true
+              },
+              "icon": "links-going-out",
+              "title": "Outgoing links from Core - Library Skeleton"
+            }
+          },
+          {
+            "id": "afc37d3f419e0fd0",
+            "type": "leaf",
+            "state": {
+              "type": "tag",
+              "state": {
+                "sortOrder": "frequency",
+                "useHierarchy": true,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-tags",
+              "title": "Tags"
+            }
+          },
+          {
+            "id": "d4546d69d9e4d37a",
+            "type": "leaf",
+            "state": {
+              "type": "outline",
+              "state": {
+                "file": "Excalidraw/Core - Library Skeleton.md",
+                "followCursor": false,
+                "showSearch": false,
+                "searchQuery": ""
+              },
+              "icon": "lucide-list",
+              "title": "Outline of Core - Library Skeleton"
+            }
+          }
+        ]
+      }
+    ],
+    "direction": "horizontal",
+    "width": 300,
+    "collapsed": true
+  },
+  "left-ribbon": {
+    "hiddenItems": {
+      "switcher:Open quick switcher": false,
+      "graph:Open graph view": false,
+      "canvas:Create new canvas": false,
+      "daily-notes:Open today's daily note": false,
+      "templates:Insert template": false,
+      "command-palette:Open command palette": false,
+      "obsidian-excalidraw-plugin:New drawing": false
+    }
+  },
+  "active": "898d4e5d87eaa4c8",
+  "lastOpenFiles": [
+    "Excalidraw/Core - Library Skeleton.md",
+    "Excalidraw",
+    "Untitled.canvas",
+    "Welcome.md"
+  ]
+}

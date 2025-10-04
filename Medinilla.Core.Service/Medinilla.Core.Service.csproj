@@ -8,6 +8,7 @@
   </PropertyGroup>
 
   <ItemGroup>
+    <None Remove="config.json" />
     <None Remove="settings.json" />
   </ItemGroup>
 
@@ -18,6 +19,9 @@
   </ItemGroup>
 
   <ItemGroup>
+    <PackageReference Include="Akka" Version="1.5.51" />
+    <PackageReference Include="Akka.DependencyInjection" Version="1.5.51" />
+    <PackageReference Include="Akka.Hosting" Version="1.5.51.1" />
     <PackageReference Include="Microsoft.EntityFrameworkCore.Design" Version="9.0.0">
       <PrivateAssets>all</PrivateAssets>
       <IncludeAssets>runtime; build; native; contentfiles; analyzers; buildtransitive</IncludeAssets>
@@ -31,6 +35,12 @@
     <ProjectReference Include="..\Medillina.Services\Medinilla.Core.csproj" />
     <ProjectReference Include="..\Medinilla.Core.SharedContracts\Medinilla.Core.SharedContracts.csproj" />
     <ProjectReference Include="..\Medinilla.RealTime\Medinilla.RealTime.csproj" />
+  </ItemGroup>
+
+  <ItemGroup>
+    <Content Include="config.json">
+      <CopyToOutputDirectory>Always</CopyToOutputDirectory>
+    </Content>
   </ItemGroup>
 
 </Project>

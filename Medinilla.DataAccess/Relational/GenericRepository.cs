@@ -45,5 +45,11 @@ namespace Medinilla.DataAccess.Relational
         {
             return await context.Set<T>().FindAsync(keyValues);
         }
+
+        public async Task<T> Update(T entity)
+        {
+            var result = context.Set<T>().Update(entity);
+            return result.Entity;
+        }
     }
 }

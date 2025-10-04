@@ -1,4 +1,5 @@
-﻿using Medinilla.DataAccess.Relational.Models.Authorization;
+﻿using Medinilla.DataAccess.Relational.Enums;
+using Medinilla.DataAccess.Relational.Models.Authorization;
 
 namespace Medinilla.DataAccess.Relational.Models;
 
@@ -20,7 +21,9 @@ public class TransactionEvent
 
     public bool? Offline { get; set; }
 
-    public decimal MeteredValue { get; set; }
+    public decimal TotalConsuption { get; set; }
+
+    public ConsumptionType? ConsumptionType { get; set; }
 
     public string UnitName { get; set; }
 

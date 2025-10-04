@@ -7,6 +7,14 @@ using Medinilla.WebApi.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
+builder.WebHost.ConfigureKestrel(options =>
+{
+    options.ListenAnyIP(5033, listenOptions =>
+    {
+        listenOptions.Protocols = Microsoft.AspNetCore.Server.Kestrel.Core.HttpProtocols.Http1;
+    });
+});
+
 // Add services to the container.
 
 builder.Services.AddControllers(options => options.InputFormatters.Add(new PlainTextFormatter()));
@@ -32,8 +40,10 @@ if (app.Environment.IsDevelopment())
     app.UseSwagger();
     //app.UseSwaggerUI();
 }
-
-app.UseHttpsRedirection();
+else if (app.Environment.IsProduction())
+{
+    app.UseHttpsRedirection();
+}
 
 app.UseAuthorization();
 

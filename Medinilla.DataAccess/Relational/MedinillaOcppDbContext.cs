@@ -10,7 +10,7 @@ public class MedinillaOcppDbContext(IConfiguration config) : DbContext
     protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
     {
         optionsBuilder.UseLazyLoadingProxies();
-        optionsBuilder.UseNpgsql(config.GetConnectionString("MedinillaCore"));
+        optionsBuilder.UseNpgsql(config.GetConnectionString("MedinillaCore"), b => b.MigrationsAssembly("Medinilla.Core.Service"));
     }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
@@ -67,6 +67,14 @@ public class MedinillaOcppDbContext(IConfiguration config) : DbContext
             .WithOne(c => c.ChargingStation)
             .HasForeignKey<AuthorizationDetails>(c => c.ChargingStationId);
 
+        // configure transaction events
+        modelBuilder.Entity<TransactionEvent>().Property(c => c.ConsumptionType)
+            .HasConversion<string>();
+
+        modelBuilder.Entity<TransactionEvent>().HasOne(c => c.IdToken)
+            .WithMany(i => i.TransactionEvents)
+            .HasForeignKey(c => c.IdTokenId);
+
         // configure transaction snapshots
         modelBuilder.Entity<TransactionSnapshot>().HasOne(c => c.EvseConnector)
             .WithMany()
@@ -74,7 +82,7 @@ public class MedinillaOcppDbContext(IConfiguration config) : DbContext
 
         // configure auth
         modelBuilder.Entity<IdToken>().HasOne(c => c.ChargingStation)
-            .WithMany()
+            .WithMany(c => c.IdTokens)
             .HasForeignKey(c => c.ChargingStationId);
 
         modelBuilder.Entity<IdToken>().HasOne(c => c.User)
@@ -85,11 +93,7 @@ public class MedinillaOcppDbContext(IConfiguration config) : DbContext
             .HasDefaultValue(false);
 
         modelBuilder.Entity<IdToken>().HasMany(c => c.TransactionSnapshots)
-            .WithOne()
-            .HasForeignKey(c => c.IdTokenId);
-
-        modelBuilder.Entity<IdToken>().HasMany(c => c.TransactionEvents)
-            .WithOne()
+            .WithOne(c => c.IdToken)
             .HasForeignKey(c => c.IdTokenId);
     }
 }

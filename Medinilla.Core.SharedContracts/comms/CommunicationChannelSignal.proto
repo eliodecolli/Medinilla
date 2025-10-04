@@ -2,10 +2,7 @@ syntax = "proto3";
 
 package medinilla.core.SharedContracts.comms;
 
-enum ChannelType {
-	OcppEvent = 0;
-	Other = 1;
-}
+import "ocpp/OcppMessage.proto";
 
 enum CommsFlag {
 	Set = 0;
@@ -13,7 +10,6 @@ enum CommsFlag {
 }
 
 message CommunicationChannelSignal {
-	string ChannelName = 1;
-	ChannelType ChannelType = 2;
-	optional CommsFlag Flag = 3;
+	CommsFlag Flag = 1;
+	medinilla.core.SharedContracts.comms.ocpp.OcppMessage Message = 2;
 }

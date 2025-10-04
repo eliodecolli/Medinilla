@@ -1,5 +1,4 @@
-﻿using Medinilla.Core.Service;
-using Medinilla.Core.Service.Communication;
+﻿using Medinilla.Core.Service.Communication;
 using Medinilla.Core.Service.Interfaces;
 using Medinilla.Core.Service.Types;
 using Medinilla.DataAccess;
@@ -11,10 +10,14 @@ using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 
+using Akka.Hosting;
+using Medinilla.Core.Service.Communication.Actors;
+using Akka.DependencyInjection;
+
 var hostApplicationBuilder = Host.CreateApplicationBuilder(args);
 
 var builder = new ConfigurationBuilder();
-using var stream = typeof(CoreServiceHost).Assembly.GetManifestResourceStream("Medinilla.Core.Service.settings.json");
+using var stream = typeof(Program).Assembly.GetManifestResourceStream("Medinilla.Core.Service.settings.json");
 
 builder.AddJsonStream(stream);
 var config = builder.Build();
@@ -33,10 +36,18 @@ hostApplicationBuilder.Services.AddMedinillaServices();
 hostApplicationBuilder.Services.AddRealTimeServices();
 hostApplicationBuilder.Services.AddScoped<IInterfaceCommunication, CoreInterfaceCommunication>();
 
+hostApplicationBuilder.Services.AddAkka("medinilla-core-akka", builder =>
+{
+    builder.WithActors((system, registry, resolver) =>
+    {
+        var coordinator = system.ActorOf(resolver.Props<Coordinator>(DependencyResolver.For(system)), "ocpp-coordinator");
+        registry.Register<Coordinator>(coordinator);
+    });
+});
+
 using var host = hostApplicationBuilder.Build();
 
 var interfaceComms = host.Services.GetRequiredService<IInterfaceCommunication>();
-await interfaceComms.Connect(CommunicationSettings.FromSettingsFile("settings.json"));
-await interfaceComms.Run();
+await interfaceComms.Run(CommunicationSettings.FromSettingsFile("settings.json"));
 
 await host.RunAsync();

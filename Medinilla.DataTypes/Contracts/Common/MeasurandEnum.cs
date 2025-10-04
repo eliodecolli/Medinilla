@@ -1,12 +1,10 @@
-﻿using System.Text.Json.Serialization;
-
+﻿
 namespace Medinilla.DataTypes.Contracts.Common;
 
 /// <summary>
 /// Type of measurement
 /// Default = "Energy.Active.Import.Register"
 /// </summary>
-[JsonConverter(typeof(JsonStringEnumConverter))]
 public enum MeasurandEnum
 {
     /// <summary>

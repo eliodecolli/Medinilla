@@ -7,6 +7,7 @@ using Medinilla.Infrastructure.Interops;
 using Medinilla.Infrastructure.WAMP;
 using Medinilla.RealTime;
 using Medinilla.WebApi.Interfaces;
+using Microsoft.AspNetCore.Cors.Infrastructure;
 using RabbitMQ.Client.Events;
 using System.Collections.Concurrent;
 using System.Net.WebSockets;
@@ -74,8 +75,6 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService, IAsync
                 }
                 _webSocket.Dispose();
             }
-
-            await CleanupCommunicationChannels();
         }
         catch (Exception ex)
         {
@@ -98,36 +97,6 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService, IAsync
         DisposeAsync().AsTask().GetAwaiter().GetResult();
 
         GC.SuppressFinalize(this);
-    }
-
-    private async Task CleanupCommunicationChannels()
-    {
-        if (_commsMessenger != null && _clientIdentifier != null)
-        {
-            try
-            {
-                var channelName = CommsUtils.GetChannelName(_clientIdentifier);
-                var responseChannelName = CommsUtils.GetResponseChannelName(channelName);
-                var signalChannelName = _config.GetSection("Comms")["SignalChannel"];
-
-                if (!string.IsNullOrEmpty(signalChannelName))
-                {
-                    await _commsMessenger.SendMessage(signalChannelName, new CommunicationChannelSignal
-                    {
-                        ChannelName = channelName,
-                        ChannelType = ChannelType.Other,
-                        Flag = CommsFlag.Remove,
-                    }.ToByteArray());
-
-                    await _commsMessenger.DestroyChannel(channelName);
-                    await _commsMessenger.DestroyChannel(responseChannelName);
-                }
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error cleaning up communication channels");
-            }
-        }
     }
 
     private void SetCurrentCall(string? value)
@@ -163,6 +132,8 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService, IAsync
             WebSocketMessageType.Text,
             true,
             _cts.Token);
+
+        _logger.LogInformation($"[Websocket]: Sent {data.Length} bytes -> {_clientIdentifier}");
     }
 
     private async Task<WebSocketResponse> DoSend(OcppCallRequest request)
@@ -268,21 +239,32 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService, IAsync
             return null;
         }
 
-        var buffer = new byte[1024];
+        var buffer = new byte[5000];
         var segment = new ArraySegment<byte>(buffer);
+        var messageBuffer = new List<byte>(); // To store the complete message
 
         try
         {
-            var result = await _webSocket.ReceiveAsync(segment, _cts.Token);
-
-            if (result.CloseStatus.HasValue)
+            WebSocketReceiveResult result;
+            do
             {
-                _logger.LogWarning("WS connection for {ClientId} has been closed. {Status}:{Description}",
-                    _clientIdentifier, result.CloseStatus.Value, result.CloseStatusDescription);
-                return null;
-            }
+                // Receive a frame
+                result = await _webSocket.ReceiveAsync(segment, _cts.Token);
 
-            return segment.AsSpan(0, result.Count).ToArray();
+                if (result.CloseStatus.HasValue)
+                {
+                    _logger.LogWarning("WS connection for {ClientId} has been closed. {Status}:{Description}",
+                        _clientIdentifier, result.CloseStatus.Value, result.CloseStatusDescription);
+                    return null;
+                }
+
+                // Add the received data to our message buffer
+                messageBuffer.AddRange(segment.AsSpan(0, result.Count).ToArray());
+
+                // Continue until we've received the entire message
+            } while (!result.EndOfMessage);
+
+            return messageBuffer.ToArray();
         }
         catch (OperationCanceledException)
         {
@@ -325,19 +307,6 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService, IAsync
             return;
         }
 
-        if (!IsConnectionOpen())
-        {
-            _logger.LogWarning(
-                "Cannot consume response from channel {RoutingKey} - websocket unavailable",
-                ea.RoutingKey);
-
-            if (args["model"] is AsyncEventingBasicConsumer consumer)
-            {
-                await consumer.Channel.BasicRejectAsync(ea.DeliveryTag, true);
-            }
-            return;
-        }
-
         try
         {
             var result = ea.Body.ToArray();
@@ -346,6 +315,15 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService, IAsync
             if (commsResult.MessageType == CommsMessageType.OcppResponse)
             {
                 var parsed = WampResult.Parser.ParseFrom(commsResult.Payload.ToByteArray());
+                if (parsed.ClientIdentifier != _clientIdentifier)
+                {
+                    return;  // not our guy
+                }
+
+                if (!IsConnectionOpen())
+                {
+                    return;  // yeah we're done here pal
+                }
 
                 if (!parsed.Result.IsEmpty)
                 {
@@ -379,32 +357,27 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService, IAsync
             throw new InvalidOperationException("Unable to get RabbitMQ messenger");
         }
 
-        var signalChannelName = _config.GetSection("Comms")["SignalChannel"];
-        if (string.IsNullOrEmpty(signalChannelName))
+        var requestQueueName = _config.GetSection("Comms")["RequestQueue"];
+        var responseQueueName = _config.GetSection("Comms")["ResponseQueue"];
+
+
+        if (string.IsNullOrEmpty(requestQueueName))
         {
-            throw new InvalidOperationException("Signal channel name is not configured");
+            throw new InvalidOperationException("Request queue name is not configured");
         }
+
+        if (string.IsNullOrEmpty(responseQueueName))
+        {
+            throw new InvalidOperationException("Response queue name is not configured");
+        }
+
+        await _commsMessenger.RegisterChannel(requestQueueName);
+        await _commsMessenger.RegisterChannel(responseQueueName);
+
+        await _commsMessenger.RegisterHandler(responseQueueName, RunCommsChannel);
 
         try
         {
-            var channelName = CommsUtils.GetChannelName(clientIdentifier);
-            var responseChannelName = CommsUtils.GetResponseChannelName(channelName);
-
-            await _commsMessenger.RegisterChannel(signalChannelName);
-            await _commsMessenger.RegisterChannel(channelName);
-            await _commsMessenger.RegisterChannel(responseChannelName);
-            await _commsMessenger.RegisterHandler(responseChannelName, RunCommsChannel);
-
-            await _commsMessenger.SendMessage(signalChannelName, new CommunicationChannelSignal
-            {
-                ChannelName = channelName,
-                ChannelType = ChannelType.OcppEvent,
-            }.ToByteArray());
-
-            _logger.LogInformation(
-                "Client {ClientId} signaled to listen on {Channel} with response on {ResponseChannel}",
-                clientIdentifier, channelName, responseChannelName);
-
             while (!_cts.Token.IsCancellationRequested && IsConnectionOpen())
             {
                 if (!IsServiceBusy())
@@ -422,7 +395,7 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService, IAsync
                             Payload = ByteString.CopyFrom(received),
                         };
 
-                        await _commsMessenger.SendMessage(channelName, payload.ToByteArray());
+                        await _commsMessenger.SendMessage(requestQueueName, payload.ToByteArray());
                     }
                 }
 

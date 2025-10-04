@@ -23,6 +23,11 @@ public class PubNubClient : IRealTimeMessenger
         throw new NotImplementedException();
     }
 
+    public object GetChannel(string channelName)
+    {
+        throw new NotImplementedException();
+    }
+
     public string GetCommunicationProviderName() => "PubNub";
 
     public Task RegisterChannel(string channelName)

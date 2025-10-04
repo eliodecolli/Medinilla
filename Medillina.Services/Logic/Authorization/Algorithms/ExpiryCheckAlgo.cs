@@ -17,7 +17,7 @@ public sealed class ExpiryCheckAlgo : IAuthAlgorithm
 
         if (context.IdToken is not null)
         {
-            status = context.IdToken.ExpiryDate > DateTime.UtcNow ?
+            status = DateTime.UtcNow > context.IdToken.ExpiryDate ?
             AuthorizeStatus.Expired :
             AuthorizeStatus.Accepted;
         }

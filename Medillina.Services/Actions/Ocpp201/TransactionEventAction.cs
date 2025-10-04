@@ -1,4 +1,5 @@
 ﻿using Medinilla.Core.Logic.Authorization;
+using Medinilla.Core.Logic.Transactions;
 using Medinilla.DataAccess.Relational.Models;
 using Medinilla.DataAccess.Relational.UnitOfWork;
 using Medinilla.DataTypes.Contracts;
@@ -8,12 +9,16 @@ using Microsoft.Extensions.Logging;
 using DbChargingStation = Medinilla.DataAccess.Relational.Models.ChargingStation;
 using DbTransaction = Medinilla.DataAccess.Relational.Models.TransactionEvent;
 using IdTokenDb = Medinilla.DataAccess.Relational.Models.Authorization.IdToken;
+using ConsumptionTypeDb = Medinilla.DataAccess.Relational.Enums.ConsumptionType;
+using Medinilla.DataTypes.Core;
+using System.Threading.Tasks;
 
 namespace Medinilla.Services.Actions.Ocpp201;
 
 public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logger,
     ChargingStationUnitOfWork unitOfWork,
-    AuthorizationAlgorithmFactory authFactory)
+    AuthorizationAlgorithmFactory authFactory,
+    TransactionService transactionService)
     : IOcppAction
 {
     // quick access
@@ -27,55 +32,6 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
     }
 
     public string ActionName => "TransactionEvent";
-
-    private string TryGetUnit(IEnumerable<MeterValue>? meters)
-    {
-        if (meters is null)
-        {
-            return "";
-        }
-
-        var meter = meters.FirstOrDefault();
-        if (meter is null)
-        {
-            return "";
-        }
-
-        var sampled = meter.SampledValue.FirstOrDefault();
-        if (sampled is null)
-        {
-            return "";
-        }
-
-        return sampled.UnitOfMeasure.Unit;
-    }
-
-    private decimal ScaleToKW(SampledValue value)
-    {
-        if (value.UnitOfMeasure.Unit.ToLower() == "wh" && value.UnitOfMeasure.Multiplier == 1)
-        {
-            return 1000 / value.Value;
-        }
-        else
-        {
-            return value.Value * (decimal)Math.Pow(10, value.UnitOfMeasure.Multiplier);
-        }
-    }
-
-    private decimal CalculateTotalMeteredValue(IEnumerable<MeterValue>? meters)
-    {
-        if (meters is null)
-        {
-            return 0.0M;
-        }
-
-        decimal total = 0.0M;
-        foreach (var meter in meters)
-        {
-            total += meter.SampledValue.Select(ScaleToKW).Sum();
-        }
-        return total;
-    }
 
     private decimal CalculateTotalCosts(decimal totalValue, DbChargingStation cs, string unit)
     {
@@ -100,7 +56,7 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
         return status;
     }
 
-    private async Task<bool> PerformTokenCleanUp(DbChargingStation cs, IdToken token)
+    private bool PerformTokenCleanUp(DbChargingStation cs, IdToken token)
     {
         var contextIdToken = cs.IdTokens.FirstOrDefault(t => t.Token == token.Token);
         if (contextIdToken is not null)
@@ -111,8 +67,11 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
         return true;
     }
 
-    private DbTransaction MapOcppTransaction(DbChargingStation cs, TransactionEventRequest request)
+    private DbTransaction MapOcppTransaction(DbChargingStation cs, TransactionEventRequest request, IdTokenDb? idToken)
     {
+        var unitName = request.MeterValue?.SelectMany(c => c.SampledValue).FirstOrDefault(s => s.Measurand == MeasurandEnum.EnergyActiveImportRegister ||
+                                                                                               s.Measurand == MeasurandEnum.EnergyActiveImportInterval)?.UnitOfMeasure?.Unit ?? "UNKNOWN";
+
         return new DbTransaction()
         {
             TransactionId = request.TransactionInfo.TransactionId,
@@ -121,49 +80,36 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
             EVSEId = request.Evse?.Id,
             Offline = request.Offline,
             ChargingStationId = cs.Id,
-            MeteredValue = CalculateTotalMeteredValue(request.MeterValue),
-            UnitName = TryGetUnit(request.MeterValue),
+            UnitName = unitName,
             TriggerReason = Enum.GetName(request.TriggerReason) ?? "UNKNOWN",
-            EventType = Enum.GetName(request.EventType) ?? "UNKNOWN"
-        };
-    }
-
-    private decimal GenerateTransactionSnapshot(DbChargingStation cs,
-        IEnumerable<TransactionEvent> currentTransactions,
-        DbTransaction finalTx,
-        IdTokenDb? idToken,
-        TransactionEventRequest request)
-    {
-        // generate a snapshot of the transaction here
-        // calculate the total costs
-        // send it back to the charging station
-        var totalValueMetered = currentTransactions.Select(c => c.MeteredValue).Sum();
-        var unit = currentTransactions.Where(t => !string.IsNullOrEmpty(t.UnitName)).FirstOrDefault()?.UnitName ?? "";
-
-        var connector = cs.EvseConnectors?.Where(c => c.ConnectorId == (request.Evse?.ConnectorId ?? 1) && c.EvseId == (request.Evse?.Id ?? 1)).FirstOrDefault();
-
-        var snapshot = new TransactionSnapshot()
-        {
-            ChargingStationId = cs.Id,
-            StartedAt = currentTransactions.FirstOrDefault()?.Timestamp ?? finalTx.Timestamp,
-            EndedAt = finalTx.Timestamp,
-            TotalMeteredValue = totalValueMetered,
-            TotalCost = CalculateTotalCosts(totalValueMetered, cs, unit),
-            TokenId = request.IdToken?.Token ?? "",
-            EvseConnectorId = connector?.Id ?? null,
-            TransactionId = request.TransactionInfo.TransactionId,
-            Unit = unit,
-            StartReason = currentTransactions.FirstOrDefault()?.TriggerReason ?? "UNKNOWN",
-            EndReason = Enum.GetName(request.TriggerReason) ?? "UNKNOWN",
+            EventType = Enum.GetName(request.EventType) ?? "UNKNOWN",
             IdTokenId = idToken?.Id,
         };
-
-        cs.TransactionSnapshots.Add(snapshot);
-        return snapshot.TotalCost;
     }
+
+    private TransactionConsumption? GetTransactionConsumption(TransactionEventRequest request, TransactionEvent transaction)
+    {
+        return transactionService.GetTransactionConsumption(request.MeterValue);
+    }
+
+#if DEBUG
+    private void SaveTxLocally(OcppCallRequest req)
+    {
+        if (!Directory.Exists("transactions"))
+        {
+            Directory.CreateDirectory("transactions");
+        }
+
+        var path = Path.Combine("transactions", $"{req.MessageId}.json");
+        File.WriteAllText(path, req.Payload);
+    }
+#endif
 
     public async Task<RpcResult> Execute(OcppCallRequest call, string clientIdentifier)
     {
+#if DEBUG
+        SaveTxLocally(call);
+#endif
         var request = call.As<TransactionEventRequest>();
 
         var chargingStation = await unitOfWork.GetChargingStation(clientIdentifier);
@@ -179,7 +125,14 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
         }
         else
         {
-            var transaction = MapOcppTransaction(chargingStation, request);
+            var idToken = await unitOfWork.TryGetIdToken(request.TransactionInfo.TransactionId, request.IdToken?.Token ?? "");
+            if (idToken is null)
+            {
+                _logger.LogWarning($"IdToken for transaction {request.TransactionInfo.TransactionId}, event '{Enum.GetName(request.EventType)}' not found ('{request.IdToken?.Token}' was found in request)");
+            }
+
+            var transaction = MapOcppTransaction(chargingStation, request, idToken);
+
             if (transaction is null)
             {
                 _logger.LogError($"{clientIdentifier}: Could not map incoming request: {call.Payload} to relational transaction type.");
@@ -190,9 +143,28 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
             }
             else
             {
+                var context = AuthUtils.GenerateAuthContext(chargingStation, request.Evse?.Id, true);
+                var authStatus = await PerformAuthorization(chargingStation, request, context);
+
+                var response = new TransactionEventResponse()
+                {
+                    IdTokenInfo = new IdTokenInfo()
+                    {
+                        Status = authStatus,
+                    }
+                };
+
+                if (authStatus != AuthorizeStatus.Accepted)
+                {
+                    return new RpcResult()
+                    {
+                        Result = call.CreateResult(response)
+                    };
+                }
+
                 var currentTransactions = chargingStation.TransactionEvents is not null ? chargingStation.TransactionEvents
                     .Where(t => t.TransactionId == request.TransactionInfo.TransactionId)
-                    .OrderBy(t => t.SeqNo).AsEnumerable() : [];
+                    .OrderBy(t => t.SeqNo).ToArray() : [];
 
                 if (currentTransactions.Any(c => (c.SeqNo == request.SeqNo)))
                 {
@@ -200,7 +172,7 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
 
                     return new RpcResult()
                     {
-                        Error = call.CreateErrorResult<TransactionEventResponse>(OcppCallError.ErrorCodes.PropertyConstraintViolation, $"Duplicate SeqNo='{request.SeqNo}' is not allowed.")
+                        Result = call.CreateResult(response),
                     };
                 }
                 else if (currentTransactions.Any(c => (c.EventType != EventTypes.Update) && c.EventType == Enum.GetName(request.EventType)))
@@ -213,26 +185,12 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
                 }
                 else
                 {
-                    var context = AuthUtils.GenerateAuthContext(chargingStation, request.Evse?.Id, true);
-                    var authStatus = await PerformAuthorization(chargingStation, request, context);
+                    var consumption = GetTransactionConsumption(request, transaction);
 
-                    var response = new TransactionEventResponse()
-                    {
-                        IdTokenInfo = new IdTokenInfo()
-                        {
-                            Status = authStatus,
-                        }
-                    };
+                    transaction.TotalConsuption = consumption?.Consumption ?? 0.0M;
+                    transaction.ConsumptionType = (ConsumptionTypeDb?)consumption?.ConsumptionType;
 
-                    if (authStatus != AuthorizeStatus.Accepted)
-                    {
-                        return new RpcResult()
-                        {
-                            Result = call.CreateResult(response)
-                        };
-                    }
-
-                    await unitOfWork.TransactionsSubUnit.RegisterTransaction(transaction, context.IdToken);
+                    transaction = await unitOfWork.TransactionSubUnit.RegisterTransaction(transaction, context.IdToken);
 
                     if (request.EventType == TransactionEventEnum.Ended)
                     {
@@ -247,11 +205,24 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
                             };
                         }
 
-                        response.TotalCost = GenerateTransactionSnapshot(chargingStation, currentTransactions, transaction, context.IdToken, request);
+                        // do we need to keep a coherent snapshot after each tx event?
+                        if (currentTransactions.Length > 0)
+                        {
+                            var firstTransaction = currentTransactions.FirstOrDefault(tx => tx.EventType == Enum.GetName(TransactionEventEnum.Started));
+                            if (firstTransaction is null)
+                            {
+                                _logger.LogWarning($"Partially finalizing tx snapshot for {request.TransactionInfo.TransactionId}: No 'Started' event was found.");
+                            }
+                            await unitOfWork.TransactionSubUnit.FinalizeSnapshot(firstTransaction, transaction, consumption);
+                        }
+
+                        var unitName = await unitOfWork.TransactionSubUnit.GetTransactionUnit(transaction.TransactionId);
+
+                        response.TotalCost = CalculateTotalCosts(consumption?.Consumption ?? 0.0M, chargingStation, unitName ?? "UNKNOWN");
 
                         if (request.IdToken?.Type == IdTokenType.Central)
                         {
-                            if (await PerformTokenCleanUp(chargingStation, request.IdToken).ConfigureAwait(false))
+                            if (PerformTokenCleanUp(chargingStation, request.IdToken))
                             {
                                 _logger.LogInformation($"{clientIdentifier}: Removed temporary token {request.IdToken.Token} because transaction is done.");
                             }
@@ -259,6 +230,12 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
                             {
                                 _logger.LogWarning($"{clientIdentifier}: Temp token {request.IdToken.Token} couldn't be removed.");
                             }
+                        }
+
+                        if (idToken is not null)
+                        {
+                            await unitOfWork.ReleaseToken(idToken);
+                            _logger.LogInformation($"Released token {idToken.Token}");
                         }
                     }
 

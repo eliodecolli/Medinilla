@@ -6,4 +6,5 @@ message WampResult {
 	optional bytes Result = 1;
 	optional bytes Error = 2;
 	bool ReturnToCS = 3;
+	string ClientIdentifier = 4;
 }

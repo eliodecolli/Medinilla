@@ -6,12 +6,15 @@ public sealed class CommunicationSettings
 {
     public string RabbitUri { get; private set; }
 
-    public string SignalChannel { get; private set; }
+    public string RequestQueue { get; private set; }
 
-    private CommunicationSettings(string rabbitUri, string signalChannel)
+    public string ResponseQueue { get; private set; }
+
+    private CommunicationSettings(string rabbitUri, string requestQueue, string responseQueue)
     {
         RabbitUri = rabbitUri;
-        SignalChannel = signalChannel;
+        RequestQueue = requestQueue;
+        ResponseQueue =  responseQueue;
     }
 
     public static CommunicationSettings FromSettingsFile(string settingsFile)
@@ -25,9 +28,12 @@ public sealed class CommunicationSettings
         var rabbitUri = root.GetProperty("RabbitUri").GetString()
             ?? throw new JsonException("RabbitUri is required in settings file");
 
-        var signalChannel = root.GetProperty("SignalChannel").GetString()
-            ?? throw new JsonException("SignalChannel is required in settings file");
+        var requestQueue = root.GetProperty("RequestQueue").GetString()
+            ?? throw new JsonException("RequestQueue is required in settings file");
 
-        return new CommunicationSettings(rabbitUri, signalChannel);
+        var responseQueue = root.GetProperty("ResponseQueue").GetString()
+            ?? throw new JsonException("ResponseQueue is required in settings file");
+
+        return new CommunicationSettings(rabbitUri, requestQueue, responseQueue);
     }
 }
