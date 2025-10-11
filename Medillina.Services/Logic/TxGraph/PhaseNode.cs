@@ -30,6 +30,23 @@ public class PhaseNode : INode
     {
         return Children?.Select(c => c.Compute()).Sum() ?? 0;
     }
+
+    public INode Copy()
+    {
+        var childrenCopy =  new List<SinkNode>();
+        foreach (var child in Children ?? [])
+        {
+            if (child.Copy() is SinkNode nodeCopy)
+            {
+                childrenCopy.Add(nodeCopy);
+            }
+        }
+
+        return new PhaseNode()
+        {
+            Children = childrenCopy
+        };
+    }
     
     public static PhaseNode operator <<(PhaseNode lhs, PhaseNode? rhs)
     {
@@ -38,7 +55,7 @@ public class PhaseNode : INode
             return lhs;
         }
         
-        lhs.Children?.AddRange(rhs.Children ?? []);
+        lhs.Children?.AddRange((rhs.Copy() as PhaseNode)?.Children ?? []);
         return lhs;
     }
 }

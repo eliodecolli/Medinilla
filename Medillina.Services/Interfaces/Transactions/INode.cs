@@ -18,4 +18,6 @@ public interface INode
     NodeType GetNodeType();
     
     int GetChildCount();
+
+    INode Copy();
 }

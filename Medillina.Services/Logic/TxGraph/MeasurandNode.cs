@@ -18,6 +18,15 @@ public class MeasurandNode : INode
     public NodeType GetNodeType() => NodeType.Measurand;
     
     public int GetChildCount() => 2;  // cause it's always two
+    
+    public INode Copy()
+    {
+        return new MeasurandNode()
+        {
+            Outlet = Outlet?.Copy() as SinkNode,
+            Phases = Phases?.Copy() as PhaseNode,
+        };
+    }
 
     private void _AddOutlet(INode outlet)
     {
@@ -68,7 +77,7 @@ public class MeasurandNode : INode
     {
         if (mRhs is null)
         {
-            return mLhs;
+            return mLhs!;
         }
         
         if (mLhs.Outlet is null)

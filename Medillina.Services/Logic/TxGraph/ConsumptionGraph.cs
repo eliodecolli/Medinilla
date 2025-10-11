@@ -6,13 +6,23 @@ namespace Medinilla.Core.Logic.TxGraph;
 public class ConsumptionGraph
 {
     [Key(0)]
-    public Logic.TxGraph.TxGraph? Begin { get; set; }
+    public TxGraph? Begin { get; set; }
     
     [Key(1)]
-    public Logic.TxGraph.TxGraph? End { get; set; }
+    public TxGraph? End { get; set; }
     
     [Key(2)]
-    public Logic.TxGraph.TxGraph? Sample { get; set; }
+    public TxGraph? Sample { get; set; }
+
+    private ConsumptionGraph Copy()
+    {
+        return new ConsumptionGraph()
+        {
+            Begin = Begin?.Copy(),
+            Sample = Sample?.Copy(),
+            End = End?.Copy()
+        };
+    }
 
     public static ConsumptionGraph Empty = new ConsumptionGraph();
 
@@ -33,20 +43,22 @@ public class ConsumptionGraph
     
     public static ConsumptionGraph? operator << (ConsumptionGraph? graph, ConsumptionGraph? other)
     {
-        if (graph is null)
+        var lgraph = graph?.Copy();
+        
+        if (lgraph is null)
         {
             return other;
         }
 
         if (other is null)
         {
-            return graph;
+            return lgraph;
         }
         
-        graph.Begin <<= other.Begin;
-        graph.Sample <<= other.Sample;
-        graph.End <<= other.End;
+        lgraph.Begin <<= other.Begin;
+        lgraph.Sample <<= other.Sample;
+        lgraph.End <<= other.End;
         
-        return graph;
+        return lgraph;
     }
 }

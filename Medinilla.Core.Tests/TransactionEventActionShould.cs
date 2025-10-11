@@ -107,5 +107,9 @@ public class TransactionEventActionShould
         var finalGraph = graph1 << graph2;
         Assert.NotNull(finalGraph);
         Assert.Equal(expected, txService.GetTransactionConsumption(finalGraph).Consumption);
+
+        var ff = finalGraph << graph2 << graph1;
+        Assert.NotNull(ff);
+        Assert.Equal(expected * 2, txService.GetTransactionConsumption(ff).Consumption);
     }
 }

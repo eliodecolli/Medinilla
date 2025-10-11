@@ -34,6 +34,11 @@ public class SinkNode : INode
     }
 
     public int GetChildCount() => Count;
+    
+    public INode Copy()
+    {
+        return new SinkNode(Value ?? 0, Type);
+    }
 
     public decimal Compute()
     {

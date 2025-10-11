@@ -1,4 +1,5 @@
 using Medinilla.Core.Interfaces.Transactions;
+using Medinilla.Core.v1.TxGraph;
 using MessagePack;
 
 namespace Medinilla.Core.Logic.TxGraph;
@@ -31,8 +32,20 @@ public class TxGraph
         return Register?.Compute() ?? 0 + Interval?.Compute() ?? 0;
     }
 
-    public static TxGraph? operator <<(TxGraph? lhs, TxGraph? rhs)
+    public TxGraph Copy()
     {
+        return new TxGraph()
+        {
+            Interval = Interval?.Copy() as MeasurandNode,
+            Register = Register?.Copy() as MeasurandNode,
+        };
+    }
+
+    public static TxGraph? operator <<(TxGraph? lgraph, TxGraph? rgraph)
+    {
+        var lhs = lgraph?.Copy();
+        var rhs = rgraph?.Copy();
+        
         if (rhs is null)
         {
             return lhs;
