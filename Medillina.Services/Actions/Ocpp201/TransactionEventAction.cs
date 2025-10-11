@@ -1,5 +1,4 @@
 ﻿using Medinilla.Core.Logic.Authorization;
-using Medinilla.Core.Logic.Transactions;
 using Medinilla.DataAccess.Relational.Models;
 using Medinilla.DataAccess.Relational.UnitOfWork;
 using Medinilla.DataTypes.Contracts;
@@ -12,6 +11,7 @@ using IdTokenDb = Medinilla.DataAccess.Relational.Models.Authorization.IdToken;
 using ConsumptionTypeDb = Medinilla.DataAccess.Relational.Enums.ConsumptionType;
 using Medinilla.DataTypes.Core;
 using System.Threading.Tasks;
+using Medinilla.Core.v1.Transactions;
 
 namespace Medinilla.Services.Actions.Ocpp201;
 

@@ -1,5 +1,5 @@
 ﻿using System.Text.Json;
-using Medinilla.Core.Logic.Transactions;
+using Medinilla.Core.v1.Transactions;
 using Medinilla.DataTypes.Contracts;
 using Medinilla.DataTypes.Contracts.Common;
 using Medinilla.Infrastructure;
@@ -8,29 +8,28 @@ namespace Medinilla.Core.Tests;
 
 public class TransactionEventActionShould
 {
-    // Based on the JSON data:
-    // - Total Energy.Active.Import.Register at Transaction.End: 51 Wh = 0.051 kWh
-    // - Per phase L1/L2/L3: 17 Wh each = 0.017 kWh each
-    // NOTE: The current implementation returns 0.017 kWh (single phase value)
-    // This constant represents what we EXPECT based on the total consumption in the JSON
     private const decimal EXPECTED_TOTAL_CONSUMPTION_KWH_1 = 0.051M; // Total: 51 Wh = 0.051 kWh
-    private const decimal EXPECTED_TOTAL_CONSUMPTION_KWH_2 = 0.041M;
+    private const decimal EXPECTED_TOTAL_CONSUMPTION_KWH_2 = 0.041M; // Ditto
 
-    private async Task AssertCalculation(string fileName, decimal expected)
+    private async Task<TransactionEventRequest> GetRequest(string fileName)
     {
-        // Arrange
         var jsonPath = Path.Combine("Data", fileName);
         var jsonContent = await File.ReadAllTextAsync(jsonPath);
         var jsonArray = JsonDocument.Parse(jsonContent).RootElement;
 
-        // Extract the payload (4th element in OCPP JSON array)
         var payloadJson = jsonArray[3].GetRawText();
         var request = JsonSerializer.Deserialize<TransactionEventRequest>(payloadJson, new JsonSerializerOptions
         {
             PropertyNameCaseInsensitive = true,
             Converters = { new DottedEnumJsonConverter() }
         });
+        
+        return request;
+    }
 
+    private async Task AssertCalculation(string fileName, decimal expected)
+    {
+        var request = await GetRequest(fileName);
         Assert.NotNull(request);
         Assert.NotNull(request.MeterValue);
 
@@ -61,5 +60,52 @@ public class TransactionEventActionShould
     {
         await AssertCalculation("TransactionEventEnd.json", EXPECTED_TOTAL_CONSUMPTION_KWH_1);
         await AssertCalculation("TransactionEventEnd2.json", EXPECTED_TOTAL_CONSUMPTION_KWH_2);
+    }
+
+    [Fact]
+    public async Task MergesConsumptionGraphs()
+    {
+        var txService = new TransactionService();
+        
+        var request1 = await GetRequest("TransactionEventEnd.json");
+
+        var graph1 = txService.GetTransactionGraph(request1.MeterValue);
+        Assert.NotNull(graph1);
+
+        var request2 = await GetRequest("TransactionEventEnd2.json");
+        
+        var graph2 =  txService.GetTransactionGraph(request2.MeterValue);
+        Assert.NotNull(graph2);
+        
+        Assert.Equal(EXPECTED_TOTAL_CONSUMPTION_KWH_1, txService.GetTransactionConsumption(graph1).Consumption);
+        Assert.Equal(EXPECTED_TOTAL_CONSUMPTION_KWH_2, txService.GetTransactionConsumption(graph2).Consumption);
+        
+        var expected = EXPECTED_TOTAL_CONSUMPTION_KWH_1 + EXPECTED_TOTAL_CONSUMPTION_KWH_2;
+        Assert.Equal(expected, txService.GetTransactionConsumption(request2.MeterValue, graph1).Consumption);
+    }
+
+    [Fact]
+    public async Task MergesConsumptionGraphsByOperator()
+    {
+        var txService =  new TransactionService();
+        
+        var request1 = await GetRequest("TransactionEventEnd.json");
+
+        var graph1 = txService.GetTransactionGraph(request1.MeterValue);
+        Assert.NotNull(graph1);
+
+        var request2 = await GetRequest("TransactionEventEnd2.json");
+        
+        var graph2 =  txService.GetTransactionGraph(request2.MeterValue);
+        Assert.NotNull(graph2);
+        
+        Assert.Equal(EXPECTED_TOTAL_CONSUMPTION_KWH_1, txService.GetTransactionConsumption(graph1).Consumption);
+        Assert.Equal(EXPECTED_TOTAL_CONSUMPTION_KWH_2, txService.GetTransactionConsumption(graph2).Consumption);
+        
+        var expected = EXPECTED_TOTAL_CONSUMPTION_KWH_1 + EXPECTED_TOTAL_CONSUMPTION_KWH_2;
+        
+        var finalGraph = graph1 << graph2;
+        Assert.NotNull(finalGraph);
+        Assert.Equal(expected, txService.GetTransactionConsumption(finalGraph).Consumption);
     }
 }
