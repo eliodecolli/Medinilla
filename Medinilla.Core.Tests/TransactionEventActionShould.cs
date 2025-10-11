@@ -69,12 +69,12 @@ public class TransactionEventActionShould
         
         var request1 = await GetRequest("TransactionEventEnd.json");
 
-        var graph1 = txService.GetTransactionGraph(request1.MeterValue);
+        var graph1 = txService.GetConsumptionGraph(request1.MeterValue);
         Assert.NotNull(graph1);
 
         var request2 = await GetRequest("TransactionEventEnd2.json");
         
-        var graph2 =  txService.GetTransactionGraph(request2.MeterValue);
+        var graph2 =  txService.GetConsumptionGraph(request2.MeterValue);
         Assert.NotNull(graph2);
         
         Assert.Equal(EXPECTED_TOTAL_CONSUMPTION_KWH_1, txService.GetTransactionConsumption(graph1).Consumption);
@@ -91,12 +91,12 @@ public class TransactionEventActionShould
         
         var request1 = await GetRequest("TransactionEventEnd.json");
 
-        var graph1 = txService.GetTransactionGraph(request1.MeterValue);
+        var graph1 = txService.GetConsumptionGraph(request1.MeterValue);
         Assert.NotNull(graph1);
 
         var request2 = await GetRequest("TransactionEventEnd2.json");
         
-        var graph2 =  txService.GetTransactionGraph(request2.MeterValue);
+        var graph2 =  txService.GetConsumptionGraph(request2.MeterValue);
         Assert.NotNull(graph2);
         
         Assert.Equal(EXPECTED_TOTAL_CONSUMPTION_KWH_1, txService.GetTransactionConsumption(graph1).Consumption);

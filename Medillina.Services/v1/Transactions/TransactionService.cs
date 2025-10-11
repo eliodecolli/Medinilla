@@ -142,7 +142,7 @@ public sealed class TransactionService
         }
     }
 
-    private ConsumptionGraph GenerateTransactionGraph(IEnumerable<SampledValue> samples,
+    private ConsumptionGraph GenerateConsumptionGraph(IEnumerable<SampledValue> samples,
         ConsumptionGraph? currentGraph = null)
     {
         var graph = currentGraph ?? new ConsumptionGraph();
@@ -172,7 +172,7 @@ public sealed class TransactionService
         return graph;
     }
 
-    public ConsumptionGraph GetTransactionGraph(IEnumerable<MeterValue>? meters, ConsumptionGraph? currentGraph = null)
+    public ConsumptionGraph GetConsumptionGraph(IEnumerable<MeterValue>? meters, ConsumptionGraph? currentGraph = null)
     {
         if (meters is null)
         {
@@ -182,7 +182,7 @@ public sealed class TransactionService
         var samples = meters.OrderBy(c => c.Timestamp)
             .SelectMany(t => t.SampledValue);
         
-        return GenerateTransactionGraph(samples,  currentGraph);
+        return GenerateConsumptionGraph(samples,  currentGraph);
     }
 
     public TransactionConsumption GetTransactionConsumption(ConsumptionGraph graph)
@@ -237,7 +237,7 @@ public sealed class TransactionService
                 Consumption = 0.0M
             };
         }
-        var graph = GetTransactionGraph(meters,  currentGraph);
+        var graph = GetConsumptionGraph(meters,  currentGraph);
 
         return GetTransactionConsumption(graph);
     }
