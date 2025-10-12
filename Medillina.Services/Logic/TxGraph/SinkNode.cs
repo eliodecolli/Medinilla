@@ -12,11 +12,11 @@ public class SinkNode : INode
         Type = NodeType.Unknown;
     }
     
-    public SinkNode(decimal value, NodeType type)
+    public SinkNode(float value, NodeType type)
         => (Value, Type) = (value, type);
     
     [Key(0)]
-    public decimal? Value { get; set; }
+    public float? Value { get; set; }
     
     [Key(1)]
     public int Count { get; set; }
@@ -40,7 +40,7 @@ public class SinkNode : INode
         return new SinkNode(Value ?? 0, Type);
     }
 
-    public decimal Compute()
+    public float Compute()
     {
         return Value ?? 0;
     }

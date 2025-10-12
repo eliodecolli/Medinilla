@@ -22,11 +22,11 @@ public sealed class TransactionsUnitOfWork(MedinillaOcppDbContext context)
         var result = currentConsumption;
         if (consumption.ConsumptionType == ConsumptionType.Cumulative)
         {
-            result = consumption.Consumption;
+            result = Convert.ToDecimal(consumption.Consumption);
         }
         else if (consumption.ConsumptionType == ConsumptionType.Periodic)
         {
-            result += consumption.Consumption;
+            result += Convert.ToDecimal(consumption.Consumption);
         }
 
         return result;

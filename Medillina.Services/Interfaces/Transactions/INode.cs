@@ -13,7 +13,7 @@ public interface INode
 {
     void AddChild(INode child);
     
-    decimal Compute();
+    float Compute();
 
     NodeType GetNodeType();
     

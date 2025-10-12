@@ -26,7 +26,7 @@ public class PhaseNode : INode
         Children.Add(sink);
     }
 
-    public decimal Compute()
+    public float Compute()
     {
         return Children?.Select(c => c.Compute()).Sum() ?? 0;
     }

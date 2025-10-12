@@ -63,7 +63,7 @@ public class MeasurandNode : INode
         }
     }
 
-    public decimal Compute()
+    public float Compute()
     {
         if (Outlet?.GetChildCount() > 0)
         {

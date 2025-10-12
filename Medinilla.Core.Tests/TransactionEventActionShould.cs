@@ -14,9 +14,9 @@ public class TransactionEventActionShould
     {
         _testOutputHelper = testOutputHelper;
     }
-
-    private const decimal EXPECTED_TOTAL_CONSUMPTION_KWH_1 = 0.051M; // Total: 51 Wh = 0.051 kWh
-    private const decimal EXPECTED_TOTAL_CONSUMPTION_KWH_2 = 0.041M; // Ditto
+    
+    private const float EXPECTED_TOTAL_CONSUMPTION_KWH_1 = 0.051f; // Total: 51 Wh = 0.051 kWh
+    private const float EXPECTED_TOTAL_CONSUMPTION_KWH_2 = 0.041f; // Ditto
 
     private async Task<TransactionEventRequest> GetRequest(string fileName)
     {
@@ -34,7 +34,7 @@ public class TransactionEventActionShould
         return request;
     }
 
-    private async Task AssertCalculation(string fileName, decimal expected)
+    private async Task AssertCalculation(string fileName, float expected)
     {
         var request = await GetRequest(fileName);
         Assert.NotNull(request);

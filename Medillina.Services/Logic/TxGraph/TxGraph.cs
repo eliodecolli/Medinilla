@@ -27,7 +27,7 @@ public class TxGraph
         Interval.AddChild(interval);
     }
 
-    public decimal Compute()
+    public float Compute()
     {
         return Register?.Compute() ?? 0 + Interval?.Compute() ?? 0;
     }
