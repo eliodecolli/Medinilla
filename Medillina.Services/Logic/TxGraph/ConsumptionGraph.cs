@@ -14,7 +14,7 @@ public class ConsumptionGraph
     [Key(2)]
     public TxGraph? Sample { get; set; }
 
-    private ConsumptionGraph Copy()
+    public ConsumptionGraph Copy()
     {
         return new ConsumptionGraph()
         {
@@ -47,7 +47,7 @@ public class ConsumptionGraph
         
         if (lgraph is null)
         {
-            return other;
+            return other?.Copy();
         }
 
         if (other is null)

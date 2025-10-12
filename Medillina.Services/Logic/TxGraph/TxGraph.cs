@@ -43,37 +43,34 @@ public class TxGraph
 
     public static TxGraph? operator <<(TxGraph? lgraph, TxGraph? rgraph)
     {
-        var lhs = lgraph?.Copy();
-        var rhs = rgraph?.Copy();
-        
-        if (rhs is null)
+        if (rgraph is null)
         {
-            return lhs;
+            return lgraph;
         }
 
-        if (lhs is null)
+        if (lgraph is null)
         {
-            return rhs;
+            return rgraph.Copy();
         }
         
-        if (lhs.Register is null)
+        if (lgraph.Register is null)
         {
-            lhs.Register =  rhs.Register;
+            lgraph.Register =  rgraph?.Register?.Copy() as MeasurandNode;
         }
         else
         {
-            lhs.Register <<= rhs.Register;
+            lgraph.Register <<= rgraph.Register;
         }
 
-        if (lhs.Interval is null)
+        if (lgraph.Interval is null)
         {
-            lhs.Interval = rhs.Interval;
+            lgraph.Interval = rgraph?.Interval?.Copy() as MeasurandNode;
         }
         else
         {
-            lhs.Interval <<=  rhs.Interval;
+            lgraph.Interval <<=  rgraph?.Interval;
         }
 
-        return lhs;
+        return lgraph;
     }
 }

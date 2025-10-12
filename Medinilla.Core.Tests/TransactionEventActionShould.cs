@@ -1,13 +1,20 @@
 ﻿using System.Text.Json;
 using Medinilla.Core.v1.Transactions;
 using Medinilla.DataTypes.Contracts;
-using Medinilla.DataTypes.Contracts.Common;
 using Medinilla.Infrastructure;
+using Xunit.Abstractions;
 
 namespace Medinilla.Core.Tests;
 
 public class TransactionEventActionShould
 {
+    private readonly ITestOutputHelper _testOutputHelper;
+
+    public TransactionEventActionShould(ITestOutputHelper testOutputHelper)
+    {
+        _testOutputHelper = testOutputHelper;
+    }
+
     private const decimal EXPECTED_TOTAL_CONSUMPTION_KWH_1 = 0.051M; // Total: 51 Wh = 0.051 kWh
     private const decimal EXPECTED_TOTAL_CONSUMPTION_KWH_2 = 0.041M; // Ditto
 

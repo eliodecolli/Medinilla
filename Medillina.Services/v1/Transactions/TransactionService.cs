@@ -146,12 +146,9 @@ public sealed class TransactionService
         ConsumptionGraph? currentGraph = null)
     {
         var graph = currentGraph ?? new ConsumptionGraph();
-        
-        using var iter = samples.GetEnumerator();
-        while (iter.MoveNext())
-        {
-            var current = iter.Current;
 
+        foreach (var current in samples)
+        {
             switch (current.Context)
             {
                 case ReadingContextEnum.TransactionBegin:
@@ -179,10 +176,14 @@ public sealed class TransactionService
             return ConsumptionGraph.Empty;
         }
         
-        var samples = meters.OrderBy(c => c.Timestamp)
-            .SelectMany(t => t.SampledValue);
-        
-        return GenerateConsumptionGraph(samples,  currentGraph);
+        var graph  = currentGraph ?? new ConsumptionGraph();
+
+        foreach (var meterValue in meters)
+        {
+            GenerateConsumptionGraph(meterValue.SampledValue, graph);
+        }
+
+        return graph;
     }
 
     public TransactionConsumption GetTransactionConsumption(ConsumptionGraph graph)
