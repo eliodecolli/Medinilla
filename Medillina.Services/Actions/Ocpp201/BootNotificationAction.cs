@@ -1,4 +1,7 @@
-﻿using Medinilla.Core.Logic;
+﻿using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
+using Medinilla.Core.Logic;
 using Medinilla.Core.Logic.Configuration;
 using Medinilla.DataAccess.Relational.Models;
 using Medinilla.DataAccess.Relational.Models.Authorization;
@@ -9,15 +12,12 @@ using Medinilla.DataTypes.Pubnub;
 using Medinilla.DataTypes.Pubnub.DTO;
 using Medinilla.Infrastructure.WAMP;
 using Medinilla.RealTime;
+using Medinilla.Services.Actions;
 using Microsoft.Extensions.Logging;
-using System.Diagnostics;
-using System.Text;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using CS = Medinilla.DataAccess.Relational.Models.ChargingStation;
 using IdTokenDb = Medinilla.DataAccess.Relational.Models.Authorization.IdToken;
 
-namespace Medinilla.Services.Actions.Ocpp201;
+namespace Medinilla.Core.Actions.Ocpp201;
 
 public sealed class BootNotificationAction(ChargingStationUnitOfWork unitOfWork,
     ILogger<BootNotificationAction> _logger,

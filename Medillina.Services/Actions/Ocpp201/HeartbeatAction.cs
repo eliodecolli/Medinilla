@@ -1,8 +1,9 @@
 ﻿using Medinilla.DataTypes.Contracts;
 using Medinilla.Infrastructure.WAMP;
+using Medinilla.Services.Actions;
 using Microsoft.Extensions.Logging;
 
-namespace Medinilla.Services.Actions.Ocpp201;
+namespace Medinilla.Core.Actions.Ocpp201;
 
 internal class HeartbeatAction : IOcppAction
 {

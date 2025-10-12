@@ -4,7 +4,7 @@ using Medinilla.Core.Service.Types;
 using Medinilla.DataAccess;
 using Medinilla.Infrastructure;
 using Medinilla.RealTime;
-using Medinilla.Services;
+using Medinilla.Core;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;

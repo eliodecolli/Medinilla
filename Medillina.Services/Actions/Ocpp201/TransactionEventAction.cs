@@ -1,19 +1,19 @@
 ﻿using Medinilla.Core.Logic.Authorization;
+using Medinilla.Core.v1.Transactions;
 using Medinilla.DataAccess.Relational.Models;
 using Medinilla.DataAccess.Relational.UnitOfWork;
 using Medinilla.DataTypes.Contracts;
 using Medinilla.DataTypes.Contracts.Common;
+using Medinilla.DataTypes.Core;
 using Medinilla.Infrastructure.WAMP;
+using Medinilla.Services.Actions;
 using Microsoft.Extensions.Logging;
 using DbChargingStation = Medinilla.DataAccess.Relational.Models.ChargingStation;
 using DbTransaction = Medinilla.DataAccess.Relational.Models.TransactionEvent;
 using IdTokenDb = Medinilla.DataAccess.Relational.Models.Authorization.IdToken;
 using ConsumptionTypeDb = Medinilla.DataAccess.Relational.Enums.ConsumptionType;
-using Medinilla.DataTypes.Core;
-using System.Threading.Tasks;
-using Medinilla.Core.v1.Transactions;
 
-namespace Medinilla.Services.Actions.Ocpp201;
+namespace Medinilla.Core.Actions.Ocpp201;
 
 public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logger,
     ChargingStationUnitOfWork unitOfWork,
