@@ -12,26 +12,6 @@ public sealed class TransactionsUnitOfWork(MedinillaOcppDbContext context)
     private IRepository<TransactionEvent> _transactionRepository = new GenericRepository<TransactionEvent>(context);
     private IRepository<TransactionSnapshot> _snapshotRepository = new GenericRepository<TransactionSnapshot>(context);
 
-    private decimal GetTotalConsumption(decimal currentConsumption, TransactionConsumption? consumption, bool isFinal)
-    {
-        if (consumption is null || isFinal)
-        {
-            return currentConsumption;
-        }
-
-        var result = currentConsumption;
-        if (consumption.ConsumptionType == ConsumptionType.Cumulative)
-        {
-            result = Convert.ToDecimal(consumption.Consumption);
-        }
-        else if (consumption.ConsumptionType == ConsumptionType.Periodic)
-        {
-            result += Convert.ToDecimal(consumption.Consumption);
-        }
-
-        return result;
-    }
-
     public async Task<TransactionEvent> RegisterTransaction(TransactionEvent transaction, Models.Authorization.IdToken? idToken)
     {
         if (idToken is not null)
@@ -86,7 +66,7 @@ public sealed class TransactionsUnitOfWork(MedinillaOcppDbContext context)
         return [.. retval];
     }
 
-    public async Task<TransactionSnapshot> FinalizeSnapshot(TransactionEvent? firstEvent, TransactionEvent lastEvent, TransactionConsumption? consumption)
+    public async Task FinalizeSnapshot(TransactionEvent? firstEvent, TransactionEvent lastEvent, TransactionConsumption? consumption)
     {
         var snapshot = new TransactionSnapshot();
         snapshot.ChargingStationId = lastEvent.ChargingStationId;
@@ -95,8 +75,8 @@ public sealed class TransactionsUnitOfWork(MedinillaOcppDbContext context)
         snapshot.EndedAt = lastEvent.Timestamp;
         snapshot.EndReason = lastEvent.TriggerReason;
 
-        snapshot.TotalCost = GetTotalConsumption(snapshot.TotalMeteredValue, consumption, true);
+        snapshot.TotalCost = Convert.ToDecimal(consumption?.Consumption ?? 0);
 
-        return await _snapshotRepository.Update(snapshot);
+        await _snapshotRepository.Update(snapshot);
     }
 }
