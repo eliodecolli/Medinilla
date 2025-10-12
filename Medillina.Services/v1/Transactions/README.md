@@ -1,3 +1,6 @@
+# Transaction Graph - Benchmarks
+The following benchmarks are ran 900k times, for 5 laps. Finally, the result is averaged.
+
 | **Test Name** | **Description** | **Run 1 (ms)** | **Run 2 (ms)** | **Run 3 (ms)** | **Run 4 (ms)** | **Run 5 (ms)** | **Average (ms)** | **Relative Speed** |
 |----------------|-----------------|---------------:|---------------:|---------------:|---------------:|---------------:|-----------------:|-------------------:|
 | **First-Run** | Build full graph from raw data each loop | 3665 | 3651 | 3777 | 3639 | 3566 | **3659.6** | 1.0× |
