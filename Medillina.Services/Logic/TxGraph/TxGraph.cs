@@ -29,7 +29,7 @@ public class TxGraph
 
     public float Compute()
     {
-        return Register?.Compute() ?? 0 + Interval?.Compute() ?? 0;
+        return Register?.Compute() ?? Interval?.Compute() ?? 0;
     }
 
     public TxGraph Copy()
