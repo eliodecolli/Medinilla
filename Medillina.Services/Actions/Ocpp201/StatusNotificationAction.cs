@@ -3,9 +3,10 @@ using Medinilla.DataAccess.Relational.UnitOfWork;
 using Medinilla.DataTypes.Contracts;
 using Medinilla.Infrastructure.WAMP;
 using Medinilla.RealTime;
+using Medinilla.Services.Actions;
 using Microsoft.Extensions.Logging;
 
-namespace Medinilla.Services.Actions.Ocpp201;
+namespace Medinilla.Core.Actions.Ocpp201;
 
 public sealed class StatusNotificationAction(ChargingStationUnitOfWork unitOfWork,
     ILogger<StatusNotificationAction> logger,

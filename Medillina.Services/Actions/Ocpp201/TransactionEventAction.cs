@@ -1,19 +1,19 @@
 ﻿using Medinilla.Core.Logic.Authorization;
-using Medinilla.Core.Logic.Transactions;
+using Medinilla.Core.v1.Transactions;
 using Medinilla.DataAccess.Relational.Models;
 using Medinilla.DataAccess.Relational.UnitOfWork;
 using Medinilla.DataTypes.Contracts;
 using Medinilla.DataTypes.Contracts.Common;
+using Medinilla.DataTypes.Core;
 using Medinilla.Infrastructure.WAMP;
+using Medinilla.Services.Actions;
 using Microsoft.Extensions.Logging;
 using DbChargingStation = Medinilla.DataAccess.Relational.Models.ChargingStation;
 using DbTransaction = Medinilla.DataAccess.Relational.Models.TransactionEvent;
 using IdTokenDb = Medinilla.DataAccess.Relational.Models.Authorization.IdToken;
 using ConsumptionTypeDb = Medinilla.DataAccess.Relational.Enums.ConsumptionType;
-using Medinilla.DataTypes.Core;
-using System.Threading.Tasks;
 
-namespace Medinilla.Services.Actions.Ocpp201;
+namespace Medinilla.Core.Actions.Ocpp201;
 
 public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logger,
     ChargingStationUnitOfWork unitOfWork,
@@ -33,10 +33,10 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
 
     public string ActionName => "TransactionEvent";
 
-    private decimal CalculateTotalCosts(decimal totalValue, DbChargingStation cs, string unit)
+    private decimal CalculateTotalCosts(float totalValue, DbChargingStation cs, string unit)
     {
         var unitPrice = !string.IsNullOrEmpty(unit) ? cs.Tariffs?.Where(t => t.UnitName == unit).FirstOrDefault()?.UnitPrice ?? 1.0M : 1.0M;
-        var total = totalValue * unitPrice;
+        var total = Convert.ToDecimal(totalValue) * unitPrice;
         return total;
     }
 
@@ -187,7 +187,7 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
                 {
                     var consumption = GetTransactionConsumption(request, transaction);
 
-                    transaction.TotalConsuption = consumption?.Consumption ?? 0.0M;
+                    transaction.TotalConsuption = Convert.ToDecimal(consumption?.Consumption ?? 0.0);
                     transaction.ConsumptionType = (ConsumptionTypeDb?)consumption?.ConsumptionType;
 
                     transaction = await unitOfWork.TransactionSubUnit.RegisterTransaction(transaction, context.IdToken);
@@ -218,7 +218,7 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
 
                         var unitName = await unitOfWork.TransactionSubUnit.GetTransactionUnit(transaction.TransactionId);
 
-                        response.TotalCost = CalculateTotalCosts(consumption?.Consumption ?? 0.0M, chargingStation, unitName ?? "UNKNOWN");
+                        response.TotalCost = CalculateTotalCosts(consumption?.Consumption ?? 0.0f, chargingStation, unitName ?? "UNKNOWN");
 
                         if (request.IdToken?.Type == IdTokenType.Central)
                         {

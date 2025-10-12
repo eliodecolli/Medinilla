@@ -20,7 +20,7 @@
   </ItemGroup>
 
   <Target Name="PreBuild" BeforeTargets="PreBuildEvent">
-    <Exec Command="python compile_protos.py csharp_out" />
+    <Exec Command="python3 compile_protos.py csharp_out" />
   </Target>
 
 </Project>

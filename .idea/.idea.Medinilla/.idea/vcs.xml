@@ -1,0 +1,23 @@
+<?xml version="1.0" encoding="UTF-8"?>
+<project version="4">
+  <component name="VcsDirectoryMappings">
+    <mapping directory="" vcs="Git" />
+    <mapping directory="$USER_HOME$/everest-work-dir/everest-dev-environment" vcs="Git" />
+    <mapping directory="$USER_HOME$/everest-work-dir/everest-dev-environment/everest-workspace/Josev" vcs="Git" />
+    <mapping directory="$USER_HOME$/everest-work-dir/everest-dev-environment/everest-workspace/everest-cmake" vcs="Git" />
+    <mapping directory="$USER_HOME$/everest-work-dir/everest-dev-environment/everest-workspace/everest-core" vcs="Git" />
+    <mapping directory="$USER_HOME$/everest-work-dir/everest-dev-environment/everest-workspace/everest-dev-environment" vcs="Git" />
+    <mapping directory="$USER_HOME$/everest-work-dir/everest-dev-environment/everest-workspace/everest-framework" vcs="Git" />
+    <mapping directory="$USER_HOME$/everest-work-dir/everest-dev-environment/everest-workspace/everest-utils" vcs="Git" />
+    <mapping directory="$USER_HOME$/everest-work-dir/everest-dev-environment/everest-workspace/ext-mbedtls" vcs="Git" />
+    <mapping directory="$USER_HOME$/everest-work-dir/everest-dev-environment/everest-workspace/libcbv2g" vcs="Git" />
+    <mapping directory="$USER_HOME$/everest-work-dir/everest-dev-environment/everest-workspace/libevse-security" vcs="Git" />
+    <mapping directory="$USER_HOME$/everest-work-dir/everest-dev-environment/everest-workspace/libfsm" vcs="Git" />
+    <mapping directory="$USER_HOME$/everest-work-dir/everest-dev-environment/everest-workspace/libiso15118" vcs="Git" />
+    <mapping directory="$USER_HOME$/everest-work-dir/everest-dev-environment/everest-workspace/liblog" vcs="Git" />
+    <mapping directory="$USER_HOME$/everest-work-dir/everest-dev-environment/everest-workspace/libnfc-nci" vcs="Git" />
+    <mapping directory="$USER_HOME$/everest-work-dir/everest-dev-environment/everest-workspace/libocpp" vcs="Git" />
+    <mapping directory="$USER_HOME$/everest-work-dir/everest-dev-environment/everest-workspace/libslac" vcs="Git" />
+    <mapping directory="$USER_HOME$/everest-work-dir/everest-dev-environment/everest-workspace/libtimer" vcs="Git" />
+  </component>
+</project>
