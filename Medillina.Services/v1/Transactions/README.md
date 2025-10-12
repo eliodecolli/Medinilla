@@ -2,7 +2,7 @@
 |----------------|-----------------|---------------:|---------------:|---------------:|---------------:|---------------:|-----------------:|-------------------:|
 | **First-Run** | Build full graph from raw data each loop | 3665 | 3651 | 3777 | 3639 | 3566 | **3659.6** | 1.0× |
 | **Copy** | Duplicate existing graph only | 655 | 647 | 644 | 644 | 639 | **645.8** | - |
-| **Merge-Inline** | Rebuild + merge using raw data | 4094 | 4145 | 4130 | 4130 | 4116 | **4123.0** | ≈0.9× (slightly slower) |
+| **Merge-Inline** | Merge raw meter values inside current graph | 4094 | 4145 | 4130 | 4130 | 4116 | **4123.0** | ≈0.9× (slightly slower) |
 | **Merge-Op** | Merge pre-built graphs (`graph1 << graph2`) | 1808 | 1791 | 1792 | 1784 | 1794 | **1793.8** | ~2.0× faster |
 
 **NOTE**: Inline merging benchmark takes into account the time to also call `Copy()` on the graph.
