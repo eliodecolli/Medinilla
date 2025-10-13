@@ -1,5 +1,8 @@
-# Transactions Graph
-Transaction graphs are tree structures that hold information regarding the ongoing transaction consumption. They store sampled values from meter values, in "Sink" nodes, that are divided by their Context, Measurand, and Measurand Source. The graph below shows the actual structure of a graph, red paths are preferred computations that take priority _if_ they are present.
+# OCPP Charging Transactions
+The underlying representation of an **OCPP transaction** is modeled as a *transaction graph*.  
+Transaction graphs are **tree structures** that capture information about the ongoing transaction’s energy consumption. They store sampled values derived from meter readings in *Sink* nodes, organized by their **Context**, **Measurand**, and **Measurand Source**.  
+
+The diagram below illustrates the structure of such a graph—**red paths** indicate preferred computation routes, which take priority *when present*.
 
 
 <p align="center">
