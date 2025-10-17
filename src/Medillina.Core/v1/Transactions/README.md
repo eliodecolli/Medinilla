@@ -6,7 +6,7 @@ The diagram below illustrates the structure of such a graph—**red paths** indi
 
 
 <p align="center">
-    <img src="/third_party/txgraph.jpg" />
+    <img src="/src/third_party/txgraph.jpg" />
 </p>
 
 Transaction Graphs can be merged, either inline by injecting raw meter values to an existing graph, or via the `<<` operator overload. This allows transactions to be kept up to date, regardless of the scenario. It also makes TxGraphs much easier to work with, because they treat consumption calculation as a basic mathematical model, of simply adding the relevant metrics together, linked by their characteristics.
