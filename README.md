@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="/third_party/medinilla-flowers-1024x683.jpg" width=70% height=70%>
+  <img src="/src/third_party/medinilla-flowers-1024x683.jpg" width=70% height=70%>
 </p>
 
 # Medinilla - An OCPP Compliant Management System
@@ -20,7 +20,7 @@ The most fundamental idea behind the architectural decisions on this project was
 One thing to note is that response to websockets is dispatched on the thread pool directly, since we don't expect it to grow that much (us sending data back to a ws is essentially 'fire-and-forget').
 
 <p align="center">
-  <img src="/third_party/core-arch.jpg" width=70% height=70%>
+  <img src="/src/third_party/core-arch.jpg" width=70% height=70%>
 </p>
 
 ### Roadmap
