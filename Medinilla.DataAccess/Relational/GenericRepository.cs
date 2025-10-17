@@ -13,27 +13,24 @@ namespace Medinilla.DataAccess.Relational
 
         public async Task<bool> DeleteMany(Func<T, bool> predicate)
         {
-            var items = context.Set<T>().Where(predicate);
-            if (!items.Any())
+            return await Task.Run(() =>
             {
-                return await Task.FromResult(false);
-            }
-
-            context.Set<T>().RemoveRange(items);
-
-            return await Task.FromResult(true);
+                var items = context.Set<T>().Where(predicate);
+                context.Set<T>().RemoveRange(items);
+                
+                return true;
+            });
         }
 
         public async Task<bool> DeleteOne(Func<T, bool> predicate)
         {
-            var item = context.Set<T>().First(predicate);
-            if (item is null)
+            return await Task.Run(() =>
             {
-                return await Task.FromResult(false);
-            }
+                var item = context.Set<T>().First(predicate);
+                context.Set<T>().Remove(item);
 
-            context.Set<T>().Remove(item);
-            return await Task.FromResult(true);
+                return true;
+            });
         }
 
         public async Task<IEnumerable<T>> Filter(Func<T, bool> predicate)
