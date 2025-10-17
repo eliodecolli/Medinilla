@@ -1,4 +1,35 @@
-# Transaction Graph - Benchmarks
+# OCPP Charging Transactions
+The underlying representation of an **OCPP transaction** is modeled as a *transaction graph*.  
+Transaction graphs are **tree structures** that capture information about the ongoing transaction’s energy consumption. They store sampled values derived from meter readings in *Sink* nodes, organized by their **Context**, **Measurand**, and **Measurand Source**.  
+
+The diagram below illustrates the structure of such a graph—**red paths** indicate preferred computation routes, which take priority *when present*.
+
+
+<p align="center">
+    <img src="/third_party/txgraph.jpg" />
+</p>
+
+Transaction Graphs can be merged, either inline by injecting raw meter values to an existing graph, or via the `<<` operator overload. This allows transactions to be kept up to date, regardless of the scenario. It also makes TxGraphs much easier to work with, because they treat consumption calculation as a basic mathematical model, of simply adding the relevant metrics together, linked by their characteristics.
+
+If you choose to merge via operator overload, you can merge several graphs all at once:
+```csharp
+var graph1 = ....;
+var graph2 = ....;
+var graph3 = ....;
+var result = graph1 << graph2 << graph3;  // merge (G3 -> G2) -> G1
+
+var finalConsumption = result.Compute();
+```
+
+## Transaction Graphs vs Consumption Graphs
+The distinction between a **TxGraph** and a **ConsumptionGraph** lies in their scope and purpose.  
+A *TxGraph* represents the consumption data for a **specific transaction context**—such as `Transaction.Begin`, `Transaction.Sample`, or `Transaction.End`. Each TxGraph computes a discrete consumption value within that narrow frame.  
+
+A *ConsumptionGraph*, on the other hand, aggregates **all relevant TxGraphs** belonging to a single transaction. It exists to encapsulate the *entire* transaction’s lifecycle and provide a holistic view of its energy consumption.  
+
+You **cannot** obtain the final consumption value of a ConsumptionGraph by merely invoking `Compute()` as you would with a TxGraph. That’s because computing total consumption involves **business logic** that extends beyond the raw graph mechanics—it requires interpreting contextual rules, not just performing arithmetic over nodes.
+
+## Transaction Graph - Benchmarks
 The following benchmarks are ran 900k times, for 5 laps. Finally, the result is averaged.
 
 | **Test Name** | **Description** | **Run 1 (ms)** | **Run 2 (ms)** | **Run 3 (ms)** | **Run 4 (ms)** | **Run 5 (ms)** | **Average (ms)** | **Relative Speed** |
