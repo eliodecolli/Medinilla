@@ -1,6 +1,6 @@
 ﻿using Microsoft.Extensions.Logging;
 
-namespace Medinilla.Services.Actions;
+namespace Medinilla.Core.Actions;
 
 public class OcppActionsFactory : IOcppActionsFactory
 {

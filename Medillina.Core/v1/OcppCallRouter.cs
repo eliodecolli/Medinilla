@@ -1,12 +1,11 @@
 ﻿using Medinilla.Infrastructure;
 using Medinilla.Infrastructure.WAMP;
-using Medinilla.Services.Actions;
-using Medinilla.Services.Interfaces;
-using Microsoft.Extensions.DependencyInjection;
+using Medinilla.Core.Interfaces;
 using Microsoft.Extensions.Logging;
 using System.Text;
+using Medinilla.Core.Actions;
 
-namespace Medinilla.Services.v1;
+namespace Medinilla.Core.v1;
 
 public class OcppCallRouter(ILogger<OcppCallRouter> _logger, IOcppActionsFactory _factory) : IOcppCallRouter
 {

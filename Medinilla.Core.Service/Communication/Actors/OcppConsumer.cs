@@ -1,7 +1,6 @@
 ﻿using Akka.Actor;
 using Medinilla.Core.SharedContracts.ActorPayloads;
-using Medinilla.Infrastructure.WAMP;
-using Medinilla.Services.Interfaces;
+using Medinilla.Core.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 

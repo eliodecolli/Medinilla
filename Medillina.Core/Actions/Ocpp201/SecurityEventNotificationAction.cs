@@ -1,10 +1,9 @@
-using Medinilla.Core.Actions.Ocpp201;
 using Medinilla.DataTypes.Contracts;
 using Medinilla.Infrastructure.WAMP;
 using Microsoft.Extensions.Logging;
 
 
-namespace Medinilla.Services.Actions.Ocpp201;
+namespace Medinilla.Core.Actions.Ocpp201;
 
 public sealed class SecurityEventNotificationAction : IOcppAction
 {

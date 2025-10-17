@@ -32,7 +32,7 @@
   </ItemGroup>
 
   <ItemGroup>
-    <ProjectReference Include="..\Medillina.Services\Medinilla.Core.csproj" />
+    <ProjectReference Include="..\Medillina.Core\Medinilla.Core.csproj" />
     <ProjectReference Include="..\Medinilla.Core.SharedContracts\Medinilla.Core.SharedContracts.csproj" />
     <ProjectReference Include="..\Medinilla.RealTime\Medinilla.RealTime.csproj" />
   </ItemGroup>

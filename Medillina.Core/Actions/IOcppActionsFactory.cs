@@ -1,4 +1,4 @@
-﻿namespace Medinilla.Services.Actions;
+﻿namespace Medinilla.Core.Actions;
 
 public interface IOcppActionsFactory
 {

@@ -1,6 +1,6 @@
 ﻿using Medinilla.Infrastructure.WAMP;
 
-namespace Medinilla.Services.Actions;
+namespace Medinilla.Core.Actions;
 
 public interface IOcppAction
 {

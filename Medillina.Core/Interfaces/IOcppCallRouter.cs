@@ -1,6 +1,6 @@
 ﻿using Medinilla.Infrastructure.WAMP;
 
-namespace Medinilla.Services.Interfaces;
+namespace Medinilla.Core.Interfaces;
 
 public interface IOcppCallRouter
 {

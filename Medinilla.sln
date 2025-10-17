@@ -9,7 +9,7 @@ Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Tests", "Tests", "{86EF603F
 EndProject
 Project("{2150E333-8FDC-42A3-9474-1A3956D46DE8}") = "Internal", "Internal", "{3C2ACFDD-B335-49D1-BC31-A3C891C1C75C}"
 EndProject
-Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Medinilla.Core", "Medillina.Services\Medinilla.Core.csproj", "{31A0B4D1-3F86-4A5D-806A-AF37DDC7F1F1}"
+Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Medinilla.Core", "Medillina.Core\Medinilla.Core.csproj", "{31A0B4D1-3F86-4A5D-806A-AF37DDC7F1F1}"
 EndProject
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Medinilla.Infrastructure", "Medinilla.Infrastructure\Medinilla.Infrastructure.csproj", "{4745F277-85B2-428F-BB89-C43ADD6A06B0}"
 EndProject

@@ -7,7 +7,7 @@ using Medinilla.Core.SharedContracts.ActorPayloads;
 using Medinilla.Core.SharedContracts.Comms;
 using Medinilla.Core.SharedContracts.Comms.Ocpp;
 using Medinilla.RealTime;
-using Medinilla.Services.Interfaces;
+using Medinilla.Core.Interfaces;
 using Microsoft.Extensions.Logging;
 using RabbitMQ.Client;
 using RabbitMQ.Client.Events;

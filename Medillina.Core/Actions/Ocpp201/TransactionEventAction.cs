@@ -6,7 +6,6 @@ using Medinilla.DataTypes.Contracts;
 using Medinilla.DataTypes.Contracts.Common;
 using Medinilla.DataTypes.Core;
 using Medinilla.Infrastructure.WAMP;
-using Medinilla.Services.Actions;
 using Microsoft.Extensions.Logging;
 using DbChargingStation = Medinilla.DataAccess.Relational.Models.ChargingStation;
 using DbTransaction = Medinilla.DataAccess.Relational.Models.TransactionEvent;
