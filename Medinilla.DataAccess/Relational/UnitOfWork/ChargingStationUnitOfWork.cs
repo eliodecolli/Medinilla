@@ -8,9 +8,7 @@ using System.Text.Json;
 
 namespace Medinilla.DataAccess.Relational.UnitOfWork;
 
-public sealed class ChargingStationUnitOfWork(MedinillaOcppDbContext context,
-    IConfiguration config,
-    ILogger<ChargingStationUnitOfWork> _logger) : BaseUnitOfWork(context)
+public sealed class ChargingStationUnitOfWork(MedinillaOcppDbContext context) : BaseUnitOfWork(context)
 {
     private IRepository<ChargingStation> repository = new GenericRepository<ChargingStation>(context);
     private IRepository<Tariff> tariffsRepo = new GenericRepository<Tariff>(context);
@@ -68,7 +66,7 @@ public sealed class ChargingStationUnitOfWork(MedinillaOcppDbContext context,
         }
 
         // try by tx
-        return await _transactionsUnitOfWork.TryGetIdTokenForTransaction(transactionId); ;
+        return await _transactionsUnitOfWork.TryGetIdTokenForTransaction(transactionId);
     }
 
     public async Task ReleaseToken(IdToken idToken)
