@@ -5,8 +5,7 @@
 # Medinilla - An OCPP Compliant Management System
 ![DOTNET CI](https://github.com/eliodecolli/Medinilla/actions/workflows/dotnet.yml/badge.svg)
 
-Medinilla is a charging station management system backend built on top of ASP .NET Core. This project aims to be part of a proprietary system for the time being. This is subject to change tbh.
-The server itself is supposed to be a monolith, I don't expect it to grow that much in terms of complexity to warrant a split into microservices.
+Medinilla is a charging station management system backend built on top of ASP .NET Core. It aims to be a comprehensive, modular platform upon which you can build EV charging solutions.
 
 Currently implemented OCPP messages:
 - Boot Notification
