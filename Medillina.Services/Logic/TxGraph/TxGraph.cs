@@ -68,7 +68,7 @@ public class TxGraph
         }
         else
         {
-            lgraph.Interval <<=  rgraph?.Interval;
+            lgraph.Interval <<= rgraph?.Interval;
         }
 
         return lgraph;
