@@ -27,7 +27,7 @@ Currently detailed, OCPP Basic Implementation (as per docs):
 
 ### Charging Station Bootup
 Use cases to be implemented:
-- ~~B01~~ - **Done as of 26/10/2025** - <span style="color:red;">NOT Tested E2E</span>
+- ~~B01~~ - **Done as of 26/10/2025** - NOT Tested E2E ❌
 - B02
 - ~~B03~~
 - ~~B04~~
