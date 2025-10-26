@@ -22,7 +22,66 @@ One thing to note is that response to websockets is dispatched on the thread poo
   <img src="/src/third_party/core-arch.jpg" width=70% height=70%>
 </p>
 
-### Roadmap
+## OCPP Implementation
+Currently detailed, OCPP Basic Implementation (as per docs):
+
+### Charging Station Bootup
+Use cases to be implemented:
+- B01
+- B02
+- B03
+- B04
+
+### Charging Station Configuration
+Use cases to be implemented:
+- B05
+- B06
+- B07
+
+### Charging Station Reset
+Use cases to be implemented:
+- B11
+- B12
+
+### Authorization Options
+Use cases to be implemented (one of):
+- C01
+- C02
+- C04
+
+### Transaction Mechanism
+Use cases to be implemented:
+- E01 (one of S1-S6)
+- E02
+- E03
+- E05
+- E06 (one of S1-S6)
+- E07
+- E08
+- One of E09, E10, E11, E12, E13
+
+### Availability
+Use cases to be implemented:
+- G01
+- G03
+- G04
+
+### Monitoring Events
+Use cases to be implemented:
+- G05
+- N07
+
+### Transaction related Meter values
+Use cases to be implemented:
+- J02
+
+### Data Transfer
+Use cases to be implemented:
+- P01
+- P02
+
+
+## Roadmap
 Some of the future features in the pipeline for Medinilla are:
 - [✓] **~~Transaction Graphs~~**. These are an optimized way of computing transaction consumption, by generating and keeping track of a graph with sampled values based on measurand, context, etc. - [Link to README](https://github.com/eliodecolli/Medinilla/blob/master/Medillina.Services/v1/Transactions/README.md)
 - **Custom hardware logic plugin**. Despite OCPP being a comprehensive protocol, firmware implementations vary significantly in practice. Medinilla will offer plug-and-play modules for extending or modifying OCPP event handlers, allowing users to either build firmware-specific plugins or reuse existing ones from the community.
