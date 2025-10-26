@@ -30,7 +30,7 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
         public static string Update = nameof(TransactionEventEnum.Updated) ?? "Updated";
     }
 
-    public string ActionName => "TransactionEvent";
+    public string ActionName => OcppActionNames.TransactionEvent;
 
     private decimal CalculateTotalCosts(float totalValue, DbChargingStation cs, string unit)
     {

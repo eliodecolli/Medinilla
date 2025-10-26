@@ -4,11 +4,23 @@ using Medinilla.Core.Interfaces;
 using Microsoft.Extensions.Logging;
 using System.Text;
 using Medinilla.Core.Actions;
+using Medinilla.Core.Interfaces.Services;
+using Medinilla.DataTypes.Core;
 
 namespace Medinilla.Core.v1;
 
-public class OcppCallRouter(ILogger<OcppCallRouter> _logger, IOcppActionsFactory _factory) : IOcppCallRouter
+public class OcppCallRouter(ILogger<OcppCallRouter> _logger, IOcppActionsFactory _factory, IRouterServices services) : IOcppCallRouter
 {
+    private async Task<bool> ValidateRouting(string clientIdentifier, string actionName)
+    {
+        if (actionName == OcppActionNames.BootNotification)
+        {
+            return true;
+        }
+
+        return await services.ValidateChargingStationAvailability(clientIdentifier);
+    }
+    
     public async Task<RpcResult> RouteOcppCall(byte[] buffer, string? clientIdentifier)
     {
         ArgumentNullException.ThrowIfNull(clientIdentifier, nameof(clientIdentifier));
@@ -41,7 +53,16 @@ public class OcppCallRouter(ILogger<OcppCallRouter> _logger, IOcppActionsFactory
                     File.WriteAllBytes("logs/" + ocppCall.Action + "_log_" + DateTime.Now.ToBinary() + "_" + salt + "_" + ".txt", buffer.ToArray());
                 }
 #endif
-
+                if (!await ValidateRouting(clientIdentifier, ocppCall.Action))
+                {
+                    return new RpcResult()
+                    {
+                        Result = null,
+                        Error = OcppCallError.SecurityError(ocppCall.MessageId),
+                        ReturnToCS = true
+                    };
+                }
+                
                 var ocppAction = _factory.GetAction(ocppCall.Action);
                 if (ocppAction is null)
                 {
@@ -94,5 +115,10 @@ public class OcppCallRouter(ILogger<OcppCallRouter> _logger, IOcppActionsFactory
                     Result = null
                 };
         }
+    }
+
+    public async Task DisconnectClient(string clientIdentifier)
+    {
+        await services.DisconnectClient(clientIdentifier);
     }
 }
