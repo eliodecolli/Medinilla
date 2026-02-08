@@ -83,7 +83,7 @@ Use cases to be implemented:
 
 ## Roadmap
 Some of the future features in the pipeline for Medinilla are:
-- [✓] **~~Transaction Graphs~~**. These are an optimized way of computing transaction consumption, by generating and keeping track of a graph with sampled values based on measurand, context, etc. - [Link to README](https://github.com/eliodecolli/Medinilla/blob/master/Medillina.Services/v1/Transactions/README.md)
+- [✓] **~~Transaction Graphs~~**. These are an optimized way of computing transaction consumption, by generating and keeping track of a graph with sampled values based on measurand, context, etc. - [Link to README](https://github.com/eliodecolli/Medinilla/blob/master/src/Medillina.Core/v1/Transactions/README.md)
 - **Custom hardware logic plugin**. Despite OCPP being a comprehensive protocol, firmware implementations vary significantly in practice. Medinilla will offer plug-and-play modules for extending or modifying OCPP event handlers, allowing users to either build firmware-specific plugins or reuse existing ones from the community.
 - **HTTP Hooks**. Users can inject custom logic in the pipeline by wiring their own implementation. We send events to your endpoint. You consume them.
 
