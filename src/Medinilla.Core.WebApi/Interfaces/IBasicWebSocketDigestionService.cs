@@ -7,6 +7,4 @@ namespace Medinilla.WebApi.Interfaces;
 public interface IBasicWebSocketDigestionService
 {
     Task Consume(WebSocket webSocket, string clientIdentifier);
-
-    Task<WebSocketResponse> Send(OcppCallRequest request);
 }
