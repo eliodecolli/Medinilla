@@ -11,7 +11,7 @@ using System.Text;
 
 namespace Medinilla.WebApi.Services;
 
-public class WebSocketDigestionService : IBasicWebSocketDigestionService, IAsyncDisposable
+public class WebSocketDigestionService : IBasicWebSocketDigestionService
 {
     private readonly IConfiguration _config;
     private readonly ILogger<WebSocketDigestionService> _logger;
@@ -111,7 +111,7 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService, IAsync
     {
         byte[]? toSend = null;
 
-        lock(_lock)
+        lock (_lock)
         {
             if (_outboundQueue.TryDequeue(out var next))
             {
@@ -134,7 +134,7 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService, IAsync
     {
         byte[]? toSend = null;
 
-        lock(_lock)
+        lock (_lock)
         {
             if (_inboundQueue.TryDequeue(out var next))
             {
@@ -162,13 +162,8 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService, IAsync
     }
 
 
-    private async Task<byte[]?> AwaitWebSocketResponse()
+    private async Task<byte[]?> WebSocketResponse()
     {
-        if (_webSocket == null || !IsConnectionOpen())
-        {
-            return null;
-        }
-
         var buffer = new byte[5000];
         var segment = new ArraySegment<byte>(buffer);
         var messageBuffer = new List<byte>(); // To store the complete message
@@ -198,6 +193,11 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService, IAsync
         }
         catch (OperationCanceledException)
         {
+            return null;
+        }
+        catch (WebSocketException)
+        {
+            // websocket probably closed up on us unexpectedly
             return null;
         }
     }
@@ -255,7 +255,7 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService, IAsync
                 var shouldDrainInbound = false;
                 var shouldForward = false;
 
-                lock(_lock)
+                lock (_lock)
                 {
                     if (_processingInboundId == messageId)
                     {
@@ -375,33 +375,26 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService, IAsync
 
         await _commsMessenger.RegisterHandler(_inboundQueueName, RunCommsChannel);
 
-        try
+        while (!_cts.Token.IsCancellationRequested && IsConnectionOpen())
         {
-            while (!_cts.Token.IsCancellationRequested && IsConnectionOpen())
+            var received = await WebSocketResponse();
+            if (received != null)
             {
-                var received = await AwaitWebSocketResponse();
-                if (received != null)
-                {
-                    _logger.LogInformation(
-                        "Received {ByteCount} bytes from {ClientId}",
-                        received.Length, clientIdentifier);
+                _logger.LogInformation(
+                    "Received {ByteCount} bytes from {ClientId}",
+                    received.Length, clientIdentifier);
 
-                    await ProcessMessageInbound(received);
-                }
-
-                if (_webSocket.CloseStatus.HasValue)
-                {
-                    _logger.LogWarning(
-                        "WS connection for {ClientId} closed. {Status}:{Description}",
-                        clientIdentifier, _webSocket.CloseStatus.Value,
-                        _webSocket.CloseStatusDescription);
-                    break;
-                }
+                await ProcessMessageInbound(received);
             }
-        }
-        finally
-        {
-            await DisposeAsync();
+
+            if (_webSocket.CloseStatus.HasValue)
+            {
+                _logger.LogWarning(
+                    "WS connection for {ClientId} closed. {Status}:{Description}",
+                    clientIdentifier, _webSocket.CloseStatus.Value,
+                    _webSocket.CloseStatusDescription);
+                break;
+            }
         }
     }
 

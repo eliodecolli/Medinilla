@@ -280,6 +280,29 @@ public class WebSocketDigestionServiceShould
             CancellationToken.None), Times.AtLeastOnce);
     }
 
+    [Fact]
+    public async Task HandleWebSocketExceptionDuringReceive()
+    {
+        var wsMock = new Mock<WebSocket>();
+        wsMock.Setup(ws => ws.State).Returns(WebSocketState.Open);
+        wsMock.Setup(ws => ws.ReceiveAsync(
+                It.IsAny<ArraySegment<byte>>(),
+                It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new WebSocketException("Connection lost"));
+        wsMock.Setup(ws => ws.CloseAsync(
+                It.IsAny<WebSocketCloseStatus>(),
+                It.IsAny<string?>(),
+                It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        var service = CreateService();
+        await service.Consume(wsMock.Object, TEST_CLIENT_ID);
+
+        // Service should handle the exception and exit gracefully
+        _messengerMock.Verify(m => m.SendMessage(
+            It.IsAny<string>(), It.IsAny<byte[]>()), Times.Never);
+    }
+
     // ================================================================
     // Message validation
     // ================================================================

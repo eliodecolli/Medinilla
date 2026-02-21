@@ -50,6 +50,7 @@ public class WSController : ControllerBase
         finally
         {
             _wsDigestionServiceCollection.Remove(clientIdentifier);
+            await webSocketDigestionService.DisposeAsync();
         }
     }
 
