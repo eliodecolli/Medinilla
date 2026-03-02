@@ -1,18 +1,17 @@
-﻿using Medinilla.Core.Service.Communication;
+﻿using Akka.DependencyInjection;
+using Akka.Hosting;
+using Medinilla.Core;
+using Medinilla.Core.Service.Communication;
+using Medinilla.Core.Service.Communication.Actors;
 using Medinilla.Core.Service.Interfaces;
 using Medinilla.Core.Service.Types;
 using Medinilla.DataAccess;
 using Medinilla.Infrastructure;
 using Medinilla.RealTime;
-using Medinilla.Core;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
-
-using Akka.Hosting;
-using Medinilla.Core.Service.Communication.Actors;
-using Akka.DependencyInjection;
 
 var hostApplicationBuilder = Host.CreateApplicationBuilder(args);
 
@@ -25,10 +24,18 @@ var config = builder.Build();
 hostApplicationBuilder.Services.AddSingleton<IConfiguration>(config);
 hostApplicationBuilder.Configuration.AddConfiguration(config);
 
-hostApplicationBuilder.Services.AddLogging();
-hostApplicationBuilder.Logging.ClearProviders();
-hostApplicationBuilder.Logging.AddSimpleConsole();
-hostApplicationBuilder.Logging.SetMinimumLevel(LogLevel.Trace);
+hostApplicationBuilder.Logging.AddSimpleConsole(options =>
+{
+    options.SingleLine = true;
+    options.IncludeScopes = false;
+    options.TimestampFormat = "HH:mm:ss ";
+});
+
+// Filter noisy namespaces
+hostApplicationBuilder.Logging.SetMinimumLevel(LogLevel.Information);
+hostApplicationBuilder.Logging.AddFilter("Microsoft", LogLevel.Warning);
+hostApplicationBuilder.Logging.AddFilter("Microsoft.Hosting.Lifetime", LogLevel.Information);
+
 
 hostApplicationBuilder.Services.AddMedinillaInfrastructure();
 hostApplicationBuilder.Services.AddMedinillaDataAccess();

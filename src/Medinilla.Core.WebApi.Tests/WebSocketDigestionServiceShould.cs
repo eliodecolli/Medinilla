@@ -185,7 +185,7 @@ public class WebSocketDigestionServiceShould
     [Fact]
     public async Task ThrowOnNullWebSocket()
     {
-        var service = CreateService();
+        await using var service = CreateService();
         await Assert.ThrowsAsync<ArgumentNullException>(
             () => service.Consume(null!, TEST_CLIENT_ID));
     }
@@ -194,7 +194,7 @@ public class WebSocketDigestionServiceShould
     public async Task ThrowOnNullClientIdentifier()
     {
         var wsMock = new Mock<WebSocket>();
-        var service = CreateService();
+        await using var service = CreateService();
         await Assert.ThrowsAsync<ArgumentNullException>(
             () => service.Consume(wsMock.Object, null!));
     }
@@ -217,7 +217,7 @@ public class WebSocketDigestionServiceShould
             .Returns((IRealTimeMessenger?)null);
 
         var wsMock = new Mock<WebSocket>();
-        var service = CreateService();
+        await using var service = CreateService();
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => service.Consume(wsMock.Object, TEST_CLIENT_ID));
     }
@@ -227,7 +227,7 @@ public class WebSocketDigestionServiceShould
     {
         _commsSectionMock.Setup(s => s["ResponseQueue"]).Returns((string?)null);
         var wsMock = new Mock<WebSocket>();
-        var service = CreateService();
+        await using var service = CreateService();
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => service.Consume(wsMock.Object, TEST_CLIENT_ID));
     }
@@ -237,7 +237,7 @@ public class WebSocketDigestionServiceShould
     {
         _commsSectionMock.Setup(s => s["RequestQueue"]).Returns((string?)null);
         var wsMock = new Mock<WebSocket>();
-        var service = CreateService();
+        await using var service = CreateService();
         await Assert.ThrowsAsync<InvalidOperationException>(
             () => service.Consume(wsMock.Object, TEST_CLIENT_ID));
     }
@@ -250,7 +250,7 @@ public class WebSocketDigestionServiceShould
     public async Task RegisterChannelsOnConsume()
     {
         var wsMock = CreateClosingWebSocketMock();
-        var service = CreateService();
+        await using var service = CreateService();
         await service.Consume(wsMock.Object, TEST_CLIENT_ID);
 
         _messengerMock.Verify(m => m.RegisterChannel(TEST_REQUEST_QUEUE), Times.Once);
@@ -271,8 +271,10 @@ public class WebSocketDigestionServiceShould
     public async Task CloseWebSocketOnDispose()
     {
         var wsMock = CreateClosingWebSocketMock();
-        var service = CreateService();
+        await using var service = CreateService();
         await service.Consume(wsMock.Object, TEST_CLIENT_ID);
+
+        await service.DisposeAsync();
 
         wsMock.Verify(ws => ws.CloseAsync(
             WebSocketCloseStatus.NormalClosure,
@@ -295,7 +297,7 @@ public class WebSocketDigestionServiceShould
                 It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
-        var service = CreateService();
+        await using var service = CreateService();
         await service.Consume(wsMock.Object, TEST_CLIENT_ID);
 
         // Service should handle the exception and exit gracefully
@@ -339,7 +341,7 @@ public class WebSocketDigestionServiceShould
                 It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
 
-        var service = CreateService();
+        await using var service = CreateService();
         await service.Consume(wsMock.Object, TEST_CLIENT_ID);
 
         _messengerMock.Verify(m => m.SendMessage(
@@ -391,7 +393,7 @@ public class WebSocketDigestionServiceShould
 
         var sentToWs = WireWebSocketSendCapture(wsMock);
 
-        var service = CreateService();
+        await using var service = CreateService();
         await service.Consume(wsMock.Object, TEST_CLIENT_ID);
 
         // Charger's request was forwarded to core
@@ -440,7 +442,7 @@ public class WebSocketDigestionServiceShould
 
         var sentToWs = WireWebSocketSendCapture(wsMock);
 
-        var service = CreateService();
+        await using var service = CreateService();
         await service.Consume(wsMock.Object, TEST_CLIENT_ID);
 
         // CSMS request was forwarded to charger
@@ -503,7 +505,7 @@ public class WebSocketDigestionServiceShould
 
         var sentToWs = WireWebSocketSendCapture(wsMock);
 
-        var service = CreateService();
+        await using var service = CreateService();
         await service.Consume(wsMock.Object, TEST_CLIENT_ID);
 
         // req-1 forwarded immediately, req-2 drained after CSMS responds = 2 sends
@@ -555,7 +557,7 @@ public class WebSocketDigestionServiceShould
 
         var sentToWs = WireWebSocketSendCapture(wsMock);
 
-        var service = CreateService();
+        await using var service = CreateService();
         await service.Consume(wsMock.Object, TEST_CLIENT_ID);
 
         // Both CSMS requests reached charger: out-1 directly, out-2 after drain
@@ -639,7 +641,7 @@ public class WebSocketDigestionServiceShould
 
         var sentToWs = WireWebSocketSendCapture(wsMock);
 
-        var service = CreateService();
+        await using var service = CreateService();
         await service.Consume(wsMock.Object, TEST_CLIENT_ID);
 
         // Two messages sent to charger: CSMS request (out-1), then CSMS response (req-1)
@@ -691,7 +693,7 @@ public class WebSocketDigestionServiceShould
 
         var sentToWs = WireWebSocketSendCapture(wsMock);
 
-        var service = CreateService();
+        await using var service = CreateService();
         await service.Consume(wsMock.Object, TEST_CLIENT_ID);
 
         // Nothing should have been sent back to charger — wrong client was ignored

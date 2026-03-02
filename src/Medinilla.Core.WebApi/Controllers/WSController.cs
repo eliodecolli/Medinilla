@@ -52,6 +52,8 @@ public class WSController : ControllerBase
             _wsDigestionServiceCollection.Remove(clientIdentifier);
             await webSocketDigestionService.DisposeAsync();
         }
+
+        _logger.LogInformation("Dropped connection from {ClientId}", clientIdentifier);
     }
 
     private async Task WriteHttpResponse(string response, int code)

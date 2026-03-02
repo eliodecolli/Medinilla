@@ -1,11 +1,9 @@
-﻿using PubnubApi.EventEngine.Core;
-using RabbitMQ.Client;
+﻿using RabbitMQ.Client;
 using RabbitMQ.Client.Events;
-using System;
 
 namespace Medinilla.RealTime.Rabbit;
 
-public sealed class RabbitMQMessenger : IRealTimeMessenger
+public sealed class RabbitMQMessenger
 {
     private IConnection _connection;
     private ConnectionFactory _factory;
@@ -14,15 +12,28 @@ public sealed class RabbitMQMessenger : IRealTimeMessenger
     // to do this, we need to offload channel storage and retrieval to a separate class,
     // let's be fancy and call it ChannelPool.
     private Dictionary<string, IChannel> _channels;
+    private Dictionary<string, string> _routingKeys;
 
     public RabbitMQMessenger(string connectionString)
     {
         _channels = new Dictionary<string, IChannel>();
+        _routingKeys = new Dictionary<string, string>();
 
         _factory = new ConnectionFactory();
         _factory.Uri = new Uri(connectionString);
 
         _connection = _factory.CreateConnectionAsync().Result;
+    }
+
+    private void SetChannel(string name, IChannel channel, string routingKey)
+    {
+        _channels.Add(name, channel);
+        _routingKeys.Add(name, routingKey);
+    }
+
+    private string GetRoutingKey(string channelName)
+    {
+        return _routingKeys[channelName];
     }
 
     public object GetChannel(string channelName)
@@ -42,12 +53,18 @@ public sealed class RabbitMQMessenger : IRealTimeMessenger
 
     public string GetCommunicationProviderName() => "RabbitMQ";
 
-    public async Task RegisterChannel(string channelName)
+    public string QueueName => "medinilla_core_queue";
+
+    public async Task RegisterChannel(string channelName, string clientIdentifier)
     {
         var channel = await _connection.CreateChannelAsync(new CreateChannelOptions(true, false)).ConfigureAwait(false);
-        await channel.QueueDeclareAsync(channelName, exclusive: false, durable: true, autoDelete: false);
 
-        _channels.Add(channelName, channel);
+        await channel.ExchangeDeclareAsync(channelName, ExchangeType.Topic, true, false);
+
+        await channel.QueueDeclareAsync(QueueName, exclusive: false, durable: true, autoDelete: false);
+        await channel.QueueBindAsync(QueueName, channelName, clientIdentifier);
+
+        SetChannel(channelName, channel, clientIdentifier);
     }
 
     public async Task RegisterHandler(string channelName, Func<object, Task> handler)
@@ -60,7 +77,7 @@ public sealed class RabbitMQMessenger : IRealTimeMessenger
                 { "model", model },
                 { "ea", ea }
             });
-            await channel.BasicConsumeAsync(channelName, true, consumer);
+            await channel.BasicConsumeAsync(QueueName, true, consumer);
         }
     }
 
@@ -68,7 +85,16 @@ public sealed class RabbitMQMessenger : IRealTimeMessenger
     {
         if (_channels.TryGetValue(channelName, out IChannel channel))
         {
-            await channel.BasicPublishAsync("", channelName, message).ConfigureAwait(false);
+            var routingKey = GetRoutingKey(channelName);
+            await channel.BasicPublishAsync(channelName, routingKey, message).ConfigureAwait(false);
+        }
+    }
+
+    public async Task SendMessage(string channelName, string routingKey, byte[] message)
+    {
+        if (_channels.TryGetValue(channelName, out IChannel channel))
+        {
+            await channel.BasicPublishAsync(channelName, routingKey, message).ConfigureAwait(false);
         }
     }
 }
