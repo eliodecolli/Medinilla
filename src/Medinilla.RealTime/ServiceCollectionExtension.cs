@@ -42,6 +42,17 @@ public static class ServiceCollectionExtensions
             return new RedisMessenger(mux);
         });
 
+        var redisUri = config.GetSection("Redis")["Uri"] ?? "";
+
+        // Outbound (RPUSH): backed by the shared singleton multiplexer — safe for non-blocking commands.
+        services.AddKeyedSingleton<IRedisQueue>("outbound", (sp, _) =>
+            new RedisQueue(sp.GetRequiredService<ConnectionMultiplexer>()));
+
+        // Inbound (BRPOP): each consumer gets its own dedicated connection so blocking
+        // BRPOP never starves RPUSH commands on the shared connection.
+        services.AddKeyedTransient<IRedisQueue>("inbound", (_, _) =>
+            new RedisQueue(redisUri));
+
         return services;
     }
 }

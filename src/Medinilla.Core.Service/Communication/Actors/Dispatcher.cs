@@ -1,17 +1,17 @@
-﻿using Akka.Actor;
+using Akka.Actor;
 using Google.Protobuf;
 using Medinilla.Core.SharedContracts.ActorPayloads;
 using Medinilla.Core.SharedContracts.Comms;
 using Medinilla.Core.SharedContracts.Comms.Ocpp;
-using Medinilla.RealTime;
 using Medinilla.RealTime.Redis;
+using Microsoft.Extensions.DependencyInjection;
 
 namespace Medinilla.Core.Service.Communication.Actors;
 
 public class Dispatcher : ReceiveActor
 {
-    private IRealTimeMessenger _comms;
-    private string _responseChannelPrefix;
+    private readonly IRedisQueue _queue;
+    private readonly string _responseChannelPrefix;
 
     private async Task DispatchResponse(WampResultMessage result)
     {
@@ -30,13 +30,13 @@ public class Dispatcher : ReceiveActor
         };
 
         var responseChannel = RedisUtils.BuildChannelName(_responseChannelPrefix, result.ClientIdentifier);
-        await _comms.SendMessage(responseChannel, response.ToByteArray());
+        await _queue.SendMessage(response.ToByteArray(), responseChannel);
     }
 
-    public Dispatcher(IRealTimeMessenger comms, string responseChannelPrefix)
+    public Dispatcher(IServiceProvider serviceProvider, string responseChannelPrefix)
     {
-        _comms = comms;
         _responseChannelPrefix = responseChannelPrefix;
+        _queue = serviceProvider.GetRequiredKeyedService<IRedisQueue>("outbound");
 
         ReceiveAsync<WampResultMessage>(DispatchResponse);
     }

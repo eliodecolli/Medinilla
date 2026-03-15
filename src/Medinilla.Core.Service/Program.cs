@@ -21,20 +21,18 @@ using var stream = typeof(Program).Assembly.GetManifestResourceStream("Medinilla
 builder.AddJsonStream(stream);
 var config = builder.Build();
 
-hostApplicationBuilder.Services.AddSingleton<IConfiguration>(config);
 hostApplicationBuilder.Configuration.AddConfiguration(config);
 
 hostApplicationBuilder.Logging.AddSimpleConsole(options =>
 {
     options.SingleLine = true;
     options.IncludeScopes = false;
-    options.TimestampFormat = "HH:mm:ss ";
+    options.TimestampFormat = "[HH:mm:ss]: ";
 });
 
 // Filter noisy namespaces
-hostApplicationBuilder.Logging.SetMinimumLevel(LogLevel.Information);
+hostApplicationBuilder.Logging.SetMinimumLevel(LogLevel.Debug);
 hostApplicationBuilder.Logging.AddFilter("Microsoft", LogLevel.Warning);
-hostApplicationBuilder.Logging.AddFilter("Microsoft.Hosting.Lifetime", LogLevel.Information);
 
 
 hostApplicationBuilder.Services.AddMedinillaInfrastructure();
@@ -54,7 +52,11 @@ hostApplicationBuilder.Services.AddAkka("medinilla-core-akka", builder =>
 
 using var host = hostApplicationBuilder.Build();
 
+// Start all hosted services first (this initialises the Akka actor system
+// and registers the Coordinator before any messages are consumed).
+await host.StartAsync();
+
 var interfaceComms = host.Services.GetRequiredService<IInterfaceCommunication>();
 await interfaceComms.Run(CommunicationSettings.FromSettingsFile("settings.json"));
 
-await host.RunAsync();
+await host.WaitForShutdownAsync();

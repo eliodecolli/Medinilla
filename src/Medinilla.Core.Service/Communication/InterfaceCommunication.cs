@@ -7,39 +7,42 @@ using Medinilla.Core.Service.Types;
 using Medinilla.Core.SharedContracts.ActorPayloads;
 using Medinilla.Core.SharedContracts.Comms;
 using Medinilla.Core.SharedContracts.Comms.Ocpp;
-using Medinilla.RealTime;
+using Medinilla.RealTime.Redis;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
-using RabbitMQ.Client;
 
 namespace Medinilla.Core.Service.Communication;
 
 internal class CoreInterfaceCommunication : IInterfaceCommunication
 {
-    private CommunicationSettings _settings;
     private ILogger<CoreInterfaceCommunication> _logger;
 
     private IRequiredActor<Coordinator> _coordinator;
     private IActorRef _dispatcher;
 
     private readonly ActorSystem _system;
+    private readonly IRedisQueue _queue;
 
-    private IChannel _responseChannel;
+    private readonly IServiceProvider _serviceProvider;
 
-    private IRealTimeMessenger _comms;
-
-    public CoreInterfaceCommunication(ICommunicationProvider provider, ILogger<CoreInterfaceCommunication> logger, IOcppCallRouter router, IRequiredActor<Coordinator> coordinator, ActorSystem system)
+    public CoreInterfaceCommunication(IServiceProvider serviceProvider, [FromKeyedServices("inbound")] IRedisQueue redisQueue, ILogger<CoreInterfaceCommunication> logger, IOcppCallRouter router, IRequiredActor<Coordinator> coordinator, ActorSystem system)
     {
         _logger = logger;
-
         _coordinator = coordinator;
         _system = system;
-
-        _comms = provider.GetMessenger("Redis") ?? throw new Exception("No Redis messenger found");  // TODO: Use custom exceptions
+        _queue = redisQueue;
+        _serviceProvider = serviceProvider;
     }
 
-    private Task RunEvent(object state)
+    private async Task RunEvent(string channelName)
     {
-        var comms = Comms.Parser.ParseFrom((byte[])state);
+        var result = await _queue.WaitForMessage(channelName);
+        if (result is null)
+        {
+            return;
+        }
+
+        var comms = Comms.Parser.ParseFrom(result);
 
         switch (comms.MessageType)
         {
@@ -58,16 +61,14 @@ internal class CoreInterfaceCommunication : IInterfaceCommunication
                 break;
         }
 
-        return Task.CompletedTask;
+        Task.Run(() => RunEvent(channelName));
     }
 
     public async Task Run(CommunicationSettings settings)
     {
-        await _comms.RegisterChannel(settings.RequestQueue);
-        await _comms.RegisterHandler(settings.RequestQueue, RunEvent);
+        _dispatcher = _system.ActorOf(Props.Create<Dispatcher>(_serviceProvider, settings.ResponseQueue), "ocpp-dispatcher");
+        Task.Run(() => RunEvent(settings.RequestQueue));
 
-        _dispatcher = _system.ActorOf(Props.Create<Dispatcher>(_comms, settings.ResponseQueue), "ocpp-dispatcher");
-
-        _logger.LogDebug("Started core service...");
+        _logger.LogInformation("Started core service...");
     }
 }
