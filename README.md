@@ -5,7 +5,7 @@
 # Medinilla - An OCPP Compliant Management System
 ![DOTNET CI](https://github.com/eliodecolli/Medinilla/actions/workflows/dotnet.yml/badge.svg)
 
-Medinilla is a charging station management system backend built on top of ASP .NET Core. It aims to be a comprehensive, modular platform upon which you can build EV charging solutions.
+Medinilla is a CSMS backend built on top of ASP .NET Core. It aims to be a comprehensive, modular platform upon which you can build EV charging solutions.
 
 Currently implemented OCPP messages:
 - Boot Notification
@@ -16,69 +16,70 @@ Currently implemented OCPP messages:
 
 ## Medinilla - Architecture
 The most fundamental idea behind the architectural decisions on this project was scalability, and fault tolerance. The core logic of Medinilla runs in Akka Actors, which are assigned per-client connection.
-One thing to note is that response to websockets is dispatched on the thread pool directly, since we don't expect it to grow that much (us sending data back to a ws is essentially 'fire-and-forget').
 
 <p align="center">
   <img src="/src/third_party/core-arch.jpg" width=70% height=70%>
 </p>
 
 ## OCPP Implementation
-Currently detailed, OCPP Basic Implementation (as per docs):
-
-### Charging Station Bootup
-Use cases to be implemented:
-- ~~B01~~ - **Done as of 26/10/2025** - NOT Tested E2E ❌
-- B02
-- ~~B03~~
-- ~~B04~~
-
-### Charging Station Configuration
-Use cases to be implemented:
-- B05
-- B06
-- B07
-
-### Charging Station Reset
-Use cases to be implemented:
-- B11
-- B12
-
-### Authorization Options
-Use cases to be implemented (one of):
-- C01
-- C02
-- C04
-
-### Transaction Mechanism
-Use cases to be implemented:
-- E01 (one of S1-S6)
-- E02
-- E03
-- E05
-- E06 (one of S1-S6)
-- E07
-- E08
-- One of E09, E10, E11, E12, E13
-
-### Availability
-Use cases to be implemented:
-- G01
-- G03
-- G04
-
-### Monitoring Events
-Use cases to be implemented:
-- G05
-- N07
-
-### Transaction related Meter values
-Use cases to be implemented:
-- J02
-
-### Data Transfer
-Use cases to be implemented:
-- P01
-- P02
+<details>
+  <summary>Currently detailed, OCPP Basic Implementation (as per docs)</summary>
+  
+  ### Charging Station Bootup
+  Use cases to be implemented:
+  - ~~B01~~ - **Done as of 26/10/2025** - NOT Tested E2E ❌
+  - B02
+  - ~~B03~~
+  - ~~B04~~
+  
+  ### Charging Station Configuration
+  Use cases to be implemented:
+  - B05
+  - B06
+  - B07
+  
+  ### Charging Station Reset
+  Use cases to be implemented:
+  - B11
+  - B12
+  
+  ### Authorization Options
+  Use cases to be implemented (one of):
+  - C01
+  - C02
+  - C04
+  
+  ### Transaction Mechanism
+  Use cases to be implemented:
+  - E01 (one of S1-S6)
+  - E02
+  - E03
+  - E05
+  - E06 (one of S1-S6)
+  - E07
+  - E08
+  - One of E09, E10, E11, E12, E13
+  
+  ### Availability
+  Use cases to be implemented:
+  - G01
+  - G03
+  - G04
+  
+  ### Monitoring Events
+  Use cases to be implemented:
+  - G05
+  - N07
+  
+  ### Transaction related Meter values
+  Use cases to be implemented:
+  - J02
+  
+  ### Data Transfer
+  Use cases to be implemented:
+  - P01
+  - P02
+</details>
 
 
 ## Roadmap
