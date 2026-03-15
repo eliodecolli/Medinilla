@@ -1,9 +1,8 @@
 {
-  "RabbitUri": "amqp://guest:guest@localhost:5672/",
-  "RequestQueue": "medinilla.ws.rabbit.request",
-  "ResponseQueue": "medinilla.ws.rabbit.response",
+  "RequestQueue": "medinilla.core.request",
+  "ResponseQueue": "medinilla.core.response",
 
   "ConnectionStrings": {
-    "MedinillaCore": "Server=127.0.0.1;Port=5432;Database=MedinillaCore;User Id=postgres;Password=admin;"
+    "MedinillaCore": "Server=127.0.0.1;Port=5432;Database=MedinillaCore;User Id=postgres;Password=postgres;"
   }
 }

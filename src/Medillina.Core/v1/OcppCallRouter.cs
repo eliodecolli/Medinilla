@@ -1,11 +1,11 @@
-﻿using Medinilla.Infrastructure;
-using Medinilla.Infrastructure.WAMP;
+﻿using Medinilla.Core.Actions;
 using Medinilla.Core.Interfaces;
-using Microsoft.Extensions.Logging;
-using System.Text;
-using Medinilla.Core.Actions;
 using Medinilla.Core.Interfaces.Services;
 using Medinilla.DataTypes.Core;
+using Medinilla.Infrastructure;
+using Medinilla.Infrastructure.WAMP;
+using Microsoft.Extensions.Logging;
+using System.Text;
 
 namespace Medinilla.Core.v1;
 
@@ -20,7 +20,7 @@ public class OcppCallRouter(ILogger<OcppCallRouter> _logger, IOcppActionsFactory
 
         return await services.ValidateChargingStationAvailability(clientIdentifier);
     }
-    
+
     public async Task<RpcResult> RouteOcppCall(byte[] buffer, string? clientIdentifier)
     {
         ArgumentNullException.ThrowIfNull(clientIdentifier, nameof(clientIdentifier));
@@ -62,11 +62,11 @@ public class OcppCallRouter(ILogger<OcppCallRouter> _logger, IOcppActionsFactory
                         ReturnToCS = true
                     };
                 }
-                
+
                 var ocppAction = _factory.GetAction(ocppCall.Action);
                 if (ocppAction is null)
                 {
-                    _logger.LogError($"Invalid action '{ocppCall.Action}'");
+                    _logger.LogError($"Invalid action '{ocppCall.Action}' - Not implemented.");
                     return new RpcResult()
                     {
                         Error = ocppCall.CreateErrorResult<object>(OcppCallError.ErrorCodes.NotImplemented, $"Action {ocppCall.Action} is not implemented on our end."),

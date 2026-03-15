@@ -1,7 +1,7 @@
 ﻿
 Microsoft Visual Studio Solution File, Format Version 12.00
-# Visual Studio Version 17
-VisualStudioVersion = 17.8.34309.116
+# Visual Studio Version 18
+VisualStudioVersion = 18.2.11415.280 d18.0
 MinimumVisualStudioVersion = 10.0.40219.1
 Project("{9A19103F-16F7-4668-BE54-9A1E7A4F7556}") = "Medinilla.Core.WebApi", "Medinilla.Core.WebApi\Medinilla.Core.WebApi.csproj", "{212C79D7-BD83-4B55-8EDE-B5CC218A687E}"
 EndProject
@@ -28,6 +28,8 @@ EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Medinilla.Core.gRPC", "Medinilla.Core.gRPC\Medinilla.Core.gRPC.csproj", "{9F7E44F2-E002-4863-98DA-9900E075C870}"
 EndProject
 Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Medinilla.Core.Tests", "Medinilla.Core.Tests\Medinilla.Core.Tests.csproj", "{867AF665-9CD5-4802-A8E8-8C9F36CD9262}"
+EndProject
+Project("{FAE04EC0-301F-11D3-BF4B-00C04F79EFBC}") = "Medinilla.Core.WebApi.Tests", "Medinilla.Core.WebApi.Tests\Medinilla.Core.WebApi.Tests.csproj", "{5C1C648D-E5AE-4F24-99B1-5663FFCB33AF}"
 EndProject
 Global
 	GlobalSection(SolutionConfigurationPlatforms) = preSolution
@@ -79,6 +81,10 @@ Global
 		{867AF665-9CD5-4802-A8E8-8C9F36CD9262}.Debug|Any CPU.Build.0 = Debug|Any CPU
 		{867AF665-9CD5-4802-A8E8-8C9F36CD9262}.Release|Any CPU.ActiveCfg = Release|Any CPU
 		{867AF665-9CD5-4802-A8E8-8C9F36CD9262}.Release|Any CPU.Build.0 = Release|Any CPU
+		{5C1C648D-E5AE-4F24-99B1-5663FFCB33AF}.Debug|Any CPU.ActiveCfg = Debug|Any CPU
+		{5C1C648D-E5AE-4F24-99B1-5663FFCB33AF}.Debug|Any CPU.Build.0 = Debug|Any CPU
+		{5C1C648D-E5AE-4F24-99B1-5663FFCB33AF}.Release|Any CPU.ActiveCfg = Release|Any CPU
+		{5C1C648D-E5AE-4F24-99B1-5663FFCB33AF}.Release|Any CPU.Build.0 = Release|Any CPU
 	EndGlobalSection
 	GlobalSection(SolutionProperties) = preSolution
 		HideSolutionNode = FALSE
@@ -95,6 +101,7 @@ Global
 		{F69D79BD-125C-476F-BC4E-9DE5A6BEA29F} = {3C2ACFDD-B335-49D1-BC31-A3C891C1C75C}
 		{9F7E44F2-E002-4863-98DA-9900E075C870} = {3C2ACFDD-B335-49D1-BC31-A3C891C1C75C}
 		{867AF665-9CD5-4802-A8E8-8C9F36CD9262} = {86EF603F-F303-4A59-95F4-0873CDD601C0}
+		{5C1C648D-E5AE-4F24-99B1-5663FFCB33AF} = {86EF603F-F303-4A59-95F4-0873CDD601C0}
 	EndGlobalSection
 	GlobalSection(ExtensibilityGlobals) = postSolution
 		SolutionGuid = {AEBA9E02-4DA6-4520-899B-B35AB90AA2B5}

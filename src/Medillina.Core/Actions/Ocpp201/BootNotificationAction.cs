@@ -1,4 +1,4 @@
-﻿using Medinilla.Core.Interfaces.Services;
+using Medinilla.Core.Interfaces.Services;
 using Medinilla.DataTypes.Contracts;
 using Medinilla.DataTypes.Contracts.Common;
 using Medinilla.DataTypes.Core;
@@ -27,6 +27,7 @@ public sealed class BootNotificationAction(IChargingStationBootingService servic
         }
         catch (Exception ex)
         {
+            _logger.LogError($"[{clientIdentifier}]: Error while processing BootNotification request: {ex}");
             return new RpcResult()
             {
                 Result = call.CreateResult(new BootNotificationResponse(1440, RegistrationStatusEnum.Rejected, new StatusInfo()

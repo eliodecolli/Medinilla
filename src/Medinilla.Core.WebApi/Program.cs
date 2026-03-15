@@ -22,8 +22,19 @@ builder.Services.AddControllers(options => options.InputFormatters.Add(new Plain
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
-builder.Logging.ClearProviders();
-builder.Logging.AddSimpleConsole();
+builder.Logging.AddSimpleConsole(options =>
+{
+    options.SingleLine = true;
+    options.IncludeScopes = false;
+    options.TimestampFormat = "HH:mm:ss ";
+});
+
+// Filter noisy namespaces
+builder.Logging.SetMinimumLevel(LogLevel.Debug);
+builder.Logging.AddFilter("Microsoft", LogLevel.Warning);
+builder.Logging.AddFilter("Microsoft.AspNetCore", LogLevel.Warning);
+builder.Logging.AddFilter("Microsoft.Hosting.Lifetime", LogLevel.Information);
+
 
 builder.Services.AddMedinillaInfrastructure();
 builder.Services.AddRealTimeServices();
