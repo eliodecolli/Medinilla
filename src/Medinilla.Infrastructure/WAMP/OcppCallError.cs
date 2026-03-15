@@ -72,6 +72,8 @@ public sealed class OcppCallError : BaseOcppMessage
     public static OcppCallError InvalidMessageIdError = new OcppCallError("-1", ErrorCodes.RpcFrameworkError, "Couldn't parse MessageId");
 
     public static OcppCallError InternalError(string messageId) => new OcppCallError(messageId, ErrorCodes.InternalError, "Internal RPC error.", "{}");
+    
+    public static OcppCallError SecurityError(string messageId) => new OcppCallError(messageId, ErrorCodes.SecurityError, "Security error: Cannot process message without booting the charging station first.", "{}");
 
     public OcppCallError(string messageId, string errorCode, string errorDescription, string? errorDetails = null)
     {

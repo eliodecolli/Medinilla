@@ -35,4 +35,14 @@ public sealed class OcppConsumer : ReceiveActor
 
         ReceiveAsync<OcppConsumerMessage>(ConsumeOcppCall);  // remember: this message is being forwarded to us
     }
+
+
+    protected override void PostStop()
+    {
+        using var scope = _serviceProvider.CreateScope();
+        var router = scope.ServiceProvider.GetRequiredService<IOcppCallRouter>();
+
+        router.DisconnectClient(Context.Self.Path.Name).RunSynchronously();   // not sure about the implications of this
+        base.PostStop();
+    }
 }

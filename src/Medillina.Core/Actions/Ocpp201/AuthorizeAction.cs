@@ -2,6 +2,7 @@
 using Medinilla.DataAccess.Relational.UnitOfWork;
 using Medinilla.DataTypes.Contracts;
 using Medinilla.DataTypes.Contracts.Common;
+using Medinilla.DataTypes.Core;
 using Medinilla.Infrastructure.WAMP;
 using Microsoft.Extensions.Logging;
 
@@ -11,7 +12,7 @@ public sealed class AuthorizeAction(ChargingStationUnitOfWork unitOfWork,
     ILogger<AuthorizeAction> logger,
     AuthorizationAlgorithmFactory authorizationAlgorithmFactory) : IOcppAction
 {
-    public string ActionName => "Authorize";
+    public string ActionName => OcppActionNames.Authorize;
 
     private AuthorizeResponse GenerateResponse(string status)
     {

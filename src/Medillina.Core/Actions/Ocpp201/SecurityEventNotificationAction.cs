@@ -1,4 +1,5 @@
 using Medinilla.DataTypes.Contracts;
+using Medinilla.DataTypes.Core;
 using Medinilla.Infrastructure.WAMP;
 using Microsoft.Extensions.Logging;
 
@@ -12,7 +13,7 @@ public sealed class SecurityEventNotificationAction : IOcppAction
     public SecurityEventNotificationAction(ILogger<BootNotificationAction> logger)
         => _logger = logger;
 
-    public string ActionName { get => "SecurityEventNotification"; }
+    public string ActionName => OcppActionNames.SecurityEventNotification;
 
     public Task<RpcResult> Execute(OcppCallRequest call, string clientIdentifier)
     {

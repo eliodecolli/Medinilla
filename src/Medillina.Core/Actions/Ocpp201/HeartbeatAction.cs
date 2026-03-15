@@ -1,4 +1,5 @@
 ﻿using Medinilla.DataTypes.Contracts;
+using Medinilla.DataTypes.Core;
 using Medinilla.Infrastructure.WAMP;
 using Microsoft.Extensions.Logging;
 
@@ -11,7 +12,7 @@ internal class HeartbeatAction : IOcppAction
     public HeartbeatAction(ILogger<HeartbeatAction> logger)
         => _logger = logger;
 
-    public string ActionName => "Heartbeat";
+    public string ActionName => OcppActionNames.Heartbeat;
 
     public Task<RpcResult> Execute(OcppCallRequest call, string clientIdentifier)
     {

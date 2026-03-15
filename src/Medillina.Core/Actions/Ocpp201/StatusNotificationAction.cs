@@ -1,6 +1,7 @@
 ﻿using Medinilla.DataAccess.Relational.Models;
 using Medinilla.DataAccess.Relational.UnitOfWork;
 using Medinilla.DataTypes.Contracts;
+using Medinilla.DataTypes.Core;
 using Medinilla.Infrastructure.WAMP;
 using Medinilla.RealTime;
 using Microsoft.Extensions.Logging;
@@ -11,7 +12,7 @@ public sealed class StatusNotificationAction(ChargingStationUnitOfWork unitOfWor
     ILogger<StatusNotificationAction> logger,
     IRealTimeMessenger realTime) : IOcppAction
 {
-    public string ActionName => "StatusNotification";
+    public string ActionName => OcppActionNames.StatusNotification;
 
     private EvseConnector GetEvseConnector(ChargingStation cs, StatusNotificationRequest request)
     {

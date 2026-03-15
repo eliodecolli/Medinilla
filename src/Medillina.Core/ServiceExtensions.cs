@@ -4,8 +4,10 @@ using Medinilla.Core.Logic.Authorization;
 using Medinilla.Core.Logic.Authorization.Algorithms;
 using Medinilla.Core.v1.Transactions;
 using Medinilla.Core.Actions;
+using Medinilla.Core.Interfaces.Services;
 using Medinilla.Services.Interfaces;
 using Medinilla.Core.v1;
+using Medinilla.Core.v1.Services;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Medinilla.Core;
@@ -38,6 +40,10 @@ public static class ServiceExtensions
     {
         AddOcppActions(serviceCollection);
         AddAuthAlgos(serviceCollection);
+        
+        // add services
+        serviceCollection.AddScoped<IChargingStationBootingService, ChargingStationBooting>();
+        serviceCollection.AddScoped<IRouterServices, RouterServices>();
 
         serviceCollection.AddScoped<IOcppActionsFactory, OcppActionsFactory>();
         serviceCollection.AddScoped<IOcppCallRouter, OcppCallRouter>();

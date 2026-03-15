@@ -9,6 +9,8 @@ public class ChargingStation
     public Guid AccountId { get; set; }
 
     public Guid AuthDetailsId { get; set; }
+    
+    public bool Booted { get; set; }
 
     public string ClientIdentifier { get; set; }
 

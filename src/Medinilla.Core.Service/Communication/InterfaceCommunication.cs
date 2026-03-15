@@ -56,8 +56,15 @@ internal class CoreInterfaceCommunication : IInterfaceCommunication
                 break;
 
             case CommsMessageType.OcppResponse:
-            // implement
-            default:
+                // implement
+                break;
+
+            case CommsMessageType.ClientDisconnect:
+                var clientDisconnect = ClientDisconnectMessage.Parser.ParseFrom(comms.Payload);
+                _coordinator.ActorRef.Tell(new ClientTerminateMessage()
+                {
+                    ClientIdentifier = clientDisconnect.ClientIdentifier,
+                });
                 break;
         }
 
