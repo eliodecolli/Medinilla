@@ -7,10 +7,10 @@ using Medinilla.DataTypes.Contracts.Common;
 using Medinilla.DataTypes.Core;
 using Medinilla.Infrastructure.WAMP;
 using Microsoft.Extensions.Logging;
+using ConsumptionTypeDb = Medinilla.DataAccess.Relational.Enums.ConsumptionType;
 using DbChargingStation = Medinilla.DataAccess.Relational.Models.ChargingStation;
 using DbTransaction = Medinilla.DataAccess.Relational.Models.TransactionEvent;
 using IdTokenDb = Medinilla.DataAccess.Relational.Models.Authorization.IdToken;
-using ConsumptionTypeDb = Medinilla.DataAccess.Relational.Enums.ConsumptionType;
 
 namespace Medinilla.Core.Actions.Ocpp201;
 
@@ -109,6 +109,7 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
 #if DEBUG
         SaveTxLocally(call);
 #endif
+        _logger.LogInformation($"Received Transaction event from {clientIdentifier}");
         var request = call.As<TransactionEventRequest>();
 
         var chargingStation = await unitOfWork.GetChargingStation(clientIdentifier);
@@ -165,7 +166,7 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
                     .Where(t => t.TransactionId == request.TransactionInfo.TransactionId)
                     .OrderBy(t => t.SeqNo).ToArray() : [];
 
-                if (currentTransactions.Any(c => (c.SeqNo == request.SeqNo)))
+                if (currentTransactions.Any(c => c.SeqNo == request.SeqNo))
                 {
                     _logger.LogWarning($"{clientIdentifier}: Transaction {request.TransactionInfo.TransactionId} trying to send a duplicate of an old SeqNo={request.SeqNo}");
 

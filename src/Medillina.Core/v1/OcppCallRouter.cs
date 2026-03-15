@@ -1,9 +1,9 @@
-﻿using Medinilla.Infrastructure;
-using Medinilla.Infrastructure.WAMP;
+﻿using Medinilla.Core.Actions;
 using Medinilla.Core.Interfaces;
+using Medinilla.Infrastructure;
+using Medinilla.Infrastructure.WAMP;
 using Microsoft.Extensions.Logging;
 using System.Text;
-using Medinilla.Core.Actions;
 
 namespace Medinilla.Core.v1;
 
@@ -45,7 +45,7 @@ public class OcppCallRouter(ILogger<OcppCallRouter> _logger, IOcppActionsFactory
                 var ocppAction = _factory.GetAction(ocppCall.Action);
                 if (ocppAction is null)
                 {
-                    _logger.LogError($"Invalid action '{ocppCall.Action}'");
+                    _logger.LogError($"Invalid action '{ocppCall.Action}' - Not implemented.");
                     return new RpcResult()
                     {
                         Error = ocppCall.CreateErrorResult<object>(OcppCallError.ErrorCodes.NotImplemented, $"Action {ocppCall.Action} is not implemented on our end."),

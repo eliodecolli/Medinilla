@@ -22,7 +22,7 @@ public sealed class AuthorizeAction(ChargingStationUnitOfWork unitOfWork,
                 Status = status,
                 CacheExpiryDateTime = DateTime.Now,
             },
-            CertificateStatus  = AuthorizeCertificateStatus.NoCertificateAvailable
+            CertificateStatus = AuthorizeCertificateStatus.NoCertificateAvailable
         };
     }
 
@@ -30,6 +30,8 @@ public sealed class AuthorizeAction(ChargingStationUnitOfWork unitOfWork,
     {
         var request = call.As<AuthorizeRequest>();
         var status = AuthorizeStatus.Accepted;
+
+        logger.LogInformation($"Processing Authorize request from {clientIdentifier}");
 
         if (request.ISO15118CertificateHashData is not null || request.Certificate is not null)
         {

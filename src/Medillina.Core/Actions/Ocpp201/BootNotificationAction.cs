@@ -1,7 +1,4 @@
-﻿using System.Text;
-using System.Text.Json;
-using System.Text.Json.Serialization;
-using Medinilla.Core.Logic;
+﻿using Medinilla.Core.Logic;
 using Medinilla.Core.Logic.Configuration;
 using Medinilla.DataAccess.Relational.Models;
 using Medinilla.DataAccess.Relational.Models.Authorization;
@@ -13,6 +10,9 @@ using Medinilla.DataTypes.Pubnub.DTO;
 using Medinilla.Infrastructure.WAMP;
 using Medinilla.RealTime;
 using Microsoft.Extensions.Logging;
+using System.Text;
+using System.Text.Json;
+using System.Text.Json.Serialization;
 using CS = Medinilla.DataAccess.Relational.Models.ChargingStation;
 using IdTokenDb = Medinilla.DataAccess.Relational.Models.Authorization.IdToken;
 
@@ -173,6 +173,7 @@ public sealed class BootNotificationAction(ChargingStationUnitOfWork unitOfWork,
         }
         catch (Exception ex)
         {
+            _logger.LogError($"[{clientIdentifier}]: Error while processing BootNotification request: {ex}");
             return new RpcResult()
             {
                 Result = call.CreateResult(new BootNotificationResponse(1440, RegistrationStatusEnum.Rejected, new StatusInfo()

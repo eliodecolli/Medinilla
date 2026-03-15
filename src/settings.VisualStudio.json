@@ -1,0 +1,6 @@
+/* Visual Studio Settings File */
+{
+  "textEditor.codeCompletions.general.codeCompletionsProviders": [
+    "intellicode"
+  ]
+}
