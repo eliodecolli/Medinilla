@@ -1,8 +1,5 @@
-﻿using Akka.DependencyInjection;
-using Akka.Hosting;
-using Medinilla.Core;
+﻿using Medinilla.Core;
 using Medinilla.Core.Service.Communication;
-using Medinilla.Core.Service.Communication.Actors;
 using Medinilla.Core.Service.Interfaces;
 using Medinilla.Core.Service.Types;
 using Medinilla.DataAccess;
@@ -39,22 +36,9 @@ hostApplicationBuilder.Services.AddMedinillaInfrastructure();
 hostApplicationBuilder.Services.AddMedinillaDataAccess();
 hostApplicationBuilder.Services.AddMedinillaServices();
 hostApplicationBuilder.Services.AddRealTimeServices();
-hostApplicationBuilder.Services.AddScoped<IInterfaceCommunication, CoreInterfaceCommunication>();
-
-hostApplicationBuilder.Services.AddAkka("medinilla-core-akka", builder =>
-{
-    builder.WithActors((system, registry, resolver) =>
-    {
-        var coordinator = system.ActorOf(resolver.Props<Coordinator>(DependencyResolver.For(system)), "ocpp-coordinator");
-        registry.Register<Coordinator>(coordinator);
-    });
-});
+hostApplicationBuilder.Services.AddSingleton<IInterfaceCommunication, CoreInterfaceCommunication>();
 
 using var host = hostApplicationBuilder.Build();
-
-// Start all hosted services first (this initialises the Akka actor system
-// and registers the Coordinator before any messages are consumed).
-await host.StartAsync();
 
 var interfaceComms = host.Services.GetRequiredService<IInterfaceCommunication>();
 await interfaceComms.Run(CommunicationSettings.FromSettingsFile("settings.json"));

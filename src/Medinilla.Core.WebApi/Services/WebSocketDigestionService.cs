@@ -4,6 +4,7 @@ using Medinilla.Core.SharedContracts.Comms.Ocpp;
 using Medinilla.Core.WebApi.Services.Domain;
 using Medinilla.Infrastructure;
 using Medinilla.Infrastructure.Exceptions;
+using Medinilla.RealTime;
 using Medinilla.RealTime.Redis;
 using Medinilla.WebApi.Interfaces;
 using Microsoft.Extensions.DependencyInjection;
@@ -22,8 +23,8 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService
     private WebSocket? _webSocket;
     private string? _clientIdentifier;
 
-    private IRedisQueue _workerOutboundQueue;
-    private IRedisQueue _workerInboundQueue;
+    private IMessageQueue _workerOutboundQueue;
+    private IMessageQueue _workerInboundQueue;
 
     private readonly object _lock;
     private bool _disposed;
@@ -57,8 +58,8 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService
     public WebSocketDigestionService(
         IConfiguration config,
         ILogger<WebSocketDigestionService> logger,
-        [FromKeyedServices("inbound")]  IRedisQueue workerInboundQueue,
-        [FromKeyedServices("outbound")] IRedisQueue workerOutboundQueue)
+        [FromKeyedServices("inbound")]  IMessageQueue workerInboundQueue,
+        [FromKeyedServices("outbound")] IMessageQueue workerOutboundQueue)
     {
         _config = config ?? throw new ArgumentNullException(nameof(config));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
@@ -270,7 +271,7 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService
         AssertComms();
         AssertOutboundChannelName();
 
-        await _workerOutboundQueue.SendMessage(message.ToByteArray(), _outboundQueueName!);
+        await _workerOutboundQueue.SendAsync(message.ToByteArray(), _outboundQueueName!);
         _logger.LogInformation($"Comms: Sent {Enum.GetName(message.MessageType)} to {_outboundQueueName}");
     }
 
@@ -320,7 +321,7 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService
         byte[]? result;
         try
         {
-            result = await _workerInboundQueue.WaitForMessage(_inboundQueueName!, _cts.Token);
+            result = await _workerInboundQueue.ReceiveAsync(_inboundQueueName!, _cts.Token);
         }
         catch (OperationCanceledException)
         {
