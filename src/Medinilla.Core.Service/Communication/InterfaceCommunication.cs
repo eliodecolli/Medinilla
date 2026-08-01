@@ -1,81 +1,102 @@
-﻿using Akka.Actor;
-using Akka.Hosting;
+﻿using Google.Protobuf;
 using Medinilla.Core.Interfaces;
-using Medinilla.Core.Service.Communication.Actors;
 using Medinilla.Core.Service.Interfaces;
 using Medinilla.Core.Service.Types;
-using Medinilla.Core.SharedContracts.ActorPayloads;
 using Medinilla.Core.SharedContracts.Comms;
 using Medinilla.Core.SharedContracts.Comms.Ocpp;
+using Medinilla.RealTime;
 using Medinilla.RealTime.Redis;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
 namespace Medinilla.Core.Service.Communication;
 
-internal class CoreInterfaceCommunication : IInterfaceCommunication
+internal sealed class CoreInterfaceCommunication(
+    IServiceProvider serviceProvider,
+    IReceiver receiver,
+    ISender sender,
+    ILogger<CoreInterfaceCommunication> logger)
+    : IInterfaceCommunication
 {
-    private ILogger<CoreInterfaceCommunication> _logger;
-
-    private IRequiredActor<Coordinator> _coordinator;
-    private IActorRef _dispatcher;
-
-    private readonly ActorSystem _system;
-    private readonly IRedisQueue _queue;
-
-    private readonly IServiceProvider _serviceProvider;
-
-    public CoreInterfaceCommunication(IServiceProvider serviceProvider, [FromKeyedServices("inbound")] IRedisQueue redisQueue, ILogger<CoreInterfaceCommunication> logger, IOcppCallRouter router, IRequiredActor<Coordinator> coordinator, ActorSystem system)
+    public async Task Run(CommunicationSettings settings, CancellationToken ct)
     {
-        _logger = logger;
-        _coordinator = coordinator;
-        _system = system;
-        _queue = redisQueue;
-        _serviceProvider = serviceProvider;
+        logger.LogInformation("Started core service...");
+        await RunEvent(settings.RequestQueue, settings.ResponseQueue, ct);
     }
 
-    private async Task RunEvent(string channelName)
+    private async Task RunEvent(string requestChannel, string responseChannelPrefix, CancellationToken ct)
     {
-        var result = await _queue.WaitForMessage(channelName);
-        if (result is null)
+        while (!ct.IsCancellationRequested)
         {
-            return;
+            var result = await receiver.ReceiveAsync(requestChannel, ct);
+            if (result is null)
+            {
+                continue;
+            }
+
+            var comms = Comms.Parser.ParseFrom(result);
+
+            switch (comms.MessageType)
+            {
+                case CommsMessageType.OcppRequest:
+                    var ocpp = OcppMessage.Parser.ParseFrom(comms.Payload);
+                    _ = Task.Run(() => ProcessOcppAsync(ocpp.ClientIdentifier, ocpp.Payload.ToByteArray(), responseChannelPrefix));
+                    break;
+
+                case CommsMessageType.OcppResponse:
+                    break;
+
+                case CommsMessageType.ClientDisconnect:
+                    var dc = ClientDisconnectMessage.Parser.ParseFrom(comms.Payload);
+                    _ = Task.Run(() => DisconnectAsync(dc.ClientIdentifier));
+                    break;
+            }
         }
-
-        var comms = Comms.Parser.ParseFrom(result);
-
-        switch (comms.MessageType)
-        {
-            case CommsMessageType.OcppRequest:
-                var message = OcppMessage.Parser.ParseFrom(comms.Payload);
-                _coordinator.ActorRef.Tell(new OcppConsumerMessage()
-                {
-                    ClientIdentifier = message.ClientIdentifier,
-                    Payload = message.Payload.ToByteArray()
-                }, _dispatcher);
-                break;
-
-            case CommsMessageType.OcppResponse:
-                // implement
-                break;
-
-            case CommsMessageType.ClientDisconnect:
-                var clientDisconnect = ClientDisconnectMessage.Parser.ParseFrom(comms.Payload);
-                _coordinator.ActorRef.Tell(new ClientTerminateMessage()
-                {
-                    ClientIdentifier = clientDisconnect.ClientIdentifier,
-                });
-                break;
-        }
-
-        Task.Run(() => RunEvent(channelName));
     }
 
-    public async Task Run(CommunicationSettings settings)
+    private async Task ProcessOcppAsync(string clientIdentifier, byte[] payload, string responseChannelPrefix)
     {
-        _dispatcher = _system.ActorOf(Props.Create<Dispatcher>(_serviceProvider, settings.ResponseQueue), "ocpp-dispatcher");
-        Task.Run(() => RunEvent(settings.RequestQueue));
+        try
+        {
+            using var scope = serviceProvider.CreateScope();
+            var router = scope.ServiceProvider.GetRequiredService<IOcppCallRouter>();
 
-        _logger.LogInformation("Started core service...");
+            var result = await router.RouteOcppCall(payload, clientIdentifier);
+
+            var proto = new WampResult
+            {
+                ClientIdentifier = clientIdentifier,
+                Result = result.Result?.ToByteArray() is { } r ? ByteString.CopyFrom(r) : ByteString.Empty,
+                Error = result.Error?.ToByteArray() is { } e ? ByteString.CopyFrom(e) : ByteString.Empty,
+                ReturnToCS = result.ReturnToCS,
+            };
+
+            var response = new Comms
+            {
+                MessageType = CommsMessageType.OcppResponse,
+                Payload = proto.ToByteString(),
+            };
+
+            var channel = RedisUtils.BuildChannelName(responseChannelPrefix, clientIdentifier);
+            await sender.SendAsync(channel, response.ToByteArray());
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "OCPP call failed for {Client}", clientIdentifier);
+        }
+    }
+
+    private async Task DisconnectAsync(string clientIdentifier)
+    {
+        try
+        {
+            using var scope = serviceProvider.CreateScope();
+            var router = scope.ServiceProvider.GetRequiredService<IOcppCallRouter>();
+            await router.DisconnectClient(clientIdentifier);
+        }
+        catch (Exception ex)
+        {
+            logger.LogError(ex, "Disconnect failed for {Client}", clientIdentifier);
+        }
     }
 }

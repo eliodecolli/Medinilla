@@ -1,6 +1,7 @@
 using Google.Protobuf;
 using Medinilla.Core.SharedContracts.Comms;
 using Medinilla.Core.SharedContracts.Comms.Ocpp;
+using Medinilla.RealTime;
 using Medinilla.RealTime.Redis;
 using Medinilla.WebApi.Services;
 using Microsoft.Extensions.Configuration;
@@ -20,8 +21,8 @@ public class WebSocketDigestionServiceShould
     private readonly Mock<IConfiguration> _configMock;
     private readonly Mock<IConfigurationSection> _commsSectionMock;
     private readonly Mock<ILogger<WebSocketDigestionService>> _loggerMock;
-    private readonly Mock<IRedisQueue> _inboundQueueMock;
-    private readonly Mock<IRedisQueue> _outboundQueueMock;
+    private readonly Mock<IReceiver> _receiverMock;
+    private readonly Mock<ISender> _senderMock;
 
     // Inbound channel synchronization: RunCommsChannel blocks here until PushInbound() releases it.
     private readonly ConcurrentQueue<byte[]?> _inboundMessages = new();
@@ -42,16 +43,16 @@ public class WebSocketDigestionServiceShould
         _configMock = new Mock<IConfiguration>();
         _commsSectionMock = new Mock<IConfigurationSection>();
         _loggerMock = new Mock<ILogger<WebSocketDigestionService>>();
-        _inboundQueueMock = new Mock<IRedisQueue>();
-        _outboundQueueMock = new Mock<IRedisQueue>();
+        _receiverMock = new Mock<IReceiver>();
+        _senderMock = new Mock<ISender>();
 
         _commsSectionMock.Setup(s => s["RequestQueue"]).Returns(TEST_REQUEST_QUEUE);
         _commsSectionMock.Setup(s => s["ResponseQueue"]).Returns(TEST_RESPONSE_QUEUE);
         _configMock.Setup(c => c.GetSection("Comms")).Returns(_commsSectionMock.Object);
 
-        // WaitForMessage blocks on the semaphore until PushInbound() releases it.
-        _inboundQueueMock
-            .Setup(q => q.WaitForMessage(TEST_INBOUND_QUEUE, It.IsAny<CancellationToken>()))
+        // ReceiveAsync blocks on the semaphore until PushInbound() releases it.
+        _receiverMock
+            .Setup(q => q.ReceiveAsync(TEST_INBOUND_QUEUE, It.IsAny<CancellationToken>()))
             .Returns<string, CancellationToken>(async (_, ct) =>
             {
                 await _inboundSemaphore.WaitAsync(ct);
@@ -59,8 +60,8 @@ public class WebSocketDigestionServiceShould
                 return msg;
             });
 
-        _outboundQueueMock
-            .Setup(q => q.SendMessage(It.IsAny<byte[]>(), It.IsAny<string>()))
+        _senderMock
+            .Setup(q => q.SendAsync(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
     }
 
@@ -68,7 +69,7 @@ public class WebSocketDigestionServiceShould
     // Helpers — inbound channel control
     // ----------------------------------------------------------------
 
-    /// <summary>Delivers a message to the next WaitForMessage call.</summary>
+    /// <summary>Delivers a message to the next ReceiveAsync call.</summary>
     private void PushInbound(byte[] message)
     {
         _inboundMessages.Enqueue(message);
@@ -85,7 +86,7 @@ public class WebSocketDigestionServiceShould
     private static string CreateOcppCallResult(string messageId, string payload = "{}")
         => $"[3,\"{messageId}\",{payload}]";
 
-    /// <summary>Bytes returned by WaitForMessage when CSMS answers a charger request.</summary>
+    /// <summary>Bytes returned by ReceiveAsync when CSMS answers a charger request.</summary>
     private static byte[] BuildCsmsResponseBytes(string clientId, string ocppCallResult)
     {
         var wampResult = new WampResult
@@ -100,7 +101,7 @@ public class WebSocketDigestionServiceShould
         }.ToByteArray();
     }
 
-    /// <summary>Bytes returned by WaitForMessage when CSMS initiates a request to the charger.</summary>
+    /// <summary>Bytes returned by ReceiveAsync when CSMS initiates a request to the charger.</summary>
     private static byte[] BuildCsmsRequestBytes(string clientId, string ocppCall)
     {
         var wampResult = new WampResult
@@ -157,7 +158,7 @@ public class WebSocketDigestionServiceShould
     }
 
     private WebSocketDigestionService CreateService() =>
-        new(_configMock.Object, _loggerMock.Object, _inboundQueueMock.Object, _outboundQueueMock.Object);
+        new(_configMock.Object, _loggerMock.Object, _receiverMock.Object, _senderMock.Object);
 
     // ================================================================
     // Constructor validation
@@ -167,28 +168,28 @@ public class WebSocketDigestionServiceShould
     public void ThrowOnNullConfiguration()
     {
         Assert.Throws<ArgumentNullException>(() =>
-            new WebSocketDigestionService(null!, _loggerMock.Object, _inboundQueueMock.Object, _outboundQueueMock.Object));
+            new WebSocketDigestionService(null!, _loggerMock.Object, _receiverMock.Object, _senderMock.Object));
     }
 
     [Fact]
     public void ThrowOnNullLogger()
     {
         Assert.Throws<ArgumentNullException>(() =>
-            new WebSocketDigestionService(_configMock.Object, null!, _inboundQueueMock.Object, _outboundQueueMock.Object));
+            new WebSocketDigestionService(_configMock.Object, null!, _receiverMock.Object, _senderMock.Object));
     }
 
     [Fact]
     public void ThrowOnNullInboundQueue()
     {
         Assert.Throws<ArgumentNullException>(() =>
-            new WebSocketDigestionService(_configMock.Object, _loggerMock.Object, null!, _outboundQueueMock.Object));
+            new WebSocketDigestionService(_configMock.Object, _loggerMock.Object, null!, _senderMock.Object));
     }
 
     [Fact]
     public void ThrowOnNullOutboundQueue()
     {
         Assert.Throws<ArgumentNullException>(() =>
-            new WebSocketDigestionService(_configMock.Object, _loggerMock.Object, _inboundQueueMock.Object, null!));
+            new WebSocketDigestionService(_configMock.Object, _loggerMock.Object, _receiverMock.Object, null!));
     }
 
     // ================================================================
@@ -294,8 +295,8 @@ public class WebSocketDigestionServiceShould
         await using var service = CreateService();
         await service.Consume(wsMock.Object, TEST_CLIENT_ID);
 
-        _outboundQueueMock.Verify(q => q.SendMessage(
-            It.IsAny<byte[]>(), It.IsAny<string>()), Times.Never);
+        _senderMock.Verify(q => q.SendAsync(
+            It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     // ================================================================
@@ -337,8 +338,8 @@ public class WebSocketDigestionServiceShould
         await using var service = CreateService();
         await service.Consume(wsMock.Object, TEST_CLIENT_ID);
 
-        _outboundQueueMock.Verify(q => q.SendMessage(
-            It.IsAny<byte[]>(), It.IsAny<string>()), Times.Never);
+        _senderMock.Verify(q => q.SendAsync(
+            It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CancellationToken>()), Times.Never);
     }
 
     // ================================================================
@@ -355,9 +356,9 @@ public class WebSocketDigestionServiceShould
         var requestBytes = Encoding.UTF8.GetBytes(chargerRequest);
 
         // When the charger request is forwarded to Redis, inject the CSMS response.
-        _outboundQueueMock
-            .Setup(q => q.SendMessage(It.IsAny<byte[]>(), TEST_REQUEST_QUEUE))
-            .Returns<byte[], string>((_, _) =>
+        _senderMock
+            .Setup(q => q.SendAsync(TEST_REQUEST_QUEUE, It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
+            .Returns<string, byte[], CancellationToken>((_, _, _) =>
             {
                 PushInbound(BuildCsmsResponseBytes(TEST_CLIENT_ID, csmsResponse));
                 return Task.CompletedTask;
@@ -390,8 +391,8 @@ public class WebSocketDigestionServiceShould
         await using var service = CreateService();
         await service.Consume(wsMock.Object, TEST_CLIENT_ID);
 
-        _outboundQueueMock.Verify(
-            q => q.SendMessage(It.IsAny<byte[]>(), TEST_REQUEST_QUEUE), Times.Once);
+        _senderMock.Verify(
+            q => q.SendAsync(TEST_REQUEST_QUEUE, It.IsAny<byte[]>(), It.IsAny<CancellationToken>()), Times.Once);
         Assert.Single(sentToWs);
         Assert.Equal(csmsResponse, Encoding.UTF8.GetString(sentToWs[0]));
     }
@@ -438,8 +439,8 @@ public class WebSocketDigestionServiceShould
 
         Assert.Single(sentToWs);
         Assert.Equal(csmsRequest, Encoding.UTF8.GetString(sentToWs[0]));
-        _outboundQueueMock.Verify(
-            q => q.SendMessage(It.IsAny<byte[]>(), TEST_REQUEST_QUEUE), Times.Once);
+        _senderMock.Verify(
+            q => q.SendAsync(TEST_REQUEST_QUEUE, It.IsAny<byte[]>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     // Scenario: Charger sends two Calls before receiving a response to the first.
@@ -454,9 +455,9 @@ public class WebSocketDigestionServiceShould
         var bytes2 = Encoding.UTF8.GetBytes(req2);
 
         var rabbitSendCount = 0;
-        _outboundQueueMock
-            .Setup(q => q.SendMessage(It.IsAny<byte[]>(), TEST_REQUEST_QUEUE))
-            .Callback<byte[], string>((_, _) => rabbitSendCount++)
+        _senderMock
+            .Setup(q => q.SendAsync(TEST_REQUEST_QUEUE, It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
+            .Callback<string, byte[], CancellationToken>((_, _, _) => rabbitSendCount++)
             .Returns(Task.CompletedTask);
 
         var callCount = 0;
@@ -547,8 +548,8 @@ public class WebSocketDigestionServiceShould
         Assert.Equal(csmsReq1, Encoding.UTF8.GetString(sentToWs[0]));
         Assert.Equal(csmsReq2, Encoding.UTF8.GetString(sentToWs[1]));
 
-        _outboundQueueMock.Verify(
-            q => q.SendMessage(It.IsAny<byte[]>(), TEST_REQUEST_QUEUE), Times.Once);
+        _senderMock.Verify(
+            q => q.SendAsync(TEST_REQUEST_QUEUE, It.IsAny<byte[]>(), It.IsAny<CancellationToken>()), Times.Once);
     }
 
     // Scenario: Full duplex — charger and CSMS each have an in-flight request simultaneously.
@@ -570,9 +571,9 @@ public class WebSocketDigestionServiceShould
         var respBytes = Encoding.UTF8.GetBytes(chargerResp);
 
         var rabbitSendCount = 0;
-        _outboundQueueMock
-            .Setup(q => q.SendMessage(It.IsAny<byte[]>(), TEST_REQUEST_QUEUE))
-            .Returns<byte[], string>((_, _) =>
+        _senderMock
+            .Setup(q => q.SendAsync(TEST_REQUEST_QUEUE, It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
+            .Returns<string, byte[], CancellationToken>((_, _, _) =>
             {
                 rabbitSendCount++;
                 if (rabbitSendCount == 1)
@@ -635,9 +636,9 @@ public class WebSocketDigestionServiceShould
         var wrongClientResponse = CreateOcppCallResult("req-1");
         var requestBytes = Encoding.UTF8.GetBytes(chargerRequest);
 
-        _outboundQueueMock
-            .Setup(q => q.SendMessage(It.IsAny<byte[]>(), TEST_REQUEST_QUEUE))
-            .Returns<byte[], string>((_, _) =>
+        _senderMock
+            .Setup(q => q.SendAsync(TEST_REQUEST_QUEUE, It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
+            .Returns<string, byte[], CancellationToken>((_, _, _) =>
             {
                 // Response arrives but for a DIFFERENT client.
                 PushInbound(BuildCsmsResponseBytes("WRONG-CHARGER-999", wrongClientResponse));
