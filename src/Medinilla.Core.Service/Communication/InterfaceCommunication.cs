@@ -14,19 +14,19 @@ namespace Medinilla.Core.Service.Communication;
 internal class CoreInterfaceCommunication : IInterfaceCommunication
 {
     private readonly ILogger<CoreInterfaceCommunication> _logger;
-    private readonly IMessageQueue _inbound;
-    private readonly IMessageQueue _outbound;
+    private readonly IReceiver _receiver;
+    private readonly ISender _sender;
     private readonly IServiceProvider _serviceProvider;
 
     public CoreInterfaceCommunication(
         IServiceProvider serviceProvider,
-        [FromKeyedServices("inbound")] IMessageQueue inbound,
-        [FromKeyedServices("outbound")] IMessageQueue outbound,
+        IReceiver receiver,
+        ISender sender,
         ILogger<CoreInterfaceCommunication> logger)
     {
         _serviceProvider = serviceProvider;
-        _inbound = inbound;
-        _outbound = outbound;
+        _receiver = receiver;
+        _sender = sender;
         _logger = logger;
     }
 
@@ -40,7 +40,7 @@ internal class CoreInterfaceCommunication : IInterfaceCommunication
     {
         while (true)
         {
-            var result = await _inbound.ReceiveAsync(requestChannel);
+            var result = await _receiver.ReceiveAsync(requestChannel);
             if (result is null)
             {
                 continue;
@@ -90,7 +90,7 @@ internal class CoreInterfaceCommunication : IInterfaceCommunication
             };
 
             var channel = RedisUtils.BuildChannelName(responseChannelPrefix, clientIdentifier);
-            await _outbound.SendAsync(response.ToByteArray(), channel);
+            await _sender.SendAsync(channel, response.ToByteArray());
         }
         catch (Exception ex)
         {

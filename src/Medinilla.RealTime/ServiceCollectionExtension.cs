@@ -19,14 +19,11 @@ public static class ServiceCollectionExtensions
 
         services.AddSingleton(_ => ConnectionMultiplexer.Connect(redisUri));
 
-        // Outbound (RPUSH): shared singleton multiplexer — safe for non-blocking commands.
-        services.AddKeyedSingleton<IMessageQueue>("outbound", (sp, _) =>
-            new RedisQueue(sp.GetRequiredService<ConnectionMultiplexer>()));
+        services.AddSingleton<ISender>(sp => new RedisQueue(sp.GetRequiredService<ConnectionMultiplexer>()));
 
-        // Inbound (BRPOP): each consumer gets its own dedicated connection so blocking
-        // BRPOP never starves RPUSH commands on the shared connection.
-        services.AddKeyedTransient<IMessageQueue>("inbound", (_, _) =>
-            new RedisQueue(redisUri));
+        // Scoped: each consumer (one per WS session, one in CoreInterfaceCommunication)
+        // gets its own instance so it can run its own BRPOP loop on its own queue.
+        services.AddScoped<IReceiver>(sp => new RedisQueue(sp.GetRequiredService<ConnectionMultiplexer>()));
 
         return services;
     }

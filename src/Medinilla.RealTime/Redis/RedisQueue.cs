@@ -2,10 +2,9 @@ using StackExchange.Redis;
 
 namespace Medinilla.RealTime.Redis;
 
-public sealed class RedisQueue : IMessageQueue
+public sealed class RedisQueue : ISender, IReceiver
 {
     private readonly IDatabase _db;
-    private readonly ConnectionMultiplexer? _ownedMux;
 
     private const string RPUSH = "RPUSH";
     private const string BRPOP = "BRPOP";
@@ -14,13 +13,6 @@ public sealed class RedisQueue : IMessageQueue
     public RedisQueue(ConnectionMultiplexer mux)
     {
         _db = mux.GetDatabase();
-        _ownedMux = null;
-    }
-
-    public RedisQueue(string connectionString)
-    {
-        _ownedMux = ConnectionMultiplexer.Connect(connectionString);
-        _db = _ownedMux.GetDatabase();
     }
 
     public async Task<byte[]?> ReceiveAsync(string queue, CancellationToken ct = default)
@@ -39,10 +31,10 @@ public sealed class RedisQueue : IMessageQueue
         return null;
     }
 
-    public async Task SendAsync(byte[] message, string queue, CancellationToken ct = default)
+    public async Task SendAsync(string queue, byte[] message, CancellationToken ct = default)
     {
         await _db.ExecuteAsync(RPUSH, queue, message).WaitAsync(ct);
     }
 
-    public void Dispose() => _ownedMux?.Dispose();
+    public void Dispose() { }
 }

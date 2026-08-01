@@ -23,8 +23,8 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService
     private WebSocket? _webSocket;
     private string? _clientIdentifier;
 
-    private IMessageQueue _workerOutboundQueue;
-    private IMessageQueue _workerInboundQueue;
+    private ISender _sender;
+    private IReceiver _receiver;
 
     private readonly object _lock;
     private bool _disposed;
@@ -58,13 +58,13 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService
     public WebSocketDigestionService(
         IConfiguration config,
         ILogger<WebSocketDigestionService> logger,
-        [FromKeyedServices("inbound")]  IMessageQueue workerInboundQueue,
-        [FromKeyedServices("outbound")] IMessageQueue workerOutboundQueue)
+        IReceiver receiver,
+        ISender sender)
     {
         _config = config ?? throw new ArgumentNullException(nameof(config));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _workerInboundQueue = workerInboundQueue ?? throw new ArgumentNullException(nameof(workerInboundQueue));
-        _workerOutboundQueue = workerOutboundQueue ?? throw new ArgumentNullException(nameof(workerOutboundQueue));
+        _receiver = receiver ?? throw new ArgumentNullException(nameof(receiver));
+        _sender = sender ?? throw new ArgumentNullException(nameof(sender));
 
         _lock = new object();
         _cts = new CancellationTokenSource();
@@ -90,7 +90,7 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService
 
     private void AssertComms()
     {
-        if (_workerInboundQueue is null || _workerOutboundQueue is null) throw new NullReferenceException("Redis comms has not been set up.");
+        if (_receiver is null || _sender is null) throw new NullReferenceException("Redis comms has not been set up.");
     }
     #endregion
 
@@ -271,7 +271,7 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService
         AssertComms();
         AssertOutboundChannelName();
 
-        await _workerOutboundQueue.SendAsync(message.ToByteArray(), _outboundQueueName!);
+        await _sender.SendAsync(_outboundQueueName!, message.ToByteArray());
         _logger.LogInformation($"Comms: Sent {Enum.GetName(message.MessageType)} to {_outboundQueueName}");
     }
 
@@ -321,7 +321,7 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService
         byte[]? result;
         try
         {
-            result = await _workerInboundQueue.ReceiveAsync(_inboundQueueName!, _cts.Token);
+            result = await _receiver.ReceiveAsync(_inboundQueueName!, _cts.Token);
         }
         catch (OperationCanceledException)
         {
