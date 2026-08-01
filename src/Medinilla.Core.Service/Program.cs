@@ -41,6 +41,8 @@ hostApplicationBuilder.Services.AddSingleton<IInterfaceCommunication, CoreInterf
 using var host = hostApplicationBuilder.Build();
 
 var interfaceComms = host.Services.GetRequiredService<IInterfaceCommunication>();
-await interfaceComms.Run(CommunicationSettings.FromSettingsFile("settings.json"));
+var lifetime = host.Services.GetRequiredService<IHostApplicationLifetime>();
+
+await interfaceComms.Run(CommunicationSettings.FromSettingsFile("settings.json"), lifetime.ApplicationStopping);
 
 await host.WaitForShutdownAsync();

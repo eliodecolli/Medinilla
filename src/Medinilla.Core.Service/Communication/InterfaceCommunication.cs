@@ -11,36 +11,24 @@ using Microsoft.Extensions.Logging;
 
 namespace Medinilla.Core.Service.Communication;
 
-internal class CoreInterfaceCommunication : IInterfaceCommunication
+internal sealed class CoreInterfaceCommunication(
+    IServiceProvider serviceProvider,
+    IReceiver receiver,
+    ISender sender,
+    ILogger<CoreInterfaceCommunication> logger)
+    : IInterfaceCommunication
 {
-    private readonly ILogger<CoreInterfaceCommunication> _logger;
-    private readonly IReceiver _receiver;
-    private readonly ISender _sender;
-    private readonly IServiceProvider _serviceProvider;
-
-    public CoreInterfaceCommunication(
-        IServiceProvider serviceProvider,
-        IReceiver receiver,
-        ISender sender,
-        ILogger<CoreInterfaceCommunication> logger)
+    public async Task Run(CommunicationSettings settings, CancellationToken ct)
     {
-        _serviceProvider = serviceProvider;
-        _receiver = receiver;
-        _sender = sender;
-        _logger = logger;
+        logger.LogInformation("Started core service...");
+        await RunEvent(settings.RequestQueue, settings.ResponseQueue, ct);
     }
 
-    public async Task Run(CommunicationSettings settings)
+    private async Task RunEvent(string requestChannel, string responseChannelPrefix, CancellationToken ct)
     {
-        _logger.LogInformation("Started core service...");
-        await RunEvent(settings.RequestQueue, settings.ResponseQueue);
-    }
-
-    private async Task RunEvent(string requestChannel, string responseChannelPrefix)
-    {
-        while (true)
+        while (!ct.IsCancellationRequested)
         {
-            var result = await _receiver.ReceiveAsync(requestChannel);
+            var result = await receiver.ReceiveAsync(requestChannel, ct);
             if (result is null)
             {
                 continue;
@@ -70,7 +58,7 @@ internal class CoreInterfaceCommunication : IInterfaceCommunication
     {
         try
         {
-            using var scope = _serviceProvider.CreateScope();
+            using var scope = serviceProvider.CreateScope();
             var router = scope.ServiceProvider.GetRequiredService<IOcppCallRouter>();
 
             var result = await router.RouteOcppCall(payload, clientIdentifier);
@@ -90,11 +78,11 @@ internal class CoreInterfaceCommunication : IInterfaceCommunication
             };
 
             var channel = RedisUtils.BuildChannelName(responseChannelPrefix, clientIdentifier);
-            await _sender.SendAsync(channel, response.ToByteArray());
+            await sender.SendAsync(channel, response.ToByteArray());
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "OCPP call failed for {Client}", clientIdentifier);
+            logger.LogError(ex, "OCPP call failed for {Client}", clientIdentifier);
         }
     }
 
@@ -102,13 +90,13 @@ internal class CoreInterfaceCommunication : IInterfaceCommunication
     {
         try
         {
-            using var scope = _serviceProvider.CreateScope();
+            using var scope = serviceProvider.CreateScope();
             var router = scope.ServiceProvider.GetRequiredService<IOcppCallRouter>();
             await router.DisconnectClient(clientIdentifier);
         }
         catch (Exception ex)
         {
-            _logger.LogError(ex, "Disconnect failed for {Client}", clientIdentifier);
+            logger.LogError(ex, "Disconnect failed for {Client}", clientIdentifier);
         }
     }
 }
