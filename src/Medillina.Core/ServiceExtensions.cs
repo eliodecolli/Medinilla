@@ -1,4 +1,5 @@
 ﻿using Medinilla.Core.Actions.Ocpp201;
+using Medinilla.Core.Commands;
 using Medinilla.Core.Interfaces;
 using Medinilla.Core.Logic.Authorization;
 using Medinilla.Core.Logic.Authorization.Algorithms;
@@ -25,6 +26,11 @@ public static class ServiceExtensions
         //...add more
     }
 
+    private static void AddOcppChargerCommands(IServiceCollection services)
+    {
+        // empty for now — populate as concrete commands land (ResetCommand, TriggerMessageCommand, ...)
+    }
+
     private static void AddAuthAlgos(IServiceCollection services)
     {
         services.AddScoped<IAuthAlgorithm, EvseCheckAlgo>();
@@ -39,8 +45,9 @@ public static class ServiceExtensions
     public static void AddMedinillaServices(this IServiceCollection serviceCollection)
     {
         AddOcppActions(serviceCollection);
+        AddOcppChargerCommands(serviceCollection);
         AddAuthAlgos(serviceCollection);
-        
+
         // add services
         serviceCollection.AddScoped<IChargingStationBootingService, ChargingStationBooting>();
         serviceCollection.AddScoped<IRouterServices, RouterServices>();
@@ -48,6 +55,7 @@ public static class ServiceExtensions
         serviceCollection.AddScoped<ITariffService, TariffService>();
 
         serviceCollection.AddScoped<IOcppActionsFactory, OcppActionsFactory>();
+        serviceCollection.AddScoped<IOcppChargerCommandFactory, OcppChargerCommandsFactory>();
         serviceCollection.AddScoped<IOcppCallRouter, OcppCallRouter>();
         serviceCollection.AddScoped<AuthorizationAlgorithmFactory>();
         serviceCollection.AddScoped<ConsumptionService>();
