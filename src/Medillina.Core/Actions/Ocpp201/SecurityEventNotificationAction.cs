@@ -8,9 +8,9 @@ namespace Medinilla.Core.Actions.Ocpp201;
 
 public sealed class SecurityEventNotificationAction : IOcppAction
 {
-    private ILogger<BootNotificationAction> _logger;
+    private ILogger<SecurityEventNotificationAction> _logger;
 
-    public SecurityEventNotificationAction(ILogger<BootNotificationAction> logger)
+    public SecurityEventNotificationAction(ILogger<SecurityEventNotificationAction> logger)
         => _logger = logger;
 
     public string ActionName => OcppActionNames.SecurityEventNotification;

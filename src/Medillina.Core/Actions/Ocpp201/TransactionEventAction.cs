@@ -1,4 +1,5 @@
-﻿using Medinilla.Core.Logic.Authorization;
+﻿using Medinilla.Core.Interfaces.Services;
+using Medinilla.Core.Logic.Authorization;
 using Medinilla.Core.v1;
 using Medinilla.Core.v1.Services;
 using Medinilla.Core.v1.Transactions;
@@ -20,8 +21,8 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
     ChargingStationUnitOfWork unitOfWork,
     AuthorizationAlgorithmFactory authFactory,
     ConsumptionService consumptionService,
-    TariffService tariffService,
-    IdTokenService idTokenService)
+    ITariffService tariffService,
+    IIdTokenService idTokenService)
     : IOcppAction
 {
     public string ActionName => OcppActionNames.TransactionEvent;

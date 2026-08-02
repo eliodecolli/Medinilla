@@ -2,7 +2,7 @@ syntax = "proto3";
 
 package medinilla.core.SharedContracts.comms;
 
-import "ocpp/OcppMessage.proto";
+import "comms/ocpp/OcppMessage.proto";
 
 enum CommsFlag {
 	Set = 0;

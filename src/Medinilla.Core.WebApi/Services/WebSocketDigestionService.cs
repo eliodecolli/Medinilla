@@ -145,7 +145,7 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService
     {
         if (inboundId is null)
         {
-            _logger.LogInformation("Clearing processing inboundd id, previous: {id}", _processingInboundId);
+            _logger.LogInformation("Clearing processing inbound id, previous: {id}", _processingInboundId);
         }
         else
         {

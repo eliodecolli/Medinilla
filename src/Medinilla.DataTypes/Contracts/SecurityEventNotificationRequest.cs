@@ -7,5 +7,5 @@ public sealed class SecurityEventNotificationRequest
 
     public string Type { get; set; }
 
-    public DateTime Timestamp { get; set; }
+    public DateTime? Timestamp { get; set; }
 }
