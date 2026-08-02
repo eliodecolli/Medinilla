@@ -44,12 +44,12 @@ public static class ServiceExtensions
         // add services
         serviceCollection.AddScoped<IChargingStationBootingService, ChargingStationBooting>();
         serviceCollection.AddScoped<IRouterServices, RouterServices>();
+        serviceCollection.AddScoped<IIdTokenService, IdTokenService>();
+        serviceCollection.AddScoped<ITariffService, TariffService>();
 
         serviceCollection.AddScoped<IOcppActionsFactory, OcppActionsFactory>();
         serviceCollection.AddScoped<IOcppCallRouter, OcppCallRouter>();
         serviceCollection.AddScoped<AuthorizationAlgorithmFactory>();
         serviceCollection.AddScoped<ConsumptionService>();
-        serviceCollection.AddScoped<TariffService>();
-        serviceCollection.AddScoped<IdTokenService>();
     }
 }

@@ -1,3 +1,4 @@
+using Medinilla.Core.Interfaces.Services;
 using Medinilla.DataAccess.Relational.Models;
 using Medinilla.DataAccess.Relational.UnitOfWork;
 using Medinilla.DataTypes.Contracts.Common;
@@ -6,7 +7,7 @@ using IdTokenDb = Medinilla.DataAccess.Relational.Models.Authorization.IdToken;
 
 namespace Medinilla.Core.v1.Services;
 
-public sealed class IdTokenService(ChargingStationUnitOfWork unitOfWork)
+public class IdTokenService(ChargingStationUnitOfWork unitOfWork) : IIdTokenService
 {
     public Task<IdTokenDb?> TryGetForTransaction(string transactionId, string token)
     {
