@@ -87,16 +87,6 @@ public class OcppCallRouter(
             File.WriteAllBytes("logs/" + ocppCall.Action + "_log_" + DateTime.Now.ToBinary() + "_" + salt + ".txt", Encoding.UTF8.GetBytes(raw));
         }
 #endif
-        if (!await ValidateRouting(clientIdentifier, ocppCall.Action))
-        {
-            return new RpcResult
-            {
-                Result = null,
-                Error = OcppCallError.SecurityError(ocppCall.MessageId),
-                ReturnToCS = true
-            };
-        }
-
         var ocppAction = _factory.GetAction(ocppCall.Action);
         if (ocppAction is null)
         {
@@ -105,6 +95,17 @@ public class OcppCallRouter(
             {
                 Error = ocppCall.CreateErrorResult<object>(OcppCallError.ErrorCodes.NotImplemented, $"Action {ocppCall.Action} is not implemented on our end."),
                 Result = null,
+                ReturnToCS = true
+            };
+        }
+        
+        if (!await ValidateRouting(clientIdentifier, ocppCall.Action))
+        {
+            _logger.LogError("Could not validate message from {clientIdentifier}: {action}", clientIdentifier,  ocppCall.Action);
+            return new RpcResult
+            {
+                Result = null,
+                Error = OcppCallError.SecurityError(ocppCall.MessageId),
                 ReturnToCS = true
             };
         }

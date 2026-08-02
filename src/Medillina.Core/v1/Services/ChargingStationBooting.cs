@@ -83,25 +83,31 @@ public class ChargingStationBooting(ChargingStationUnitOfWork unitOfWork) : ICha
     {
         var result = await unitOfWork.ChargingStationRepository.Filter(c => c.ClientIdentifier == clientIdentifier);
         var entity = result.FirstOrDefault();
-        
+
         if (entity == null)
         {
             entity = GetChargingStation(clientIdentifier, request);
             var accountQuery = await unitOfWork.AccountRepository.Filter(c => c.Name == "MedinillaTest-Core").ConfigureAwait(false);
             var account = accountQuery.First();
             entity.AccountId = account.Id;
-
             entity.CreatedAt = DateTime.UtcNow;
+            entity.LatestBootNotificationReason = GetBootupReason(request);
+            entity.ModifiedAt = DateTime.UtcNow;
+            entity.Booted = true;
+
             entity = await unitOfWork.ChargingStationRepository.Create(entity);
+            await unitOfWork.Save();
+
+            await TryBootstrapChargingStatation(entity);
         }
         else
         {
             entity.LatestBootNotificationReason = GetBootupReason(request);
             entity.ModifiedAt = DateTime.UtcNow;
             entity.Booted = true;
+            await unitOfWork.ChargingStationRepository.Update(entity);
+            await unitOfWork.Save();
         }
-
-        await TryBootstrapChargingStatation(entity);
     }
 
     public async Task DisconnectClient(string clientIdentifier)

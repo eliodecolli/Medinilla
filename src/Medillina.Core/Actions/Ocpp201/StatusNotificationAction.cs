@@ -48,6 +48,7 @@ public sealed class StatusNotificationAction(ChargingStationUnitOfWork unitOfWor
     public async Task<RpcResult> Execute(OcppCallRequest call, string clientIdentifier)
     {
         var request = call.As<StatusNotificationRequest>();
+        logger.LogInformation("{ci}: Status Notification Event Received - Connector Id: {cii} - Status: {cs}", clientIdentifier, request.ConnectorId, request.ConnectorStatus.ToString());
 
         var chargingStation = await unitOfWork.GetChargingStation(clientIdentifier);
         if (chargingStation == null)
