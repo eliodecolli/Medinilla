@@ -15,7 +15,7 @@ Currently implemented OCPP messages:
 - Transaction Event
 
 ## Medinilla - Architecture
-The most fundamental idea behind the architectural decisions on this project was scalability, and fault tolerance. The core logic of Medinilla runs in Akka Actors, which are assigned per-client connection.
+The most fundamental idea behind the architectural decisions on this project was scalability, and fault tolerance.
 
 <p align="center">
   <img src="/src/third_party/core-arch.jpg" width=70% height=70%>
