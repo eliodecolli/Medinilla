@@ -21,6 +21,19 @@ internal sealed class CoreInterfaceCommunication(
     public async Task Run(CommunicationSettings settings, CancellationToken ct)
     {
         logger.LogInformation("Started core service...");
+
+        using var scope = serviceProvider.CreateScope();
+        var router = scope.ServiceProvider.GetRequiredService<IOcppCallRouter>();
+        router.SetCallSubmitter((clientId, frame, ctInner) =>
+            sender.SendAsync(
+                RedisUtils.BuildChannelName(settings.ResponseQueue, clientId),
+                new Comms
+                {
+                    MessageType = CommsMessageType.OcppRequest,
+                    Payload = ByteString.CopyFromUtf8(frame),
+                }.ToByteArray(),
+                ctInner));
+
         await RunEvent(settings.RequestQueue, settings.ResponseQueue, ct);
     }
 
@@ -39,17 +52,19 @@ internal sealed class CoreInterfaceCommunication(
             switch (comms.MessageType)
             {
                 case CommsMessageType.OcppRequest:
+                case CommsMessageType.OcppResponse:
+                {
                     var ocpp = OcppMessage.Parser.ParseFrom(comms.Payload);
                     _ = Task.Run(() => ProcessOcppAsync(ocpp.ClientIdentifier, ocpp.Payload.ToByteArray(), responseChannelPrefix));
                     break;
-
-                case CommsMessageType.OcppResponse:
-                    break;
+                }
 
                 case CommsMessageType.ClientDisconnect:
+                {
                     var dc = ClientDisconnectMessage.Parser.ParseFrom(comms.Payload);
                     _ = Task.Run(() => DisconnectAsync(dc.ClientIdentifier));
                     break;
+                }
             }
         }
     }
@@ -62,6 +77,10 @@ internal sealed class CoreInterfaceCommunication(
             var router = scope.ServiceProvider.GetRequiredService<IOcppCallRouter>();
 
             var result = await router.RouteOcppCall(payload, clientIdentifier);
+            if (result is null)
+            {
+                return;
+            }
 
             var proto = new WampResult
             {
