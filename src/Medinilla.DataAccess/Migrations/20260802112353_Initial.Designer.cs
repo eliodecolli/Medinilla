@@ -10,10 +10,10 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
-namespace Medinilla.Core.Service.Migrations
+namespace Medinilla.DataAccess.Migrations
 {
     [DbContext(typeof(MedinillaOcppDbContext))]
-    [Migration("20251004172712_Initial")]
+    [Migration("20260802112353_Initial")]
     partial class Initial
     {
         /// <inheritdoc />
@@ -146,6 +146,9 @@ namespace Medinilla.Core.Service.Migrations
 
                     b.Property<Guid>("AuthDetailsId")
                         .HasColumnType("uuid");
+
+                    b.Property<bool>("Booted")
+                        .HasColumnType("boolean");
 
                     b.Property<string>("ClientIdentifier")
                         .IsRequired()

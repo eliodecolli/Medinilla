@@ -9,7 +9,7 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
 #nullable disable
 
-namespace Medinilla.Core.Service.Migrations
+namespace Medinilla.DataAccess.Migrations
 {
     [DbContext(typeof(MedinillaOcppDbContext))]
     partial class MedinillaOcppDbContextModelSnapshot : ModelSnapshot

@@ -87,7 +87,7 @@ public class ChargingStationBooting(ChargingStationUnitOfWork unitOfWork) : ICha
         if (entity == null)
         {
             entity = GetChargingStation(clientIdentifier, request);
-            var accountQuery = await unitOfWork.AccountRepository.Filter(c => c.Name == "Main Test Account").ConfigureAwait(false);
+            var accountQuery = await unitOfWork.AccountRepository.Filter(c => c.Name == "MedinillaTest-Core").ConfigureAwait(false);
             var account = accountQuery.First();
             entity.AccountId = account.Id;
 

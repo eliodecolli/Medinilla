@@ -41,7 +41,7 @@ public class TransactionEventActionShould
         Assert.NotNull(request.MeterValue);
 
         // Create the TransactionService (this is what actually calculates consumption)
-        var transactionService = new TransactionService();
+        var transactionService = new ConsumptionService();
 
         // Act - Calculate consumption from meter values
         // The JSON has meter values at Transaction.Begin and Transaction.End
@@ -72,7 +72,7 @@ public class TransactionEventActionShould
     [Fact]
     public async Task MergesConsumptionGraphs()
     {
-        var txService = new TransactionService();
+        var txService = new ConsumptionService();
         
         var request1 = await GetRequest("TransactionEventEnd.json");
 
@@ -94,7 +94,7 @@ public class TransactionEventActionShould
     [Fact]
     public async Task MergesConsumptionGraphsByOperator()
     {
-        var txService =  new TransactionService();
+        var txService =  new ConsumptionService();
         
         var request1 = await GetRequest("TransactionEventEnd.json");
 

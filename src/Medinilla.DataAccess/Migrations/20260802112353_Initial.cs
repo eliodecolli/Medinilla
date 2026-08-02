@@ -4,7 +4,7 @@ using Microsoft.EntityFrameworkCore.Migrations;
 
 #nullable disable
 
-namespace Medinilla.Core.Service.Migrations
+namespace Medinilla.DataAccess.Migrations
 {
     /// <inheritdoc />
     public partial class Initial : Migration
@@ -46,6 +46,7 @@ namespace Medinilla.Core.Service.Migrations
                     Id = table.Column<Guid>(type: "uuid", nullable: false),
                     AccountId = table.Column<Guid>(type: "uuid", nullable: false),
                     AuthDetailsId = table.Column<Guid>(type: "uuid", nullable: false),
+                    Booted = table.Column<bool>(type: "boolean", nullable: false),
                     ClientIdentifier = table.Column<string>(type: "text", nullable: false),
                     Model = table.Column<string>(type: "text", nullable: false),
                     Vendor = table.Column<string>(type: "text", nullable: false),

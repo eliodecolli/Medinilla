@@ -1,17 +1,11 @@
 ﻿using Medinilla.DataAccess.Relational.Models;
 using Medinilla.DataAccess.Relational.Models.Authorization;
 using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Configuration;
 
 namespace Medinilla.DataAccess.Relational;
 
-public class MedinillaOcppDbContext(IConfiguration config) : DbContext
+public class MedinillaOcppDbContext(DbContextOptions<MedinillaOcppDbContext> options) : DbContext(options)
 {
-    protected override void OnConfiguring(DbContextOptionsBuilder optionsBuilder)
-    {
-        optionsBuilder.UseLazyLoadingProxies();
-        optionsBuilder.UseNpgsql(config.GetConnectionString("MedinillaCore"), b => b.MigrationsAssembly("Medinilla.Core.Service"));
-    }
 
     protected override void OnModelCreating(ModelBuilder modelBuilder)
     {

@@ -1,0 +1,34 @@
+services:
+  postgres:
+    image: mirror.gcr.io/library/postgres:16-alpine
+    container_name: medinilla-postgres
+    environment:
+      POSTGRES_USER: medinilla
+      POSTGRES_PASSWORD: medinilla
+      POSTGRES_DB: medinilla
+    ports:
+      - "5432:5432"
+    volumes:
+      - medinilla-pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U medinilla -d medinilla"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+  redis:
+    image: mirror.gcr.io/library/redis:7-alpine
+    container_name: medinilla-redis
+    ports:
+      - "6379:6379"
+    volumes:
+      - medinilla-redisdata:/data
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 5s
+      timeout: 3s
+      retries: 10
+
+volumes:
+  medinilla-pgdata:
+  medinilla-redisdata:

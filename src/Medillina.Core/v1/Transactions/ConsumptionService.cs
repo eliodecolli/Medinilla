@@ -7,7 +7,7 @@ using Medinilla.DataTypes.Core.Enums;
 
 namespace Medinilla.Core.v1.Transactions;
 
-public sealed class TransactionService
+public sealed class ConsumptionService
 {
     private float ScaleToKW(SampledValue value)
     {
