@@ -48,6 +48,8 @@ public static class ServiceExtensions
         serviceCollection.AddScoped<IOcppActionsFactory, OcppActionsFactory>();
         serviceCollection.AddScoped<IOcppCallRouter, OcppCallRouter>();
         serviceCollection.AddScoped<AuthorizationAlgorithmFactory>();
-        serviceCollection.AddScoped<TransactionService>();
+        serviceCollection.AddScoped<ConsumptionService>();
+        serviceCollection.AddScoped<TariffService>();
+        serviceCollection.AddScoped<IdTokenService>();
     }
 }
