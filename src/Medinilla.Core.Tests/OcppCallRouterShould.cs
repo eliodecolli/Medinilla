@@ -107,6 +107,7 @@ public class OcppCallRouterShould
     [Fact]
     public async Task RouteOcppCall_WhenAvailabilityValidationFails_ReturnsSecurityError()
     {
+        _actionsFactoryMock.Setup(f => f.GetAction(KNOWN_ACTION)).Returns(new FakeAction { ActionName = KNOWN_ACTION });
         _routerServicesMock
             .Setup(s => s.ValidateChargingStationAvailability(CLIENT_ID))
             .ReturnsAsync(false);
