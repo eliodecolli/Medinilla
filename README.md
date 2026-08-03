@@ -1,6 +1,7 @@
-<p style="text-align: center;">
+<p align="center">
   <img src="/src/third_party/medinilla-logo.png" width=70% height=70% alt="">
 </p>
+<br>
 
 # Medinilla - An OCPP Compliant Management System
 ![DOTNET CI](https://github.com/eliodecolli/Medinilla/actions/workflows/dotnet.yml/badge.svg)
@@ -17,7 +18,7 @@ Currently implemented OCPP messages:
 ## Medinilla - Architecture
 The most fundamental idea behind the architectural decisions on this project was scalability, and fault tolerance.
 
-<p style="text-align: center;">
+<p align="center">
   <img src="/src/third_party/core-arch.jpg" width=70% height=70% alt="Medinilla High Level Architecture Diagram">
 </p>
 
