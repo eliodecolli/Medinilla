@@ -23,7 +23,7 @@ public class MessageQueue(uint ttl = 5) : IMessageQueue
             {
                 var now = DateTime.Now;
 
-                // give each call request 5 seconds to be processed
+                // give each call request a TTL
                 if (_lastAdded.HasValue && !_queue.IsEmpty) shouldClean = now.Subtract(_lastAdded.Value).TotalSeconds >= ttl;
             }
 
