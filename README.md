@@ -1,5 +1,5 @@
-<p align="center">
-  <img src="/src/third_party/medinilla-flowers-1024x683.jpg" width=70% height=70%>
+<p style="text-align: center;">
+  <img src="/src/third_party/medinilla-logo.png" width=70% height=70% alt="">
 </p>
 
 # Medinilla - An OCPP Compliant Management System
@@ -17,8 +17,8 @@ Currently implemented OCPP messages:
 ## Medinilla - Architecture
 The most fundamental idea behind the architectural decisions on this project was scalability, and fault tolerance.
 
-<p align="center">
-  <img src="/src/third_party/core-arch.jpg" width=70% height=70%>
+<p style="text-align: center;">
+  <img src="/src/third_party/core-arch.jpg" width=70% height=70% alt="Medinilla High Level Architecture Diagram">
 </p>
 
 ## OCPP Implementation
