@@ -3,13 +3,13 @@ using Medinilla.Core.SharedContracts.Comms;
 using Medinilla.Core.SharedContracts.Comms.Ocpp;
 using Medinilla.RealTime;
 using Medinilla.RealTime.Redis;
-using Medinilla.WebApi.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Moq;
 using System.Collections.Concurrent;
 using System.Net.WebSockets;
 using System.Text;
+using Medinilla.Core.WebApi.Services;
 using Xunit.Abstractions;
 
 namespace Medinilla.Core.WebApi.Tests;
@@ -20,6 +20,7 @@ public class WebSocketDigestionServiceShould
 
     private readonly Mock<IConfiguration> _configMock;
     private readonly Mock<IConfigurationSection> _commsSectionMock;
+    private readonly Mock<IConfigurationSection> _generalSectionMock;
     private readonly Mock<ILogger<WebSocketDigestionService>> _loggerMock;
     private readonly Mock<IReceiver> _receiverMock;
     private readonly Mock<ISender> _senderMock;
@@ -42,6 +43,7 @@ public class WebSocketDigestionServiceShould
 
         _configMock = new Mock<IConfiguration>();
         _commsSectionMock = new Mock<IConfigurationSection>();
+        _generalSectionMock = new Mock<IConfigurationSection>();
         _loggerMock = new Mock<ILogger<WebSocketDigestionService>>();
         _receiverMock = new Mock<IReceiver>();
         _senderMock = new Mock<ISender>();
@@ -49,6 +51,9 @@ public class WebSocketDigestionServiceShould
         _commsSectionMock.Setup(s => s["RequestQueue"]).Returns(TEST_REQUEST_QUEUE);
         _commsSectionMock.Setup(s => s["ResponseQueue"]).Returns(TEST_RESPONSE_QUEUE);
         _configMock.Setup(c => c.GetSection("Comms")).Returns(_commsSectionMock.Object);
+
+        _generalSectionMock.Setup(s => s["MessageQueueTTL"]).Returns("5");
+        _configMock.Setup(c => c.GetSection("General")).Returns(_generalSectionMock.Object);
 
         // ReceiveAsync blocks on the semaphore until PushInbound() releases it.
         _receiverMock
