@@ -3,13 +3,14 @@ using Medinilla.Core.SharedContracts.Comms;
 using Medinilla.Core.SharedContracts.Comms.Ocpp;
 using Medinilla.RealTime;
 using Medinilla.RealTime.Redis;
-using Medinilla.WebApi.Services;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Moq;
 using System.Collections.Concurrent;
 using System.Net.WebSockets;
 using System.Text;
+using Medinilla.Core.WebApi.Services;
+using Medinilla.WebApi.Interfaces;
 using Xunit.Abstractions;
 
 namespace Medinilla.Core.WebApi.Tests;
@@ -20,7 +21,9 @@ public class WebSocketDigestionServiceShould
 
     private readonly Mock<IConfiguration> _configMock;
     private readonly Mock<IConfigurationSection> _commsSectionMock;
+    private readonly Mock<IConfigurationSection> _generalSectionMock;
     private readonly Mock<ILogger<WebSocketDigestionService>> _loggerMock;
+    private readonly Mock<ILogger<InternalCommunicationService>> _commsLoggerMock;
     private readonly Mock<IReceiver> _receiverMock;
     private readonly Mock<ISender> _senderMock;
 
@@ -42,13 +45,18 @@ public class WebSocketDigestionServiceShould
 
         _configMock = new Mock<IConfiguration>();
         _commsSectionMock = new Mock<IConfigurationSection>();
+        _generalSectionMock = new Mock<IConfigurationSection>();
         _loggerMock = new Mock<ILogger<WebSocketDigestionService>>();
+        _commsLoggerMock = new Mock<ILogger<InternalCommunicationService>>();
         _receiverMock = new Mock<IReceiver>();
         _senderMock = new Mock<ISender>();
 
         _commsSectionMock.Setup(s => s["RequestQueue"]).Returns(TEST_REQUEST_QUEUE);
         _commsSectionMock.Setup(s => s["ResponseQueue"]).Returns(TEST_RESPONSE_QUEUE);
         _configMock.Setup(c => c.GetSection("Comms")).Returns(_commsSectionMock.Object);
+
+        _generalSectionMock.Setup(s => s["MessageQueueTTL"]).Returns("5");
+        _configMock.Setup(c => c.GetSection("General")).Returns(_generalSectionMock.Object);
 
         // ReceiveAsync blocks on the semaphore until PushInbound() releases it.
         _receiverMock
@@ -157,8 +165,14 @@ public class WebSocketDigestionServiceShould
         return sentToWs;
     }
 
+    private InternalCommunicationService CreateCommsService() =>
+        new(_senderMock.Object, _receiverMock.Object, _commsLoggerMock.Object);
+
+    private IMessageQueueFactory CreateQueueFactory() =>
+        new MessageQueueFactory(_configMock.Object);
+
     private WebSocketDigestionService CreateService() =>
-        new(_configMock.Object, _loggerMock.Object, _receiverMock.Object, _senderMock.Object);
+        new(_configMock.Object, _loggerMock.Object, CreateCommsService(), CreateQueueFactory());
 
     // ================================================================
     // Constructor validation
@@ -168,28 +182,49 @@ public class WebSocketDigestionServiceShould
     public void ThrowOnNullConfiguration()
     {
         Assert.Throws<ArgumentNullException>(() =>
-            new WebSocketDigestionService(null!, _loggerMock.Object, _receiverMock.Object, _senderMock.Object));
+            new WebSocketDigestionService(null!, _loggerMock.Object, CreateCommsService(), CreateQueueFactory()));
     }
 
     [Fact]
     public void ThrowOnNullLogger()
     {
         Assert.Throws<ArgumentNullException>(() =>
-            new WebSocketDigestionService(_configMock.Object, null!, _receiverMock.Object, _senderMock.Object));
+            new WebSocketDigestionService(_configMock.Object, null!, CreateCommsService(), CreateQueueFactory()));
     }
 
     [Fact]
-    public void ThrowOnNullInboundQueue()
+    public void ThrowOnNullComms()
     {
         Assert.Throws<ArgumentNullException>(() =>
-            new WebSocketDigestionService(_configMock.Object, _loggerMock.Object, null!, _senderMock.Object));
+            new WebSocketDigestionService(_configMock.Object, _loggerMock.Object, null!, CreateQueueFactory()));
     }
 
     [Fact]
-    public void ThrowOnNullOutboundQueue()
+    public void ThrowOnNullQueueFactory()
     {
         Assert.Throws<ArgumentNullException>(() =>
-            new WebSocketDigestionService(_configMock.Object, _loggerMock.Object, _receiverMock.Object, null!));
+            new WebSocketDigestionService(_configMock.Object, _loggerMock.Object, CreateCommsService(), (IMessageQueueFactory)null!));
+    }
+
+    [Fact]
+    public void ThrowOnNullSender()
+    {
+        Assert.Throws<ArgumentNullException>(() =>
+            new InternalCommunicationService(null!, _receiverMock.Object, _commsLoggerMock.Object));
+    }
+
+    [Fact]
+    public void ThrowOnNullReceiver()
+    {
+        Assert.Throws<ArgumentNullException>(() =>
+            new InternalCommunicationService(_senderMock.Object, null!, _commsLoggerMock.Object));
+    }
+
+    [Fact]
+    public void ThrowOnNullCommsLogger()
+    {
+        Assert.Throws<ArgumentNullException>(() =>
+            new InternalCommunicationService(_senderMock.Object, _receiverMock.Object, null!));
     }
 
     // ================================================================

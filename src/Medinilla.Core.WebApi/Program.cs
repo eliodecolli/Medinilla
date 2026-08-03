@@ -1,9 +1,9 @@
+using Medinilla.Core.WebApi.Services;
 using Medinilla.DataAccess;
 using Medinilla.Infrastructure;
 using Medinilla.RealTime;
 using Medinilla.WebApi;
 using Medinilla.WebApi.Interfaces;
-using Medinilla.WebApi.Services;
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -40,7 +40,10 @@ builder.Services.AddMedinillaInfrastructure();
 builder.Services.AddRealTimeServices();
 builder.Services.AddMedinillaDataAccess();
 
+builder.Services.AddSingleton<IMessageQueueFactory, MessageQueueFactory>();
+
 builder.Services.AddScoped<IWSDigestionServiceCollection, WSDigestionServiceCollection>();
+builder.Services.AddScoped<IInternalCommunicationService, InternalCommunicationService>();
 builder.Services.AddScoped<IBasicWebSocketDigestionService, WebSocketDigestionService>();
 
 var app = builder.Build();
