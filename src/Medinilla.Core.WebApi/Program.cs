@@ -40,7 +40,10 @@ builder.Services.AddMedinillaInfrastructure();
 builder.Services.AddRealTimeServices();
 builder.Services.AddMedinillaDataAccess();
 
+builder.Services.AddSingleton<IMessageQueueFactory, MessageQueueFactory>();
+
 builder.Services.AddScoped<IWSDigestionServiceCollection, WSDigestionServiceCollection>();
+builder.Services.AddScoped<IInternalCommunicationService, InternalCommunicationService>();
 builder.Services.AddScoped<IBasicWebSocketDigestionService, WebSocketDigestionService>();
 
 var app = builder.Build();

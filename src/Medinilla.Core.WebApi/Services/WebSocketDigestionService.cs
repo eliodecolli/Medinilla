@@ -6,7 +6,6 @@ using Medinilla.Core.SharedContracts.Comms.Ocpp;
 using Medinilla.Core.WebApi.Services.Domain;
 using Medinilla.Infrastructure;
 using Medinilla.Infrastructure.Exceptions;
-using Medinilla.RealTime;
 using Medinilla.RealTime.Redis;
 using Medinilla.WebApi.Interfaces;
 
@@ -21,9 +20,8 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService
     private WebSocket? _webSocket;
     private string? _clientIdentifier;
 
-    private ISender _sender;
-    private IReceiver _receiver;
-    
+    private readonly IInternalCommunicationService _comms;
+
     private bool _disposed;
 
     // currently processing message id
@@ -40,30 +38,29 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService
     // semaphore to coordinate sending data
     private readonly SemaphoreSlim _sendLock;
 
-    private object _lock = new object();
+    private readonly Lock _lock = new Lock();
 
-    private MessageQueue _inbound;
-    private MessageQueue _outbound;
+    private readonly IMessageQueue _inbound;
+    private readonly IMessageQueue _outbound;
 
-    private const string InboundDir = "Inbound";
-    private const string OutboundDir = "Outbound";
+    private const string InboundDirection = "Inbound";
+    private const string OutboundDirection = "Outbound";
 
     public WebSocketDigestionService(
         IConfiguration config,
         ILogger<WebSocketDigestionService> logger,
-        IReceiver receiver,
-        ISender sender)
+        IInternalCommunicationService comms,
+        IMessageQueueFactory queueFactory)
     {
         _config = config ?? throw new ArgumentNullException(nameof(config));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _receiver = receiver ?? throw new ArgumentNullException(nameof(receiver));
-        _sender = sender ?? throw new ArgumentNullException(nameof(sender));
+        _comms = comms ?? throw new ArgumentNullException(nameof(comms));
+        ArgumentNullException.ThrowIfNull(queueFactory);
+
+        _inbound = queueFactory.Create();
+        _outbound = queueFactory.Create();
 
         _cts = new CancellationTokenSource();
-
-        var ttl = GetMessageQueueTtl();
-        _inbound = new MessageQueue(ttl);
-        _outbound = new MessageQueue(ttl);
 
         _sendLock = new SemaphoreSlim(1, 1);
 
@@ -80,11 +77,6 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService
     private void AssertOutboundChannelName()
     {
         if (_outboundQueueName is null) throw new NullReferenceException("Outbound Channel Name is not set.");
-    }
-
-    private void AssertComms()
-    {
-        if (_receiver is null || _sender is null) throw new NullReferenceException("Redis comms has not been set up.");
     }
     #endregion
 
@@ -103,14 +95,6 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService
         _outboundQueueName = outboundPrefix;
 
         _inboundQueueName = RedisUtils.BuildChannelName(inboundPrefix, _clientIdentifier);
-    }
-
-    private uint GetMessageQueueTtl()
-    {
-        var value = _config.GetSection("General")["MessageQueueTTL"];
-        if (value is null) throw new InvalidOperationException("'MessageQueueTTL' configuration is not set.");
-        if (!uint.TryParse(value, out var ttl)) throw new InvalidOperationException("'MessageQueueTTL' must be a non-negative integer.");
-        return ttl;
     }
 
     private bool IsConnectionOpen()
@@ -160,7 +144,7 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService
             var messageId = parser.TryExtractMessageId();
             if (messageId is null)
             {
-                throw new InvalidOcppMessageException(_clientIdentifier ?? "<Unkown>");
+                throw new InvalidOcppMessageException(_clientIdentifier ?? "Unknown");
             }
 
             var type = parser.GetMessageType() switch
@@ -201,6 +185,11 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService
         var segment = new ArraySegment<byte>(buffer);
         var messageBuffer = new List<byte>(); // To store the complete message
 
+        if (_webSocket is null)
+        {
+            throw new InvalidOperationException($"{_clientIdentifier}: WebSocket is not defined.");
+        }
+
         try
         {
             WebSocketReceiveResult result;
@@ -217,12 +206,12 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService
                 }
 
                 // Add the received data to our message buffer
-                messageBuffer.AddRange(segment.AsSpan(0, result.Count).ToArray());
+                messageBuffer.AddRange([.. segment.AsSpan(0, result.Count)]);
 
                 // Continue until we've received the entire message
             } while (!result.EndOfMessage);
 
-            return messageBuffer.ToArray();
+            return [.. messageBuffer];
         }
         catch (OperationCanceledException)
         {
@@ -238,8 +227,8 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService
 
     #region Queue Management
     private async Task DrainQueue(
-        MessageQueue queue,
-        string dir,
+        IMessageQueue queue,
+        string direction,
         Func<OcppHeader, byte[], Task> processor)
     {
         byte[]? payload = null;
@@ -253,11 +242,11 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService
                 header = GetMessageHeader(rawMessage);
 
                 _logger.LogInformation("[{ClientId}] De-queueing message: {MessageId} ({Direction})",
-                    _clientIdentifier, header.MessageId, dir.ToLowerInvariant());
+                    _clientIdentifier, header.MessageId, direction.ToLowerInvariant());
 
                 if (!string.IsNullOrEmpty(header.MessageId))
                 {
-                    if (dir == InboundDir) SetProcessingInboundId(header.MessageId);
+                    if (direction == InboundDirection) SetProcessingInboundId(header.MessageId);
                     else                   SetProcessingOutboundId(header.MessageId);
                 }
                 payload = next.Payload.ToByteArray();
@@ -269,7 +258,7 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService
     }
 
     private Task DrainInbound()
-        => DrainQueue(_inbound, InboundDir, async (header, payload) =>
+        => DrainQueue(_inbound, InboundDirection, async (header, payload) =>
             await PublishCommsMessage(new Comms
             {
                 MessageType = header.Type,
@@ -277,116 +266,73 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService
             }));
 
     private Task DrainOutbound()
-        => DrainQueue(_outbound, OutboundDir, (_, payload) => SendRaw(payload));
+        => DrainQueue(_outbound, OutboundDirection, (_, payload) => SendRaw(payload));
 
-    private async Task PublishCommsMessage(Comms message)
+    private Task PublishCommsMessage(Comms message)
+        => _comms.PublishCommsMessage(message);
+    
+    private async Task OnWampMessage(WampResult parsed)
     {
-        AssertComms();
-        AssertOutboundChannelName();
-
-        await _sender.SendAsync(_outboundQueueName!, message.ToByteArray());
-        _logger.LogInformation("[{ClientId}] Comms: Sent {Type} to {Queue}",
-            _clientIdentifier, Enum.GetName(message.MessageType), _outboundQueueName);
-    }
-
-    private async Task RunCommsChannel()
-    {
-        byte[]? result;
-        try
+        if (!IsConnectionOpen())
         {
-            result = await _receiver.ReceiveAsync(_inboundQueueName!, _cts.Token);
-        }
-        catch (OperationCanceledException)
-        {
-            return;
+            // stop the comms but finish processing the message
+            _comms.Stop();
         }
 
-        _logger.LogInformation("[{ClientId}] Received from {rabbit}", _clientIdentifier, _inboundQueueName);
+        byte[]? message = null;
 
-        try
+        if (!parsed.Result.IsEmpty)
         {
-            if (result is not null)
+            message = parsed.Result.ToByteArray();
+        }
+        else if (!parsed.Error.IsEmpty)
+        {
+            message = parsed.Error.ToByteArray();
+        }
+
+        var rawString = Encoding.UTF8.GetString(message ?? []);
+        var header = GetMessageHeader(rawString);
+
+        var shouldDrainInbound = false;
+        var shouldForward = false;
+
+        lock (_lock)
+        {
+            if (header.Type == CommsMessageType.OcppResponse)
             {
-                var commsResult = Comms.Parser.ParseFrom(result);
-
-                var parsed = WampResult.Parser.ParseFrom(commsResult.Payload.ToByteArray());
-                if (parsed.ClientIdentifier != _clientIdentifier)
+                if (_processingInboundId == header.MessageId)
                 {
-                    return;  // not our guy
+                    _processingInboundId = null;
+                    shouldDrainInbound = true;
+                    shouldForward = true;
                 }
-
-                if (!IsConnectionOpen())
+                else
                 {
-                    return;  // yeah we're done here pal
+                    _logger.LogWarning(
+                        "[{ClientId}] Received message {MessageId} of type {Type} - but it doesn't match our inbound ID",
+                        _clientIdentifier, header.MessageId, Enum.GetName(header.Type));
                 }
-
-
-                byte[]? message = null;
-
-                if (!parsed.Result.IsEmpty)
+            }
+            else if (header.Type == CommsMessageType.OcppRequest)
+            {
+                if (_processingOutboundId is null)
                 {
-                    message = parsed.Result.ToByteArray();
+                    _processingOutboundId = header.MessageId;
+                    shouldForward = true;
                 }
-                else if (!parsed.Error.IsEmpty)
+                else
                 {
-                    message = parsed.Error.ToByteArray();
-                }
-
-                var rawString = Encoding.UTF8.GetString(message ?? []);
-                var header = GetMessageHeader(rawString);
-
-                var shouldDrainInbound = false;
-                var shouldForward = false;
-
-                lock (_lock)
-                {
-                    if (commsResult.MessageType == CommsMessageType.OcppResponse)
+                    _outbound.EnqueueMessage(new OcppMessage
                     {
-                        if (_processingInboundId == header.MessageId)
-                        {
-                            // boy have we got a response for you :)
-                            _processingInboundId = null;
-                            shouldDrainInbound = true;
-                            shouldForward = true;
-                        }
-                        else
-                        {
-                            _logger.LogWarning("[{ClientId}] Received message {MessageId} of type {Type} - but it doesn't match our inbound ID",
-                                _clientIdentifier, header.MessageId, Enum.GetName(header.Type));
-                        }
-                    }
-                    // only  check this when we're trying to send a request
-                    else if (header.Type == CommsMessageType.OcppRequest)
-                    {
-                        if (_processingOutboundId is null)
-                        {
-                            _processingOutboundId = header.MessageId;
-                            shouldForward = true;
-                        }
-                        else
-                        {
-                            _outbound.EnqueueMessage(new OcppMessage()
-                            {
-                                ClientIdentifier = _clientIdentifier,
-                                Payload = ByteString.CopyFrom(message)
-                            });
-                        }
-                    }
+                        ClientIdentifier = _clientIdentifier,
+                        Payload = ByteString.CopyFrom(message)
+                    });
                 }
-
-                if (shouldForward && message is not null) await SendRaw(message);
-                if (shouldDrainInbound) await DrainInbound();
             }
         }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, "[{ClientId}] Error processing message from {RoutingKey}", _clientIdentifier, _inboundQueueName);
-        }
-        finally
-        {
-            if (!_cts.Token.IsCancellationRequested)
-                Task.Run(RunCommsChannel);
-        }
+
+        if (shouldForward && message is not null) await SendRaw(message);
+        if (shouldDrainInbound) await DrainInbound();
     }
 
     private async Task ProcessMessageInbound(byte[] message)
@@ -478,6 +424,7 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService
             _outbound.Dispose();
             _sendLock.Dispose();
             _cts.Dispose();
+            await _comms.DisposeAsync();
         }
     }
     #endregion
@@ -504,7 +451,7 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService
             throw new InvalidOperationException("Response queue name is not configured");
         }
         
-        _ = Task.Run(RunCommsChannel);
+        _comms.Start(_clientIdentifier, _inboundQueueName!, _outboundQueueName!, OnWampMessage);
 
         var inboundVacuum = Task.Run(() => _inbound.ScheduleVacuum(_cts));
         var outboundVacuum = Task.Run(() => _outbound.ScheduleVacuum(_cts));
@@ -548,5 +495,7 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService
         {
             _logger.LogDebug("[{ClientId}] Vacuum Task ended.", _clientIdentifier);
         }
+
+        _comms.Stop();
     }
 }

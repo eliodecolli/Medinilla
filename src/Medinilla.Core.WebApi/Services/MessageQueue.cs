@@ -1,17 +1,18 @@
 using System.Collections.Concurrent;
 using Medinilla.Core.SharedContracts.Comms.Ocpp;
+using Medinilla.WebApi.Interfaces;
 
 namespace Medinilla.Core.WebApi.Services;
 
-public class MessageQueue(uint ttl = 5) : IDisposable
+public class MessageQueue(uint ttl = 5) : IMessageQueue
 {
     private readonly ConcurrentQueue<OcppMessage> _queue = new();
-    private object _lock = new();
+    private readonly Lock _lock = new();
     
     private readonly PeriodicTimer _timer = new(TimeSpan.FromSeconds(5));
     private DateTime? _lastAdded;
     
-    public Func<Task>? OnDrainQueue;
+    public Func<Task>? OnDrainQueue { get; set; }
 
     public async Task ScheduleVacuum(CancellationTokenSource cts)
     {
@@ -48,5 +49,6 @@ public class MessageQueue(uint ttl = 5) : IDisposable
     {
         _queue.Clear();
         _timer.Dispose();
+        GC.SuppressFinalize(this);
     }
 }
