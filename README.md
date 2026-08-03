@@ -1,5 +1,5 @@
 <p align="center">
-  <img src="/src/third_party/medinilla-logo.png" width=70% height=70% alt="">
+  <img src="/src/third_party/medinilla-logo.png" alt="">
 </p>
 <br>
 
