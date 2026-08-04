@@ -59,13 +59,14 @@ public class OcppCallRouter(
             case OcppJMessageType.CALL_RESULT:
                 {
                     var result = parser.ParseResult();
-                    await HandleCommandResponse(clientIdentifier, result);
+                    await DispatchCommandReplyAsync(clientIdentifier, result, cmd => cmd.HandleResponse(result));
                     return null;
                 }
 
             case OcppJMessageType.CALL_ERROR:
             {
                 var error = parser.ParseError();
+                await DispatchCommandReplyAsync(clientIdentifier, error, cmd => cmd.HandleError(error));
                 return null;
             }
 
@@ -121,29 +122,33 @@ public class OcppCallRouter(
         }
     }
 
-    private async Task HandleCommandResponse(string clientIdentifier, OcppCallResult result)
+    private async Task DispatchCommandReplyAsync<TMessage>(
+        string clientIdentifier,
+        TMessage message,
+        Func<IOcppChargerCommand, Task> dispatch)
+        where TMessage : BaseOcppMessage
     {
         if (_outboundTable is null)
         {
             throw new InvalidOperationException("Outbound table is not defined.");
         }
 
-        var pending = await _outboundTable.TryGetValue(result.MessageId);
+        var pending = await _outboundTable.TryGetValue(message.MessageId);
         if (pending is not null)
         {
             var command = commandFactory.GetCommand(pending);
             if (command is null)
             {
-                _logger.LogError("Message {mid} is marked as {cmd}, but {cmd} is not implemented in our end.", result.MessageId, pending, pending);
+                _logger.LogError("Message {mid} is marked as {cmd}, but {cmd} is not implemented in our end.", message.MessageId, pending, pending);
                 return;
             }
 
-            await _outboundTable.Remove(result.MessageId);
-            await command.HandleResponse(result);
+            await _outboundTable.Remove(message.MessageId);
+            await dispatch(command);
         }
         else
         {
-            _logger.LogError("Received message response, however in-flight message was not present in our table. Message ID: {msgId}, Client ID: {clientId}", result.MessageId, clientIdentifier);
+            _logger.LogError("Received message reply, however in-flight message was not present in our table. Message ID: {msgId}, Client ID: {clientId}", message.MessageId, clientIdentifier);
         }
     }
 
