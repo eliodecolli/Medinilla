@@ -1,9 +1,16 @@
 ---
 name: commands-generator
-description: Create a new OcppChargerCommand instance.
+description: Scaffold a new OcppChargerCommand instance (skeleton + DTOs only).
 ---
 
 ## Summary
+Scaffolds the skeleton of a new `OcppChargerCommand` and its associated DTOs. The skill produces:
+
+1. The command class (interface implementation, no handler logic).
+2. The `Request`/`Response` DTOs in `Medinilla.DataTypes/Contracts/`, populated from the action's OCPP JSON schema.
+
+The skill does **not** implement `HandleResponse` / `HandleError` logic — those are left as empty stubs for the developer to fill in.
+
 OCPP Charger Commands are part of the "Core" component. They handle data flowing **from the CSMS to the charger** (the outbound direction). A command:
 
 1. Holds the `Action` name it owns.
@@ -70,6 +77,8 @@ The wire payload for the OCPP message itself (what `OcppCallRequest.Payload` is 
 
 The mapping from user DTO -> OCPP payload DTO happens **in the caller**, before `SubmitAsync`, not inside the command.
 
+**DTO generation rule:** When scaffolding a new action, populate the `Request` and `Response` property types from the action's OCPP JSON schema (OCPP 1.6 / 2.0.1 spec). Reuse existing common types under `Contracts/Common/` wherever the schema references them — don't redefine them.
+
 ## Skeleton
 
 ```csharp
@@ -83,13 +92,13 @@ internal sealed class NewCommand : IOcppChargerCommand
 
     public Task HandleResponse(OcppCallResult result)
     {
-        // deserialize result.Payload and act on it
+        // TODO: deserialize result.Payload and act on it
         return Task.CompletedTask;
     }
 
     public Task HandleError(OcppCallError error)
     {
-        // react to OCPP error
+        // TODO: react to OCPP error
         return Task.CompletedTask;
     }
 }
