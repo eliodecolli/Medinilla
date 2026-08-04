@@ -7,7 +7,7 @@ public interface IOcppCallRouter
 {
     Task<RpcResult?> RouteOcppCall(byte[] buffer, string? clientIdentifier);
 
-    Task SubmitAsync(string clientIdentifier, IOcppChargerCommand command, CancellationToken ct);
+    Task SubmitAsync(string clientIdentifier, OcppCallRequest request, CancellationToken ct);
 
     void SetCallSubmitter(Func<string, string, CancellationToken, Task> submitter);
 
