@@ -14,7 +14,7 @@ public sealed class OcppCallResult : BaseOcppMessage
 
     public string? Payload { get; private set; }
 
-    public T? PayloadAs<T>() where T : class
+    public T? As<T>() where T : class
     {
         if (Payload is null)
         {

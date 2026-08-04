@@ -62,11 +62,43 @@ behaviour the user is asking about (a message, use case, configuration variable,
    6. **Related configuration variables / size limits**.
    7. **Cross-references** — other use cases where this message appears.
 
-   Keep the summary under ~4 paragraphs unless the user asks for detail. Use
-   `file_path:page` style references (`docs/OCPP-2.0.1_part2_specification_edition2.pdf:53`)
-   so the user can jump to the page.
+   Keep the summary under ~4 paragraphs unless the user asks for detail.
 
-4. **If the topic is not in Part 2**, tell the user — Part 1 (Architecture &
+4. **Citation rules** — these are mandatory, not optional:
+   - **Every factual claim** must be followed by a source in parentheses,
+     pointing at the PDF page. Use the `file_path:page` style, e.g.
+     `(docs/OCPP-2.0.1_part2_specification_edition2.pdf:53)`.
+   - The cite goes **inline after the claim**, not gathered at the end of
+     the paragraph or section. The user must be able to trace each fact back
+     to a page without re-reading the whole answer.
+   - **Tables count.** A cell that contains a claim must end with the source
+     in parentheses, just like prose. Add a `Source` column when every cell
+     in a row would share the same citation, or append the cite to each
+     cell when citations differ.
+   - If a claim cannot be traced to a specific page, **do not make the
+     claim**. Either drop it or flag it explicitly as
+     `(inferred from <context>, not directly stated in spec)`.
+   - If multiple pages support the same claim, cite the most specific one
+     first, e.g. `(p. 53, Figure 14)` and only add others if the user asks.
+
+5. **Neutrality rules** — these are also mandatory:
+   - **Do not make assumptions about what's better or worse.** The spec
+     describes protocol behaviour; it does not endorse one approach over
+     another. Stick to what the spec says and what the spec requires.
+   - Do not use comparative language that is not in the spec. Avoid phrases
+     like "this is the recommended/best/preferred way", "you should
+     really…", "it would be better to…", "this is more secure/flexible/
+     modern…", unless the spec itself uses those words (e.g. "RECOMMENDED",
+     "SHOULD"). When the spec uses a normative keyword, quote it
+     (`SHALL` / `SHOULD` / `MAY` / `RECOMMENDED`) and cite the page.
+   - Do not editorialize about design choices, market trends, or what other
+     vendors do. If the user wants an opinion, they will ask.
+   - When the spec actually contains a recommendation (e.g.
+     `B05.FR.04` "The Charging Station SHALL respond with
+     `SetVariablesResponse(Accepted)`"), report it neutrally as a requirement
+     of the spec, not as a personal opinion.
+
+6. **If the topic is not in Part 2**, tell the user — Part 1 (Architecture &
    Topology) and Part 4 (JSON over WebSockets) cover material that isn't in
    Part 2. Don't guess.
 
