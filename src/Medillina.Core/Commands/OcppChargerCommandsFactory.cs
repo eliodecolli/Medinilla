@@ -16,7 +16,7 @@ public class OcppChargerCommandsFactory(
             return command;
         }
 
-        _logger.LogWarning("No charger command registered for action '{Action}'", action);
+        _logger.LogError("No charger command registered for action '{Action}'", action);
         return null;
     }
 }

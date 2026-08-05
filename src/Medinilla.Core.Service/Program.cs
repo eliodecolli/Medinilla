@@ -1,7 +1,9 @@
 ﻿using Medinilla.Core;
+using Medinilla.Core.Interfaces;
 using Medinilla.Core.Service.Communication;
 using Medinilla.Core.Service.Interfaces;
 using Medinilla.Core.Service.Types;
+using Medinilla.Core.v1;
 using Medinilla.DataAccess;
 using Medinilla.Infrastructure;
 using Medinilla.RealTime;
@@ -36,6 +38,10 @@ hostApplicationBuilder.Services.AddMedinillaInfrastructure();
 hostApplicationBuilder.Services.AddMedinillaDataAccess();
 hostApplicationBuilder.Services.AddMedinillaServices();
 hostApplicationBuilder.Services.AddRealTimeServices();
+
+hostApplicationBuilder.Services.AddSingleton(CommunicationSettings.FromSettingsFile("settings.json"));
+hostApplicationBuilder.Services.AddScoped<IOcppRequestDispatcher, OcppRequestDispatcher>();
+hostApplicationBuilder.Services.AddScoped<BaseOcppRoutingTable, RedisRoutingTable>();
 hostApplicationBuilder.Services.AddSingleton<IInterfaceCommunication, CoreInterfaceCommunication>();
 
 using var host = hostApplicationBuilder.Build();
@@ -43,6 +49,6 @@ using var host = hostApplicationBuilder.Build();
 var interfaceComms = host.Services.GetRequiredService<IInterfaceCommunication>();
 var lifetime = host.Services.GetRequiredService<IHostApplicationLifetime>();
 
-await interfaceComms.Run(CommunicationSettings.FromSettingsFile("settings.json"), lifetime.ApplicationStopping);
+await interfaceComms.Run(lifetime.ApplicationStopping);
 
 await host.WaitForShutdownAsync();

@@ -7,6 +7,5 @@ import "Service/Types.proto";
 package medinilla.core.grpc;
 
 service OcppService {
-    rpc GetChargingStations (GetChargingStationsQuery) returns (GetChargingStationsResponse) {}
-    rpc GetChargingStation (GetChargingStationQuery) returns (GetChargingStationResponse) {}
+    rpc SetVariables (SetVariablesRequest) returns (SetVariablesResponse) {}
 }

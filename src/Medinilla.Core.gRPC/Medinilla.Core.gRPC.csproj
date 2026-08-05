@@ -8,6 +8,7 @@
 
   <ItemGroup>
     <Protobuf Include="Contracts\ChargingStation.proto" />
+    <Protobuf Include="Contracts\UserSetVariablesRequest.proto" />
     <Protobuf Include="Service\Types.proto" />
     <Protobuf Include="Service\OcppService.proto" />
   </ItemGroup>

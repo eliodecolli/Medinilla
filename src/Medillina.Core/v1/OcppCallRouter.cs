@@ -2,7 +2,6 @@
 using Medinilla.Core.Commands;
 using Medinilla.Core.Interfaces;
 using Medinilla.Core.Interfaces.Services;
-using Medinilla.DataTypes.Core;
 using Medinilla.Infrastructure;
 using Medinilla.Infrastructure.WAMP;
 using Microsoft.Extensions.Logging;
@@ -12,15 +11,12 @@ namespace Medinilla.Core.v1;
 
 public class OcppCallRouter(
     ILogger<OcppCallRouter> _logger,
-    IOcppActionsFactory _factory,
-    IOcppChargerCommandFactory _commands,
-    IRouterServices services) : IOcppCallRouter
+    IRouterServices services,
+    IOcppActionsFactory actionsFactory,
+    IOcppChargerCommandFactory commandFactory,
+    IOcppRequestDispatcher dispatcher,
+    BaseOcppRoutingTable outboundTable) : IOcppCallRouter
 {
-    private Func<string, string, CancellationToken, Task>? _submitCall;
-
-    public void SetCallSubmitter(Func<string, string, CancellationToken, Task> submitter)
-        => _submitCall = submitter;
-
     public async Task<RpcResult?> RouteOcppCall(byte[] buffer, string? clientIdentifier)
     {
         ArgumentNullException.ThrowIfNull(clientIdentifier, nameof(clientIdentifier));
@@ -41,24 +37,26 @@ public class OcppCallRouter(
         switch (parser.GetMessageType())
         {
             case OcppJMessageType.CALL:
-                return await HandleCall(parser, clientIdentifier, messageString);
+                {
+                    var call = parser.ParseCall();
+                    return await HandleCall(clientIdentifier, call).ConfigureAwait(false);
+                }
 
             case OcppJMessageType.CALL_RESULT:
-            {
-                var result = parser.ParseResult();
-                _logger.LogInformation("Received OCPP Call Result from {Client} for action '{Action}'", clientIdentifier, ExtractActionFromMessageId(result.MessageId));
-                _commands.GetCommand(ExtractActionFromMessageId(result.MessageId) ?? string.Empty)
-                         ?.HandleResponse(result.Payload, error: null);
-                return null;
-            }
+                {
+                    var result = parser.ParseResult();
+                    await DispatchCommandReplyAsync(clientIdentifier, result, cmd => cmd.HandleResponse(result))
+                        .ConfigureAwait(false);
+
+                    return null;
+                }
 
             case OcppJMessageType.CALL_ERROR:
             {
                 var error = parser.ParseError();
-                _logger.LogInformation("Received OCPP Call Error from {Client} for action '{Action}': [{Code}] {Desc}",
-                    clientIdentifier, ExtractActionFromMessageId(error.MessageId), error.ErrorCode, error.ErrorDescription);
-                _commands.GetCommand(ExtractActionFromMessageId(error.MessageId) ?? string.Empty)
-                         ?.HandleResponse(responsePayload: null, error: error);
+                await DispatchCommandReplyAsync(clientIdentifier, error, cmd => cmd.HandleError(error))
+                        .ConfigureAwait(false);
+
                 return null;
             }
 
@@ -71,23 +69,11 @@ public class OcppCallRouter(
         }
     }
 
-    private async Task<RpcResult?> HandleCall(OcppMessageParser parser, string clientIdentifier, string raw)
+    private async Task<RpcResult?> HandleCall(string clientIdentifier, OcppCallRequest ocppCall)
     {
-        var ocppCall = parser.ParseCall();
         _logger.LogInformation("Received OCPP Call: {Action} - from {Client}", ocppCall.Action, clientIdentifier);
 
-#if DEBUG
-        var salt = new Random().Next().ToString("X");
-        if (!Directory.Exists("logs"))
-        {
-            Directory.CreateDirectory("logs");
-        }
-        if (ocppCall.Action != "Heartbeat")
-        {
-            File.WriteAllBytes("logs/" + ocppCall.Action + "_log_" + DateTime.Now.ToBinary() + "_" + salt + ".txt", Encoding.UTF8.GetBytes(raw));
-        }
-#endif
-        var ocppAction = _factory.GetAction(ocppCall.Action);
+        var ocppAction = actionsFactory.GetAction(ocppCall.Action);
         if (ocppAction is null)
         {
             _logger.LogError("Invalid action '{Action}' - Not implemented.", ocppCall.Action);
@@ -126,14 +112,36 @@ public class OcppCallRouter(
         }
     }
 
-    public async Task SubmitAsync(string clientIdentifier, IOcppChargerCommand command, CancellationToken ct)
+    private async Task DispatchCommandReplyAsync<TMessage>(
+        string clientIdentifier,
+        TMessage message,
+        Func<IOcppChargerCommand, Task> dispatch)
+        where TMessage : BaseOcppMessage
     {
-        if (_submitCall is null)
-            throw new InvalidOperationException("Call submitter not wired. Set it from InterfaceCommunication at startup.");
 
-        var messageId = BuildMessageId(command.Action);
-        var frame = command.BuildCall(messageId).ToBytes();
-        await _submitCall(clientIdentifier, Encoding.UTF8.GetString(frame), ct).ConfigureAwait(false);
+        var pending = await outboundTable.TryGetValue(message.MessageId).ConfigureAwait(false);
+        if (pending is not null)
+        {
+            var command = commandFactory.GetCommand(pending);
+            if (command is null)
+            {
+                _logger.LogError("Message {mid} is marked as {cmd}, but {cmd} is not implemented in our end.", message.MessageId, pending, pending);
+                return;
+            }
+
+            await outboundTable.Remove(message.MessageId);
+            await dispatch(command);
+        }
+        else
+        {
+            _logger.LogError("Received message reply, however in-flight message was not present in our table. Message ID: {msgId}, Client ID: {clientId}", message.MessageId, clientIdentifier);
+        }
+    }
+
+    public async Task SubmitAsync(string clientIdentifier, OcppCallRequest request)
+    {
+        await outboundTable.Add(request.MessageId, request.Action).ConfigureAwait(false);
+        await dispatcher.SubmitRequest(clientIdentifier, request.Serialize()).ConfigureAwait(false);
     }
 
     public async Task DisconnectClient(string clientIdentifier)
@@ -149,13 +157,5 @@ public class OcppCallRouter(
         }
 
         return await services.ValidateChargingStationAvailability(clientIdentifier);
-    }
-
-    private static string BuildMessageId(string action) => $"{action}-{Guid.NewGuid():N}";
-
-    private static string? ExtractActionFromMessageId(string messageId)
-    {
-        var dash = messageId.IndexOf('-');
-        return dash > 0 ? messageId[..dash] : null;
     }
 }

@@ -6,4 +6,8 @@ public static class RedisUtils
     {
         return $"{prefix}-{id}";
     }
+
+    public static string ProducerConnectionMultiplexer => "medinilla.producer";
+
+    public static string ConsumerConnectionMultiplexer => "medinilla.consumer";
 }

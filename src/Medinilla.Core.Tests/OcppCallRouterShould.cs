@@ -1,10 +1,10 @@
 using Medinilla.Core.Actions;
 using Medinilla.Core.Commands;
+using Medinilla.Core.Interfaces;
 using Medinilla.Core.Interfaces.Services;
 using Medinilla.Core.v1;
 using Medinilla.Infrastructure.WAMP;
 using Microsoft.Extensions.Logging;
-using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using System.Text;
 using Xunit.Abstractions;
@@ -19,6 +19,7 @@ public class OcppCallRouterShould
     private readonly Mock<IOcppActionsFactory> _actionsFactoryMock = new();
     private readonly Mock<IOcppChargerCommandFactory> _commandsFactoryMock = new();
     private readonly Mock<IRouterServices> _routerServicesMock = new();
+    private readonly Mock<IOcppRequestDispatcher> _dispatcherMock = new();
 
     private const string CLIENT_ID = "TEST-CHARGER-001";
     private const string KNOWN_ACTION = "Heartbeat";
@@ -35,10 +36,24 @@ public class OcppCallRouterShould
         _routerServicesMock
             .Setup(s => s.DisconnectClient(It.IsAny<string>()))
             .Returns(Task.CompletedTask);
+
+        _dispatcherMock
+            .Setup(d => d.SubmitRequest(It.IsAny<string>(), It.IsAny<string>()))
+            .Returns(Task.CompletedTask);
     }
 
-    private OcppCallRouter CreateSut() =>
-        new(_loggerMock.Object, _actionsFactoryMock.Object, _commandsFactoryMock.Object, _routerServicesMock.Object);
+    private (OcppCallRouter Router, FakeRoutingTable Table) CreateSut()
+    {
+        var table = new FakeRoutingTable();
+        var router = new OcppCallRouter(
+            _loggerMock.Object,
+            _routerServicesMock.Object,
+            _actionsFactoryMock.Object,
+            _commandsFactoryMock.Object,
+            _dispatcherMock.Object,
+            table);
+        return (router, table);
+    }
 
     // ----------------------------------------------------------------
     // CALL → Action dispatch
@@ -50,13 +65,13 @@ public class OcppCallRouterShould
         var fakeAction = new FakeAction { ActionName = "BootNotification" };
         _actionsFactoryMock.Setup(f => f.GetAction("BootNotification")).Returns(fakeAction);
 
-        var sut = CreateSut();
+        var (sut, _) = CreateSut();
         var frame = Encoding.UTF8.GetBytes(BuildCall("msg-1", "BootNotification", "{}"));
 
         var result = await sut.RouteOcppCall(frame, CLIENT_ID);
 
         Assert.NotNull(result);
-        Assert.Same(fakeAction.ExecutedCall, fakeAction.ExecutedCall);   // executed
+        Assert.Same(fakeAction.ExecutedCall, fakeAction.ExecutedCall);
         _routerServicesMock.Verify(s => s.ValidateChargingStationAvailability(It.IsAny<string>()), Times.Never);
     }
 
@@ -75,7 +90,7 @@ public class OcppCallRouterShould
         };
         _actionsFactoryMock.Setup(f => f.GetAction(KNOWN_ACTION)).Returns(fakeAction);
 
-        var sut = CreateSut();
+        var (sut, _) = CreateSut();
         var frame = Encoding.UTF8.GetBytes(BuildCall("msg-1", KNOWN_ACTION, "{}"));
 
         var result = await sut.RouteOcppCall(frame, CLIENT_ID);
@@ -92,7 +107,7 @@ public class OcppCallRouterShould
     {
         _actionsFactoryMock.Setup(f => f.GetAction(UNKNOWN_ACTION)).Returns((IOcppAction?)null);
 
-        var sut = CreateSut();
+        var (sut, _) = CreateSut();
         var frame = Encoding.UTF8.GetBytes(BuildCall("msg-1", UNKNOWN_ACTION, "{}"));
 
         var result = await sut.RouteOcppCall(frame, CLIENT_ID);
@@ -112,7 +127,7 @@ public class OcppCallRouterShould
             .Setup(s => s.ValidateChargingStationAvailability(CLIENT_ID))
             .ReturnsAsync(false);
 
-        var sut = CreateSut();
+        var (sut, _) = CreateSut();
         var frame = Encoding.UTF8.GetBytes(BuildCall("msg-1", KNOWN_ACTION, "{}"));
 
         var result = await sut.RouteOcppCall(frame, CLIENT_ID);
@@ -128,7 +143,7 @@ public class OcppCallRouterShould
         var fakeAction = new FakeAction { ActionName = KNOWN_ACTION, ThrowOnExecute = new InvalidOperationException("boom") };
         _actionsFactoryMock.Setup(f => f.GetAction(KNOWN_ACTION)).Returns(fakeAction);
 
-        var sut = CreateSut();
+        var (sut, _) = CreateSut();
         var frame = Encoding.UTF8.GetBytes(BuildCall("msg-1", KNOWN_ACTION, "{}"));
 
         var result = await sut.RouteOcppCall(frame, CLIENT_ID);
@@ -142,8 +157,8 @@ public class OcppCallRouterShould
     [Fact]
     public async Task RouteOcppCall_ForMalformedFrame_ReturnsNull()
     {
-        var sut = CreateSut();
-        var frame = Encoding.UTF8.GetBytes("[2,\"broken");   // unparseable
+        var (sut, _) = CreateSut();
+        var frame = Encoding.UTF8.GetBytes("[2,\"broken");
 
         var result = await sut.RouteOcppCall(frame, CLIENT_ID);
 
@@ -157,10 +172,12 @@ public class OcppCallRouterShould
     [Fact]
     public async Task RouteOcppCall_ForCallResultWithKnownAction_DispatchesToCommand()
     {
-        var fakeCommand = new FakeCommand { Action = "Reset" };
+        var fakeCommand = new FakeCommand("Reset");
         _commandsFactoryMock.Setup(f => f.GetCommand("Reset")).Returns(fakeCommand);
 
-        var sut = CreateSut();
+        var (sut, table) = CreateSut();
+        await table.Add("Reset-abc123", "Reset");
+
         var frame = Encoding.UTF8.GetBytes(BuildCallResult("Reset-abc123", "{\"status\":\"Accepted\"}"));
 
         var result = await sut.RouteOcppCall(frame, CLIENT_ID);
@@ -169,6 +186,7 @@ public class OcppCallRouterShould
         Assert.Equal(1, fakeCommand.HandleResponseCallCount);
         Assert.Equal("{\"status\":\"Accepted\"}", fakeCommand.LastResponsePayload);
         Assert.Null(fakeCommand.LastError);
+        Assert.False(await table.Contains("Reset-abc123"));
     }
 
     [Fact]
@@ -176,12 +194,25 @@ public class OcppCallRouterShould
     {
         _commandsFactoryMock.Setup(f => f.GetCommand(It.IsAny<string>())).Returns((IOcppChargerCommand?)null);
 
-        var sut = CreateSut();
+        var (sut, _) = CreateSut();
         var frame = Encoding.UTF8.GetBytes(BuildCallResult("Whatever-abc123", "{}"));
 
         var result = await sut.RouteOcppCall(frame, CLIENT_ID);
 
         Assert.Null(result);
+        _commandsFactoryMock.Verify(f => f.GetCommand(It.IsAny<string>()), Times.Never);
+    }
+
+    [Fact]
+    public async Task RouteOcppCall_ForCallResultWithoutTableEntry_DoesNotInvokeAnyCommand()
+    {
+        var (sut, _) = CreateSut();
+        var frame = Encoding.UTF8.GetBytes(BuildCallResult("Unknown-msg-id", "{}"));
+
+        var result = await sut.RouteOcppCall(frame, CLIENT_ID);
+
+        Assert.Null(result);
+        _commandsFactoryMock.Verify(f => f.GetCommand(It.IsAny<string>()), Times.Never);
     }
 
     // ----------------------------------------------------------------
@@ -191,19 +222,22 @@ public class OcppCallRouterShould
     [Fact]
     public async Task RouteOcppCall_ForCallErrorWithKnownAction_DispatchesToCommandWithError()
     {
-        var fakeCommand = new FakeCommand { Action = "Reset" };
+        var fakeCommand = new FakeCommand("Reset");
         _commandsFactoryMock.Setup(f => f.GetCommand("Reset")).Returns(fakeCommand);
 
-        var sut = CreateSut();
+        var (sut, table) = CreateSut();
+        await table.Add("Reset-abc123", "Reset");
+
         var frame = Encoding.UTF8.GetBytes(BuildCallError("Reset-abc123", "GenericError", "charger rejected", "{}"));
 
         var result = await sut.RouteOcppCall(frame, CLIENT_ID);
 
         Assert.Null(result);
-        Assert.Equal(1, fakeCommand.HandleResponseCallCount);
+        Assert.Equal(1, fakeCommand.HandleErrorCallCount);
         Assert.Null(fakeCommand.LastResponsePayload);
         Assert.NotNull(fakeCommand.LastError);
         Assert.Equal("GenericError", fakeCommand.LastError!.ErrorCode);
+        Assert.False(await table.Contains("Reset-abc123"));
     }
 
     [Fact]
@@ -211,12 +245,13 @@ public class OcppCallRouterShould
     {
         _commandsFactoryMock.Setup(f => f.GetCommand(It.IsAny<string>())).Returns((IOcppChargerCommand?)null);
 
-        var sut = CreateSut();
+        var (sut, _) = CreateSut();
         var frame = Encoding.UTF8.GetBytes(BuildCallError("Whatever-abc123", "GenericError", "x", "{}"));
 
         var result = await sut.RouteOcppCall(frame, CLIENT_ID);
 
         Assert.Null(result);
+        _commandsFactoryMock.Verify(f => f.GetCommand(It.IsAny<string>()), Times.Never);
     }
 
     // ----------------------------------------------------------------
@@ -226,8 +261,8 @@ public class OcppCallRouterShould
     [Fact]
     public async Task RouteOcppCall_ForUnknownMessageType_ReturnsMessageTypeNotSupported()
     {
-        var sut = CreateSut();
-        var frame = Encoding.UTF8.GetBytes("[99,\"msg-1\"]");   // message type 99 doesn't exist
+        var (sut, _) = CreateSut();
+        var frame = Encoding.UTF8.GetBytes("[99,\"msg-1\"]");
 
         var result = await sut.RouteOcppCall(frame, CLIENT_ID);
 
@@ -241,75 +276,112 @@ public class OcppCallRouterShould
     // ----------------------------------------------------------------
 
     [Fact]
-    public async Task SubmitAsync_BuildsFrameWithActionPrefixedMessageId_AndForwardsToSubmitter()
+    public async Task SubmitAsync_RegistersMessageIdInOutboundTable_AndForwardsToSubmitter()
     {
-        var fakeCommand = new FakeCommand { Action = "Reset" };
-
-        var sut = CreateSut();
+        var (sut, table) = CreateSut();
+        var request = new OcppCallRequest("Reset-abc123", "Reset", "{}");
 
         string? capturedClientId = null;
         string? capturedFrame = null;
-        sut.SetCallSubmitter((clientId, frame, ct) =>
-        {
-            capturedClientId = clientId;
-            capturedFrame = frame;
-            return Task.CompletedTask;
-        });
+        _dispatcherMock
+            .Setup(d => d.SubmitRequest(It.IsAny<string>(), It.IsAny<string>()))
+            .Callback<string, string>((clientId, frame) =>
+            {
+                capturedClientId = clientId;
+                capturedFrame = frame;
+            })
+            .Returns(Task.CompletedTask);
 
-        await sut.SubmitAsync(CLIENT_ID, fakeCommand, CancellationToken.None);
+        await sut.SubmitAsync(CLIENT_ID, request);
 
         Assert.Equal(CLIENT_ID, capturedClientId);
         Assert.NotNull(capturedFrame);
 
-        // BuildCall must have been called with the action-prefixed messageId
-        Assert.NotNull(fakeCommand.LastMessageIdPassedToBuildCall);
-        Assert.StartsWith("Reset-", fakeCommand.LastMessageIdPassedToBuildCall);
-        Assert.True(fakeCommand.LastMessageIdPassedToBuildCall.Length > "Reset-".Length);
+        var registeredAction = await table.TryGetValue("Reset-abc123");
+        Assert.Equal("Reset", registeredAction);
 
-        // The wire frame starts with [2,"Reset-... and contains the action
-        Assert.StartsWith("[2,\"Reset-", capturedFrame);
+        Assert.StartsWith("[2,\"Reset-abc123\"", capturedFrame);
         Assert.Contains("\"Reset\"", capturedFrame);
     }
 
     [Fact]
-    public async Task SubmitAsync_WithoutSubmitterWired_Throws()
+    public async Task SubmitAsync_PreservesPayloadInWireFrame()
     {
-        var sut = CreateSut();
-        var fakeCommand = new FakeCommand { Action = "Reset" };
+        var (sut, _) = CreateSut();
+        const string payload = "{\"type\":\"Full\",\"evseId\":1}";
+        var request = new OcppCallRequest("Reset-xyz", "Reset", payload);
+
+        string? capturedFrame = null;
+        _dispatcherMock
+            .Setup(d => d.SubmitRequest(It.IsAny<string>(), It.IsAny<string>()))
+            .Callback<string, string>((_, frame) => capturedFrame = frame)
+            .Returns(Task.CompletedTask);
+
+        await sut.SubmitAsync(CLIENT_ID, request);
+
+        Assert.NotNull(capturedFrame);
+        Assert.Contains(payload, capturedFrame);
+    }
+
+    [Fact]
+    public async Task SubmitAsync_RegistersAllSentRequests_ForLaterResponseDispatch()
+    {
+        var (sut, table) = CreateSut();
+
+        await sut.SubmitAsync(CLIENT_ID, new OcppCallRequest("msg-A", "Reset", "{}"));
+        await sut.SubmitAsync(CLIENT_ID, new OcppCallRequest("msg-B", "TriggerMessage", "{}"));
+
+        Assert.Equal("Reset", await table.TryGetValue("msg-A"));
+        Assert.Equal("TriggerMessage", await table.TryGetValue("msg-B"));
+    }
+
+    [Fact]
+    public async Task SubmitAsync_ThenCallResult_DispatchesToRegisteredCommand()
+    {
+        var fakeCommand = new FakeCommand("Reset");
+        _commandsFactoryMock.Setup(f => f.GetCommand("Reset")).Returns(fakeCommand);
+
+        var (sut, _) = CreateSut();
+
+        await sut.SubmitAsync(CLIENT_ID, new OcppCallRequest("Reset-1", "Reset", "{}"));
+
+        var frame = Encoding.UTF8.GetBytes(BuildCallResult("Reset-1", "{\"status\":\"Accepted\"}"));
+        await sut.RouteOcppCall(frame, CLIENT_ID);
+
+        Assert.Equal(1, fakeCommand.HandleResponseCallCount);
+        Assert.Equal("{\"status\":\"Accepted\"}", fakeCommand.LastResponsePayload);
+    }
+
+    [Fact]
+    public async Task SubmitAsync_ThenCallError_DispatchesToRegisteredCommand()
+    {
+        var fakeCommand = new FakeCommand("Reset");
+        _commandsFactoryMock.Setup(f => f.GetCommand("Reset")).Returns(fakeCommand);
+
+        var (sut, _) = CreateSut();
+
+        await sut.SubmitAsync(CLIENT_ID, new OcppCallRequest("Reset-2", "Reset", "{}"));
+
+        var frame = Encoding.UTF8.GetBytes(BuildCallError("Reset-2", "GenericError", "nope", "{}"));
+        await sut.RouteOcppCall(frame, CLIENT_ID);
+
+        Assert.Equal(1, fakeCommand.HandleErrorCallCount);
+        Assert.NotNull(fakeCommand.LastError);
+        Assert.Equal("GenericError", fakeCommand.LastError!.ErrorCode);
+    }
+
+    [Fact]
+    public async Task SubmitAsync_WhenDispatcherThrows_PropagatesException()
+    {
+        var (sut, _) = CreateSut();
+        _dispatcherMock
+            .Setup(d => d.SubmitRequest(It.IsAny<string>(), It.IsAny<string>()))
+            .Throws(new InvalidOperationException("wire down"));
+
+        var request = new OcppCallRequest("Reset-3", "Reset", "{}");
 
         await Assert.ThrowsAsync<InvalidOperationException>(
-            () => sut.SubmitAsync(CLIENT_ID, fakeCommand, CancellationToken.None));
-    }
-
-    [Fact]
-    public async Task SubmitAsync_PassesCancellationTokenToSubmitter()
-    {
-        var fakeCommand = new FakeCommand { Action = "Reset" };
-        var sut = CreateSut();
-
-        using var cts = new CancellationTokenSource();
-        CancellationToken capturedCt = default;
-        sut.SetCallSubmitter((_, _, ct) => { capturedCt = ct; return Task.CompletedTask; });
-
-        await sut.SubmitAsync(CLIENT_ID, fakeCommand, cts.Token);
-
-        Assert.Equal(cts.Token, capturedCt);
-    }
-
-    [Fact]
-    public async Task SubmitAsync_GeneratesUniqueMessageIdsPerCall()
-    {
-        var fakeCommand = new FakeCommand { Action = "Reset" };
-        var sut = CreateSut();
-        sut.SetCallSubmitter((_, _, _) => Task.CompletedTask);
-
-        await sut.SubmitAsync(CLIENT_ID, fakeCommand, CancellationToken.None);
-        await sut.SubmitAsync(CLIENT_ID, fakeCommand, CancellationToken.None);
-
-        Assert.Equal(2, fakeCommand.BuildCallCallCount);
-        Assert.NotEqual(
-            fakeCommand.AllMessageIdsPassedToBuildCall[0],
-            fakeCommand.AllMessageIdsPassedToBuildCall[1]);
+            () => sut.SubmitAsync(CLIENT_ID, request));
     }
 
     // ----------------------------------------------------------------
@@ -319,7 +391,7 @@ public class OcppCallRouterShould
     [Fact]
     public async Task DisconnectClient_ForwardsToRouterServices()
     {
-        var sut = CreateSut();
+        var (sut, _) = CreateSut();
         await sut.DisconnectClient(CLIENT_ID);
         _routerServicesMock.Verify(s => s.DisconnectClient(CLIENT_ID), Times.Once);
     }
@@ -362,28 +434,51 @@ public class OcppCallRouterShould
 
     private sealed class FakeCommand : IOcppChargerCommand
     {
-        public string Action { get; set; } = "";
-        public string Payload { get; set; } = "{}";
-        public string? LastMessageIdPassedToBuildCall { get; private set; }
-        public List<string> AllMessageIdsPassedToBuildCall { get; } = new();
-        public int BuildCallCallCount { get; private set; }
+        public FakeCommand(string action) => Action = action;
+
+        public string Action { get; }
         public string? LastResponsePayload { get; private set; }
         public OcppCallError? LastError { get; private set; }
         public int HandleResponseCallCount { get; private set; }
+        public int HandleErrorCallCount { get; private set; }
 
-        public OcppCallRequest BuildCall(string messageId)
-        {
-            BuildCallCallCount++;
-            LastMessageIdPassedToBuildCall = messageId;
-            AllMessageIdsPassedToBuildCall.Add(messageId);
-            return new OcppCallRequest(messageId, Action, Payload);
-        }
-
-        public void HandleResponse(string? responsePayload, OcppCallError? error)
+        public Task HandleResponse(OcppCallResult result)
         {
             HandleResponseCallCount++;
-            LastResponsePayload = responsePayload;
-            LastError = error;
+            LastResponsePayload = result.Payload;
+            return Task.CompletedTask;
         }
+
+        public Task HandleError(OcppCallError error)
+        {
+            HandleErrorCallCount++;
+            LastError = error;
+            return Task.CompletedTask;
+        }
+    }
+
+    private sealed class FakeRoutingTable : BaseOcppRoutingTable
+    {
+        private readonly Dictionary<string, string> _entries = new();
+
+        public override Task Add(string messageId, string value)
+        {
+            _entries[messageId] = value;
+            return Task.CompletedTask;
+        }
+
+        public override Task Remove(string messageId)
+        {
+            _entries.Remove(messageId);
+            return Task.CompletedTask;
+        }
+
+        public override Task<string?> TryGetValue(string messageId)
+        {
+            _entries.TryGetValue(messageId, out var value);
+            return Task.FromResult(value);
+        }
+
+        public Task<bool> Contains(string messageId) => Task.FromResult(_entries.ContainsKey(messageId));
     }
 }

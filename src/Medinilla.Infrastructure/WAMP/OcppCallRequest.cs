@@ -1,4 +1,5 @@
-﻿using System.Text.Json;
+﻿using System.Text;
+using System.Text.Json;
 using System.Text.Json.Serialization;
 
 namespace Medinilla.Infrastructure.WAMP;
@@ -43,15 +44,12 @@ public sealed class OcppCallRequest : BaseOcppMessage
         }));
     }
 
-    public byte[] ToBytes()
+    public string Serialize()
     {
-        var writer = new OcppMessageWriter();
-        writer.WriteInt((int)MessageType);
-        writer.WriteString(MessageId);
-        writer.WriteString(Action);
-        writer.WriteJson(Payload);
+        var payload = string.Compare(Payload, "null") == 0 ? "{}" : Payload;
 
-        return writer.Serialize();
+        var responseString = $"[{(int)MessageType},\"{MessageId}\",\"{Action}\",{payload}]";
+        return responseString;
     }
 
     public OcppCallError CreateErrorResult<T>(string errorCode, string errorDescription = "", T? details = null)
