@@ -29,6 +29,7 @@
 
   <ItemGroup>
     <ProjectReference Include="..\Medillina.Core\Medinilla.Core.csproj" />
+    <ProjectReference Include="..\Medinilla.Core.gRPC\Medinilla.Core.gRPC.csproj" />
     <ProjectReference Include="..\Medinilla.Core.SharedContracts\Medinilla.Core.SharedContracts.csproj" />
     <ProjectReference Include="..\Medinilla.RealTime\Medinilla.RealTime.csproj" />
   </ItemGroup>

@@ -4,7 +4,6 @@ using Medinilla.Core.Interfaces;
 using Medinilla.Core.Interfaces.Services;
 using Medinilla.Infrastructure;
 using Medinilla.Infrastructure.WAMP;
-using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Text;
 
@@ -14,26 +13,13 @@ public class OcppCallRouter(
     ILogger<OcppCallRouter> _logger,
     IRouterServices services,
     IOcppActionsFactory actionsFactory,
-    IOcppChargerCommandFactory commandFactory) : IOcppCallRouter
+    IOcppChargerCommandFactory commandFactory,
+    IOcppRequestDispatcher dispatcher,
+    BaseOcppRoutingTable outboundTable) : IOcppCallRouter
 {
-    private Func<string, string, CancellationToken, Task>? _submitCall;
-    private BaseOcppRoutingTable? _outboundTable;
-
-    private void AssertRoutingTable()
-    {
-        if (_outboundTable is null) throw new InvalidOperationException("Routing table is not initialized.");
-    }
-
-    public void InitializeRoutingTable(BaseOcppRoutingTable outboundTable)
-        => _outboundTable = outboundTable;
-
-    public void SetCallSubmitter(Func<string, string, CancellationToken, Task> submitter)
-        => _submitCall = submitter;
-
     public async Task<RpcResult?> RouteOcppCall(byte[] buffer, string? clientIdentifier)
     {
         ArgumentNullException.ThrowIfNull(clientIdentifier, nameof(clientIdentifier));
-        AssertRoutingTable();
 
         var messageString = Encoding.UTF8.GetString(buffer);
 
@@ -53,20 +39,24 @@ public class OcppCallRouter(
             case OcppJMessageType.CALL:
                 {
                     var call = parser.ParseCall();
-                    return await HandleCall(clientIdentifier, call);
+                    return await HandleCall(clientIdentifier, call).ConfigureAwait(false);
                 }
 
             case OcppJMessageType.CALL_RESULT:
                 {
                     var result = parser.ParseResult();
-                    await DispatchCommandReplyAsync(clientIdentifier, result, cmd => cmd.HandleResponse(result));
+                    await DispatchCommandReplyAsync(clientIdentifier, result, cmd => cmd.HandleResponse(result))
+                        .ConfigureAwait(false);
+
                     return null;
                 }
 
             case OcppJMessageType.CALL_ERROR:
             {
                 var error = parser.ParseError();
-                await DispatchCommandReplyAsync(clientIdentifier, error, cmd => cmd.HandleError(error));
+                await DispatchCommandReplyAsync(clientIdentifier, error, cmd => cmd.HandleError(error))
+                        .ConfigureAwait(false);
+
                 return null;
             }
 
@@ -128,12 +118,8 @@ public class OcppCallRouter(
         Func<IOcppChargerCommand, Task> dispatch)
         where TMessage : BaseOcppMessage
     {
-        if (_outboundTable is null)
-        {
-            throw new InvalidOperationException("Outbound table is not defined.");
-        }
 
-        var pending = await _outboundTable.TryGetValue(message.MessageId);
+        var pending = await outboundTable.TryGetValue(message.MessageId).ConfigureAwait(false);
         if (pending is not null)
         {
             var command = commandFactory.GetCommand(pending);
@@ -143,7 +129,7 @@ public class OcppCallRouter(
                 return;
             }
 
-            await _outboundTable.Remove(message.MessageId);
+            await outboundTable.Remove(message.MessageId);
             await dispatch(command);
         }
         else
@@ -152,15 +138,10 @@ public class OcppCallRouter(
         }
     }
 
-    public async Task SubmitAsync(string clientIdentifier, OcppCallRequest request, CancellationToken ct)
+    public async Task SubmitAsync(string clientIdentifier, OcppCallRequest request)
     {
-        AssertRoutingTable();
-
-        if (_submitCall is null)
-            throw new InvalidOperationException("Call submitter not wired.");
-
-        await _outboundTable!.Add(request.MessageId, request.Action);
-        await _submitCall(clientIdentifier, Encoding.UTF8.GetString(request.ToBytes()), ct).ConfigureAwait(false);
+        await outboundTable.Add(request.MessageId, request.Action).ConfigureAwait(false);
+        await dispatcher.SubmitRequest(clientIdentifier, request.Serialize()).ConfigureAwait(false);
     }
 
     public async Task DisconnectClient(string clientIdentifier)

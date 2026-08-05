@@ -6,8 +6,6 @@ namespace Medinilla.RealTime.Redis;
 
 internal static class ServiceCollectionExtensions
 {
-    static string ProducerName => "medinilla.producer";
-    static string ConsumerName => "medinilla.consumer";
     
     internal static IServiceCollection AddMedinillaRedis(this IServiceCollection services)
     {
@@ -20,17 +18,23 @@ internal static class ServiceCollectionExtensions
         var redisUri = config.GetSection("Redis")["Uri"] ?? "";
 
         var producerOptions = ConfigurationOptions.Parse(redisUri);
-        producerOptions.ClientName = $"{ProducerName}-{Random.Shared.NextInt64()}";
+        producerOptions.ClientName = $"{RedisUtils.ProducerConnectionMultiplexer}-{Random.Shared.NextInt64()}";
 
         var consumerOptions = ConfigurationOptions.Parse(redisUri);
-        consumerOptions.ClientName = $"{ConsumerName}-{Random.Shared.NextInt64()}";
+        consumerOptions.ClientName = $"{RedisUtils.ConsumerConnectionMultiplexer}-{Random.Shared.NextInt64()}";
 
-        services.AddKeyedSingleton<ConnectionMultiplexer>(producerOptions.ClientName, (_, _) => ConnectionMultiplexer.Connect(producerOptions));
-        services.AddKeyedSingleton<ConnectionMultiplexer>(consumerOptions.ClientName, (_, _) => ConnectionMultiplexer.Connect(consumerOptions));
+        services.AddKeyedSingleton(RedisUtils.ProducerConnectionMultiplexer,
+            (_, _) => ConnectionMultiplexer.Connect(producerOptions));
+        services.AddKeyedSingleton(RedisUtils.ConsumerConnectionMultiplexer,
+            (_, _) => ConnectionMultiplexer.Connect(consumerOptions));
 
-        services.AddSingleton<ISender>(sp => new RedisSender(sp.GetRequiredKeyedService<ConnectionMultiplexer>(producerOptions.ClientName)));
+        services.AddSingleton<ISender>(sp => new RedisSender(
+            sp.GetRequiredKeyedService<ConnectionMultiplexer>(RedisUtils.ProducerConnectionMultiplexer))
+        );
 
-        services.AddSingleton<IReceiver>(sp => new RedisReceiver(sp.GetRequiredKeyedService<ConnectionMultiplexer>(consumerOptions.ClientName)));
+        services.AddSingleton<IReceiver>(sp => new RedisReceiver(
+            sp.GetRequiredKeyedService<ConnectionMultiplexer>(RedisUtils.ConsumerConnectionMultiplexer))
+        );
 
         return services;
     }

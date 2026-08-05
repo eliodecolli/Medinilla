@@ -15,25 +15,14 @@ internal sealed class CoreInterfaceCommunication(
     IServiceProvider serviceProvider,
     IReceiver receiver,
     ISender sender,
-    ILogger<CoreInterfaceCommunication> logger)
+    ILogger<CoreInterfaceCommunication> logger,
+    CommunicationSettings settings)
     : IInterfaceCommunication
 {
-    public async Task Run(CommunicationSettings settings, CancellationToken ct)
+
+    public async Task Run(CancellationToken ct)
     {
         logger.LogInformation("Started core service...");
-
-        using var scope = serviceProvider.CreateScope();
-        var router = scope.ServiceProvider.GetRequiredService<IOcppCallRouter>();
-        router.SetCallSubmitter((clientId, frame, ctInner) =>
-            sender.SendAsync(
-                RedisUtils.BuildChannelName(settings.ResponseQueue, clientId),
-                new Comms
-                {
-                    MessageType = CommsMessageType.OcppRequest,
-                    Payload = ByteString.CopyFromUtf8(frame),
-                }.ToByteArray(),
-                ctInner));
-
         await RunEvent(settings.RequestQueue, settings.ResponseQueue, ct);
     }
 
@@ -51,7 +40,6 @@ internal sealed class CoreInterfaceCommunication(
 
             switch (comms.MessageType)
             {
-                case CommsMessageType.OcppRequest:
                 case CommsMessageType.OcppResponse:
                 {
                     var ocpp = OcppMessage.Parser.ParseFrom(comms.Payload);

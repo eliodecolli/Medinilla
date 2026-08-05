@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+option csharp_namespace = "Medinilla.Core.gRPC.Contracts";
+
+package medinilla.core.grpc;
+
+message UserSetVariablesRequest {
+    string component_name = 1;
+    optional string component_instance = 2;
+    string variable_name = 3;
+    optional string variable_instance = 4;
+    optional string attribute_type = 5;
+    string attribute_value = 6;
+}
