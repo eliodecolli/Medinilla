@@ -1,17 +1,17 @@
-﻿using Medinilla.DataTypes.Contracts;
+using Medinilla.DataTypes.Contracts;
 using Medinilla.DataTypes.Contracts.Common;
 
 namespace Medinilla.Core.Service.Communication.Mapping;
 
 public partial class MedinillaMapping
 {
-    public static SetVariablesRequest MapSetVariables(Medinilla.Core.gRPC.Service.SetVariablesRequest request)
+    public static GetVariablesRequest MapGetVariables(Medinilla.Core.gRPC.Service.GetVariablesRequest request)
     {
-        return new SetVariablesRequest
+        return new GetVariablesRequest
         {
-            SetVariableData = request.SetVariableData?
+            GetVariableData = request.GetVariableData?
                 .Where(d => d is not null)
-                .Select(d => new SetVariableData
+                .Select(d => new GetVariableData
                 {
                     Component = new Component
                     {
@@ -24,7 +24,6 @@ public partial class MedinillaMapping
                         Instance = string.IsNullOrEmpty(d.VariableInstance) ? null : d.VariableInstance,
                     },
                     AttributeType = Enum.TryParse<AttributeEnum>(d.AttributeType, out var attr) ? attr : null,
-                    AttributeValue = d.AttributeValue,
                 })
                 .ToList() ?? [],
         };

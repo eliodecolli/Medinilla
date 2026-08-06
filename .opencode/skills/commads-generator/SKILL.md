@@ -1,32 +1,40 @@
 ---
 name: commands-generator
-description: Scaffold a new OcppChargerCommand instance (skeleton + DTOs only).
+description: Scaffold a new OCPP 2.0.1 charger command end-to-end (command, OCPP DTOs, gRPC contract, gRPC service method, gRPC->OCPP mapping).
 ---
 
-## Summary
-Scaffolds the skeleton of a new `OcppChargerCommand` and its associated DTOs. The skill produces:
+## What this skill produces
+Everything needed to add a new outbound OCPP action (CSMS -> charger):
 
-1. The command class (interface implementation, no handler logic).
-2. The `Request`/`Response` DTOs in `Medinilla.DataTypes/Contracts/`, populated from the action's OCPP JSON schema.
+1. The gRPC contract message(s) and `rpc` declaration in `Medinilla.Core.gRPC`.
+2. The gRPC service method implementation in `Medinilla.Core.Service/Communication/MedinillaGrpc.cs`.
+3. The `gRPC -> OCPP payload` mapping as a partial `MedinillaMapping` class in `Medinilla.Core.Service/Communication/Mapping/<CommandName>Mapping.cs`.
+4. The OCPP payload `Request`/`Response` DTOs in `Medinilla.DataTypes/Contracts/` (plus any common types under `Contracts/Common/`).
+5. The command class in `Medillina.Core/Commands/Ocpp201/` (response handlers only — no mapping, no call-building).
+6. Registration in `AddOcppChargerCommands` and the action constant in `OcppActionNames`.
 
-The skill does **not** implement `HandleResponse` / `HandleError` logic — those are left as empty stubs for the developer to fill in.
+The skill does **not** implement `HandleResponse` / `HandleError` logic — those are left as empty stubs for the developer to fill in. The command does **no mapping**: a single `OcppCallRequest` is built in the gRPC service method and handed to the router.
 
-OCPP Charger Commands are part of the "Core" component. They handle data flowing **from the CSMS to the charger** (the outbound direction). A command:
+Do not explore other already-implemented commands unless you are told the scaffold is wrong. Follow the directions in this skill end-to-end.
 
-1. Holds the `Action` name it owns.
-2. Receives the `OcppCallResult` (or `OcppCallError`) when the charger replies, asynchronously.
+## What goes where
+Use `<NewAction>` as the placeholder for the new OCPP action's PascalCase name (e.g. `GetVariables`, `Reset`, `UnlockConnector`). The same name is reused in every file below.
 
-CSMS <-> Charger communication is asynchronous: the response comes back at a later time. Outbound correlation is handled by the **routing table** (see Architecture), so commands do **not** build calls or manage `MessageId`s themselves.
-
-When creating a new Command:
-
-1. Implement `IOcppChargerCommand` (`src/Medillina.Core/Commands/IOcppChargerCommand.cs:6`).
-2. Place the implementation under `src/Medillina.Core/Commands/Ocpp201/` (or `Ocpp16/` for OCPP 1.6 actions).
-3. Add the action constant to `OcppActionNames` (`src/Medinilla.Infrastructure/WAMP/OcppActionNames.cs`) if it isn't there yet.
-4. Register the command in `AddOcppChargerCommands` (`src/Medillina.Core/ServiceExtensions.cs:29`).
+| Step | File |
+| --- | --- |
+| 1. gRPC `rpc` | `src/Medinilla.Core.gRPC/Service/OcppService.proto` |
+| 1. gRPC request/response messages | `src/Medinilla.Core.gRPC/Service/Types.proto` |
+| 1. (optional) shared sub-message | `src/Medinilla.Core.gRPC/Contracts/<Name>.proto` + register in `src/Medinilla.Core.gRPC/Medinilla.Core.gRPC.csproj` |
+| 2. Service method | `src/Medinilla.Core.Service/Communication/MedinillaGrpc.cs` |
+| 3. Mapping | `src/Medinilla.Core.Service/Communication/Mapping/<NewAction>Mapping.cs` |
+| 4. OCPP payload DTOs | `src/Medinilla.DataTypes/Contracts/<NewAction>Request.cs`, `.../<NewAction>Response.cs` |
+| 4. (optional) common type | `src/Medinilla.DataTypes/Contracts/Common/<Name>.cs` |
+| 5. Command class | `src/Medillina.Core/Commands/Ocpp201/<NewAction>Command.cs` |
+| 6a. Action constant | `src/Medinilla.Infrastructure/WAMP/OcppActionNames.cs` |
+| 6b. DI registration | `src/Medillina.Core/ServiceExtensions.cs` (`AddOcppChargerCommands`) |
 
 ## Interface
-`IOcppChargerCommand` has only three members (`src/Medillina.Core/Commands/IOcppChargerCommand.cs:6`):
+`IOcppChargerCommand` (`src/Medillina.Core/Commands/IOcppChargerCommand.cs:6`):
 
 ```csharp
 public interface IOcppChargerCommand
@@ -37,62 +45,196 @@ public interface IOcppChargerCommand
 }
 ```
 
-There is **no `BuildCall`** and **no payload mapping** on the command — see Architecture. Commands are thin: they only react to the response.
+There is **no `BuildCall`** and **no payload mapping** on the command. Commands are thin: they only react to the response.
 
-## Architecture
-Outbound flow:
+## Architecture (outbound flow)
+`gRPC caller -> MedinillaGrpc.<NewAction>(request) -> MedinillaMapping.Map<NewAction>(request) -> OcppCallRequest -> IOcppCallRouter.SubmitAsync -> RoutingTable (msgId -> action) -> Charger -> ... -> IOcppCallRouter.RouteOcppCall -> RoutingTable lookup -> IOcppChargerCommand.HandleResponse/HandleError`
 
-`Caller -> IOcppCallRouter.SubmitAsync(OcppCallRequest) -> RoutingTable (msgId -> action) -> Charger -> ... -> IOcppCallRouter.RouteOcppCall -> RoutingTable lookup -> IOcppChargerCommand.HandleResponse/HandleError`
+- The gRPC service method generates a fresh `MessageId`, calls the mapping, serializes the payload (camelCase, enums-as-strings, omit nulls), builds an `OcppCallRequest(messageId, OcppActionNames.<NewAction>, payloadJson)`, and calls `IOcppCallRouter.SubmitAsync(clientIdentifier, ocppRequest)`.
+- `OcppCallRouter.HandleCommandResponse` (`src/Medillina.Core/v1/OcppCallRouter.cs:124`) looks up the inbound `MessageId` in the routing table, finds the `Action`, asks `IOcppChargerCommandFactory.GetCommand(action)` for the matching `IOcppChargerCommand`, removes the entry, and dispatches `HandleResponse(result)` or `HandleError(error)` on it.
+- `OcppChargerCommandsFactory` (`src/Medillina.Core/Commands/OcppChargerCommandsFactory.cs:5`) keys its registry by the command's `Action` string — each `Action` has exactly one command.
 
-### 1. Caller builds the request
-Whoever wants to talk to the charger (e.g. an API endpoint, a background job) constructs an `OcppCallRequest` (`src/Medinilla.Infrastructure/WAMP/OcppCallRequest.cs`) with a fresh `MessageId`, the OCPP `Action` string, and the JSON payload, then calls `IOcppCallRouter.SubmitAsync(clientIdentifier, request, ct)` (`src/Medillina.Core/Interfaces/IOcppCallRouter.cs:10`).
+---
 
-The router:
+## Step 1 — gRPC contract
 
-- Registers `request.MessageId -> request.Action` in the outbound routing table (`BaseOcppRoutingTable`).
-- Serializes the request and hands it to the wired `submitCall` delegate (the transport).
+### 1a. `OcppService.proto` (`src/Medinilla.Core.gRPC/Service/OcppService.proto`)
+Add a new `rpc` to the existing `OcppService` service block:
 
-### 2. Response arrives
-`OcppCallRouter.HandleCommandResponse` (`src/Medillina.Core/v1/OcppCallRouter.cs:124`) looks up the inbound `MessageId` in the routing table, finds the `Action`, asks `IOcppChargerCommandFactory.GetCommand(action)` for the matching `IOcppChargerCommand`, removes the entry, and dispatches `HandleResponse(result)` or `HandleError(error)` on it.
+```proto
+syntax = "proto3";
 
-`OcppChargerCommandsFactory` (`src/Medillina.Core/Commands/OcppChargerCommandsFactory.cs:5`) keys its registry by the command's `Action` string, so each `Action` may only have **one** command registered.
+option csharp_namespace = "Medinilla.Core.gRPC.Service";
 
-## DTOs
-Two DTOs are involved — they are **separate** concerns and live in different namespaces:
+import "Service/Types.proto";
 
-### User request DTO — `Medinilla.DataTypes.Core.CommandRequests`
-Carries what the caller (typically an HTTP API) hands to the CSMS. Extends `BaseCommandRequest`. Example skeleton: `UserSetVariablesRequest` (`src/Medinilla.DataTypes/Core/CommandRequests/UserSetVariablesRequest.cs:3`).
+package medinilla.core.grpc;
 
-```csharp
-public sealed class UserSetVariablesRequest : BaseCommandRequest
-{
-    // user-supplied fields go here
+service OcppService {
+    rpc <NewAction> (<NewAction>Request) returns (<NewAction>Response) {}
 }
 ```
 
-If the user request type for the new command doesn't exist yet, add it next to `BaseCommandRequest.cs`.
+### 1b. `Types.proto` (`src/Medinilla.Core.gRPC/Service/Types.proto`)
+Add the request and response messages. The response always wraps `Error`:
 
-### OCPP payload DTO — `Medinilla.DataTypes.Contracts`
-The wire payload for the OCPP message itself (what `OcppCallRequest.Payload` is serialized from/to). Example: `SetVariablesRequest` / `SetVariablesResponse` (`src/Medinilla.DataTypes/Contracts/`), and the shared common types under `src/Medinilla.DataTypes/Contracts/Common/` (e.g. `Variable`, `Component`, `SetVariableData`, `SetVariableResult`).
+```proto
+syntax = "proto3";
 
-The mapping from user DTO -> OCPP payload DTO happens **in the caller**, before `SubmitAsync`, not inside the command.
+option csharp_namespace = "Medinilla.Core.gRPC.Service";
 
-**DTO generation rule:** When scaffolding a new action, populate the `Request` and `Response` property types from the action's OCPP JSON schema (OCPP 1.6 / 2.0.1 spec). Reuse existing common types under `Contracts/Common/` wherever the schema references them — don't redefine them.
+package medinilla.core.grpc;
 
-## Skeleton
+message Error {
+    bool has_error = 1;
+    optional string message = 2;
+}
+
+message <NewAction>Request {
+    string client_identifier = 1;
+    // action-specific gRPC fields go here
+}
+
+message <NewAction>Response {
+    Error error = 1;
+}
+```
+
+If the request needs a shared sub-message (a single item reused across the message), put it in `src/Medinilla.Core.gRPC/Contracts/<Name>.proto`, then add an `import "<Name>.proto";` to `Types.proto` and reference it.
+
+### 1c. `Medinilla.Core.gRPC.csproj` (only if you added a new proto under `Contracts/`)
+The csproj does **not** glob — add an explicit `<Protobuf Include="Contracts\<Name>.proto" />` line under `<ItemGroup>`.
+
+---
+
+## Step 2 — gRPC service method
+Add the override to `src/Medinilla.Core.Service/Communication/MedinillaGrpc.cs` (alongside the other `OcppServiceBase` overrides). The method:
+
+- Logs the request.
+- Generates a fresh `messageId`.
+- Calls `MedinillaMapping.Map<NewAction>(request)`.
+- Serializes with `JsonNamingPolicy.CamelCase`, a `JsonStringEnumConverter`, and `DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull`.
+- Builds an `OcppCallRequest(messageId, OcppActionNames.<NewAction>, json)` and calls `router.SubmitAsync(request.ClientIdentifier, ocppRequest)`.
+- Catches exceptions, logs, and returns an `Error` (success/failure).
 
 ```csharp
+public override async Task<<NewAction>Response> <NewAction>(<NewAction>Request request, ServerCallContext context)
+{
+    log.LogInformation("{ci}: {an}", request.ClientIdentifier, OcppActionNames.<NewAction>);
+
+    try
+    {
+        var messageId = Guid.NewGuid().ToString();
+        var payload = MedinillaMapping.Map<NewAction>(request);
+
+        var ocppRequest = new OcppCallRequest(messageId, OcppActionNames.<NewAction>, JsonSerializer.Serialize(payload, new JsonSerializerOptions
+        {
+            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+            Converters = { new JsonStringEnumConverter() },
+            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+        }));
+        using var scope = serviceProvider.CreateScope();
+        var router = scope.ServiceProvider.GetRequiredService<IOcppCallRouter>();
+
+        await router.SubmitAsync(request.ClientIdentifier, ocppRequest);
+        return new <NewAction>Response()
+        {
+            Error = new Error() { HasError = false },
+        };
+    }
+    catch (Exception e)
+    {
+        log.LogError("{ci}: {an}: Error: {msg}", request.ClientIdentifier, OcppActionNames.<NewAction>, e.Message);
+        return new <NewAction>Response()
+        {
+            Error = new Error() { HasError = true, Message = e.Message },
+        };
+    }
+}
+```
+
+The required usings already in the file: `Grpc.Core`, `Medinilla.Core.gRPC.Service`, `Medinilla.Core.Interfaces`, `Medinilla.Core.Service.Communication.Mapping`, `Medinilla.Core.Service.Types`, `System.Text.Json`, `System.Text.Json.Serialization`. Don't add duplicates.
+
+---
+
+## Step 3 — Mapping (gRPC -> OCPP payload)
+Create `src/Medinilla.Core.Service/Communication/Mapping/<NewAction>Mapping.cs`. One static method per command, named `Map<NewAction>`:
+
+```csharp
+using Medinilla.DataTypes.Contracts;
+
+namespace Medinilla.Core.Service.Communication.Mapping;
+
+public partial class MedinillaMapping
+{
+    public static <NewAction>Request Map<NewAction>(Medinilla.Core.gRPC.Service.<NewAction>Request request)
+    {
+        return new <NewAction>Request
+        {
+            // map gRPC fields -> OCPP payload DTO fields here
+        };
+    }
+}
+```
+
+Rules:
+
+- Reuse existing common types under `Medinilla.DataTypes.Contracts.Common/` — don't redefine them.
+- Be tolerant of null collections (`?.Where(x => x is not null).Select(...).ToList() ?? []`).
+- For enum strings, use `Enum.TryParse<TEnum>(s, out var v) ? v : null` (or a sensible default).
+
+---
+
+## Step 4 — OCPP payload DTOs
+Wire payload for the OCPP message itself (what `OcppCallRequest.Payload` is serialized from/to). One file per DTO:
+
+`src/Medinilla.DataTypes/Contracts/<NewAction>Request.cs`:
+
+```csharp
+using Medinilla.DataTypes.Contracts.Common;
+
+namespace Medinilla.DataTypes.Contracts;
+
+public class <NewAction>Request
+{
+    // OCPP-schema-shaped fields go here
+}
+```
+
+`src/Medinilla.DataTypes/Contracts/<NewAction>Response.cs`:
+
+```csharp
+using Medinilla.DataTypes.Contracts.Common;
+
+namespace Medinilla.DataTypes.Contracts;
+
+public class <NewAction>Response
+{
+    // OCPP-schema-shaped fields go here
+}
+```
+
+**DTO generation rule:** Populate the `Request` and `Response` property types from the action's OCPP JSON schema (OCPP 1.6 / 2.0.1 spec). Reuse existing common types under `Contracts/Common/` wherever the schema references them — don't redefine them. If the schema introduces a new common type, add it under `src/Medinilla.DataTypes/Contracts/Common/`.
+
+---
+
+## Step 5 — Command skeleton
+`src/Medillina.Core/Commands/Ocpp201/<NewAction>Command.cs`:
+
+```csharp
+using Medinilla.DataTypes.Contracts;
 using Medinilla.Infrastructure.WAMP;
+using Microsoft.Extensions.Logging;
 
 namespace Medinilla.Core.Commands.Ocpp201;
 
-internal sealed class NewCommand : IOcppChargerCommand
+internal sealed class <NewAction>Command(ILogger<<NewAction>Command> log) : IOcppChargerCommand
 {
-    public string Action => OcppActionNames.NewAction;
+    public string Action => OcppActionNames.<NewAction>;
 
     public Task HandleResponse(OcppCallResult result)
     {
-        // TODO: deserialize result.Payload and act on it
+        // TODO: deserialize result.Payload (e.g. result.As<<NewAction>Response>()) and act on it
         return Task.CompletedTask;
     }
 
@@ -104,21 +246,22 @@ internal sealed class NewCommand : IOcppChargerCommand
 }
 ```
 
-Then in `src/Medillina.Core/ServiceExtensions.cs`:
+---
+
+## Step 6 — Registration
+
+### 6a. Action constant — `src/Medinilla.Infrastructure/WAMP/OcppActionNames.cs`
+
+```csharp
+public const string <NewAction> = "<NewAction>";
+```
+
+### 6b. DI — `src/Medillina.Core/ServiceExtensions.cs`
 
 ```csharp
 private static void AddOcppChargerCommands(IServiceCollection services)
 {
-    services.AddScoped<IOcppChargerCommand, NewCommand>();
-    // ...
+    services.AddScoped<IOcppChargerCommand, <NewAction>Command>();
+    // ...existing registrations...
 }
 ```
-
-And in `src/Medinilla.Infrastructure/WAMP/OcppActionNames.cs`:
-
-```csharp
-public const string NewAction = "NewAction";
-```
-
-## Reference
-Existing (WIP) example: `src/Medillina.Core/Commands/Ocpp201/SetVariablesCommand.cs`.

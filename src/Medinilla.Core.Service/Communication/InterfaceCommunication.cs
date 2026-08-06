@@ -30,29 +30,39 @@ internal sealed class CoreInterfaceCommunication(
     {
         while (!ct.IsCancellationRequested)
         {
-            var result = await receiver.ReceiveAsync(requestChannel, ct);
-            if (result is null)
+            try
             {
-                continue;
+                var result = await receiver.ReceiveAsync(requestChannel, ct);
+                if (result is null)
+                {
+                    continue;
+                }
+
+                logger.LogInformation("[{rc}]: {len} bytes", requestChannel, result.Length);
+
+                var comms = Comms.Parser.ParseFrom(result);
+
+                switch (comms.MessageType)
+                {
+                    case CommsMessageType.OcppRequest:
+                    case CommsMessageType.OcppResponse:
+                    {
+                        var ocpp = OcppMessage.Parser.ParseFrom(comms.Payload);
+                        _ = Task.Run(() => ProcessOcppAsync(ocpp.ClientIdentifier, ocpp.Payload.ToByteArray(), responseChannelPrefix));
+                        break;
+                    }
+
+                    case CommsMessageType.ClientDisconnect:
+                    {
+                        var dc = ClientDisconnectMessage.Parser.ParseFrom(comms.Payload);
+                        _ = Task.Run(() => DisconnectAsync(dc.ClientIdentifier));
+                        break;
+                    }
+                }
             }
-
-            var comms = Comms.Parser.ParseFrom(result);
-
-            switch (comms.MessageType)
+            catch (Exception ex)
             {
-                case CommsMessageType.OcppResponse:
-                {
-                    var ocpp = OcppMessage.Parser.ParseFrom(comms.Payload);
-                    _ = Task.Run(() => ProcessOcppAsync(ocpp.ClientIdentifier, ocpp.Payload.ToByteArray(), responseChannelPrefix));
-                    break;
-                }
-
-                case CommsMessageType.ClientDisconnect:
-                {
-                    var dc = ClientDisconnectMessage.Parser.ParseFrom(comms.Payload);
-                    _ = Task.Run(() => DisconnectAsync(dc.ClientIdentifier));
-                    break;
-                }
+                logger.LogError("InterfaceComms: [{rc}]: Error: {msg}", requestChannel, ex.Message);
             }
         }
     }

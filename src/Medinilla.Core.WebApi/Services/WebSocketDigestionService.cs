@@ -122,11 +122,11 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService
     {
         if (outboundId is null)
         {
-            _logger.LogInformation("[{ClientId}] Clearing processing inbound id, previous: {id}", _clientIdentifier, _processingOutboundId);
+            _logger.LogInformation("[{ClientId}] Clearing processing outbound id, previous: {id}", _clientIdentifier, _processingOutboundId);
         }
         else
         {
-            _logger.LogInformation("[{ClientId}] Processing inbound id {prev} -> {new}", _clientIdentifier, _processingOutboundId, outboundId);
+            _logger.LogInformation("[{ClientId}] Processing outbound id {prev} -> {new}", _clientIdentifier, _processingOutboundId, outboundId);
         }
 
         _processingOutboundId = outboundId;
@@ -262,7 +262,11 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService
             await PublishCommsMessage(new Comms
             {
                 MessageType = header.Type,
-                Payload = ByteString.CopyFrom(payload)
+                Payload = new OcppMessage
+                {
+                    ClientIdentifier = _clientIdentifier,
+                    Payload = ByteString.CopyFrom(payload),
+                }.ToByteString()
             }));
 
     private Task DrainOutbound()
@@ -281,13 +285,17 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService
 
         byte[]? message = null;
 
-        if (!parsed.Result.IsEmpty)
+        if (parsed.HasResult)
         {
             message = parsed.Result.ToByteArray();
         }
-        else if (!parsed.Error.IsEmpty)
+        else if (parsed.HasError)
         {
             message = parsed.Error.ToByteArray();
+        }
+        else if (parsed.HasRequest)
+        {
+            message = parsed.Request.ToByteArray();
         }
 
         var rawString = Encoding.UTF8.GetString(message ?? []);
@@ -319,6 +327,8 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService
                 {
                     _processingOutboundId = header.MessageId;
                     shouldForward = true;
+
+                    _logger.LogInformation("[{ci}]: Sending Raw: {raw}", _clientIdentifier, rawString);
                 }
                 else
                 {

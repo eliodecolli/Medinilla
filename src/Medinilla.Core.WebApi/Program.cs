@@ -15,10 +15,7 @@ builder.WebHost.ConfigureKestrel(options =>
     });
 });
 
-// Add services to the container.
-
 builder.Services.AddControllers(options => options.InputFormatters.Add(new PlainTextFormatter()));
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
 
@@ -28,12 +25,6 @@ builder.Logging.AddSimpleConsole(options =>
     options.IncludeScopes = false;
     options.TimestampFormat = "HH:mm:ss ";
 });
-
-// Filter noisy namespaces
-builder.Logging.SetMinimumLevel(LogLevel.Debug);
-builder.Logging.AddFilter("Microsoft", LogLevel.Warning);
-builder.Logging.AddFilter("Microsoft.AspNetCore", LogLevel.Warning);
-builder.Logging.AddFilter("Microsoft.Hosting.Lifetime", LogLevel.Information);
 
 
 builder.Services.AddMedinillaInfrastructure();

@@ -10,6 +10,7 @@ using Medinilla.Services.Interfaces;
 using Medinilla.Core.v1;
 using Medinilla.Core.v1.Services;
 using Microsoft.Extensions.DependencyInjection;
+using Medinilla.Core.Commands.Ocpp201;
 
 namespace Medinilla.Core;
 
@@ -28,7 +29,9 @@ public static class ServiceExtensions
 
     private static void AddOcppChargerCommands(IServiceCollection services)
     {
-        // empty for now — populate as concrete commands land (ResetCommand, TriggerMessageCommand, ...)
+        services.AddScoped<IOcppChargerCommand, SetVariablesCommand>();
+        services.AddScoped<IOcppChargerCommand, GetVariablesCommand>();
+        //...add more
     }
 
     private static void AddAuthAlgos(IServiceCollection services)

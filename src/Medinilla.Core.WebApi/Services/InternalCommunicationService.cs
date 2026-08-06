@@ -81,53 +81,48 @@ public class InternalCommunicationService : IInternalCommunicationService
 
     private async Task RunCommsChannel()
     {
-        if (_stopped || _disposed) return;
-
-        byte[]? result;
-        try
+        while((!_cts.Token.IsCancellationRequested && !_stopped && !_disposed))
         {
-            result = await _receiver.ReceiveAsync(_inboundQueueName!, _cts.Token);
-        }
-        catch (OperationCanceledException)
-        {
-            return;
-        }
-
-        if (_stopped || _disposed) return;
-
-        _logger.LogInformation(
-            "[{ClientId}] Received from {Queue}",
-            _clientIdentifier,
-            _inboundQueueName);
-
-        try
-        {
-            if (result is not null && _onMessage is not null)
+            byte[]? result;
+            try
             {
-                var commsResult = Comms.Parser.ParseFrom(result);
-                var parsed = WampResult.Parser.ParseFrom(commsResult.Payload.ToByteArray());
-
-                if (parsed.ClientIdentifier == _clientIdentifier)
-                {
-                    await _onMessage(parsed);
-                }
+                result = await _receiver.ReceiveAsync(_inboundQueueName!, _cts.Token);
             }
-        }
-        catch (Exception ex)
-        {
-            _logger.LogError(
-                ex,
-                "[{ClientId}] Error processing message from {Queue}",
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+
+            if (_stopped || _disposed) break;
+
+            _logger.LogInformation(
+                "[{ClientId}] Received from {Queue}",
                 _clientIdentifier,
                 _inboundQueueName);
-        }
-        finally
-        {
-            if (!_cts.Token.IsCancellationRequested && !_stopped && !_disposed)
+
+            try
             {
-                _ = Task.Run(RunCommsChannel);
+                if (result is not null && _onMessage is not null)
+                {
+                    var commsResult = Comms.Parser.ParseFrom(result);
+                    var parsed = WampResult.Parser.ParseFrom(commsResult.Payload.ToByteArray());
+
+                    if (parsed.ClientIdentifier == _clientIdentifier)
+                    {
+                        await _onMessage(parsed);
+                    }
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(
+                    ex,
+                    "[{ClientId}] Error processing message from {Queue}",
+                    _clientIdentifier,
+                    _inboundQueueName);
             }
         }
+        _logger.LogInformation("[{ci}]: ================ Service stopped. ================ ", _clientIdentifier);
     }
 
     public async ValueTask DisposeAsync()

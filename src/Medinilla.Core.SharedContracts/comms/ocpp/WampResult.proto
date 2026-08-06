@@ -3,8 +3,9 @@ syntax = "proto3";
 package medinilla.core.SharedContracts.comms.ocpp;
 
 message WampResult {
-	optional bytes Result = 1;
-	optional bytes Error = 2;
-	bool ReturnToCS = 3;
-	string ClientIdentifier = 4;
+	optional bytes Request = 1;
+	optional bytes Result = 2;
+	optional bytes Error = 3;
+	bool ReturnToCS = 4;
+	string ClientIdentifier = 5;
 }

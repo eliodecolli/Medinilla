@@ -1,7 +1,10 @@
-﻿using Medinilla.Core.Actions;
+﻿using Google.Protobuf;
+using Medinilla.Core.Actions;
 using Medinilla.Core.Commands;
 using Medinilla.Core.Interfaces;
 using Medinilla.Core.Interfaces.Services;
+using Medinilla.Core.SharedContracts.Comms;
+using Medinilla.Core.SharedContracts.Comms.Ocpp;
 using Medinilla.Infrastructure;
 using Medinilla.Infrastructure.WAMP;
 using Microsoft.Extensions.Logging;
@@ -141,7 +144,21 @@ public class OcppCallRouter(
     public async Task SubmitAsync(string clientIdentifier, OcppCallRequest request)
     {
         await outboundTable.Add(request.MessageId, request.Action).ConfigureAwait(false);
-        await dispatcher.SubmitRequest(clientIdentifier, request.Serialize()).ConfigureAwait(false);
+
+        var wamp = new WampResult()
+        {
+            ClientIdentifier = clientIdentifier,
+            ReturnToCS = true,
+            Request = ByteString.CopyFrom(request.Serialize(), Encoding.UTF8),
+        };
+
+        var comms = new Comms()
+        {
+            MessageType = CommsMessageType.OcppRequest,
+            Payload = wamp.ToByteString(),
+        };
+
+        await dispatcher.SubmitRequest(clientIdentifier, comms.ToByteArray()).ConfigureAwait(false);
     }
 
     public async Task DisconnectClient(string clientIdentifier)
