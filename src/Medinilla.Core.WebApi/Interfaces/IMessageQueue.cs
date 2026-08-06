@@ -1,5 +1,3 @@
-using Medinilla.Core.SharedContracts.Comms.Ocpp;
-
 namespace Medinilla.WebApi.Interfaces;
 
 public interface IMessageQueue : IDisposable
@@ -8,7 +6,7 @@ public interface IMessageQueue : IDisposable
 
     Task ScheduleVacuum(CancellationTokenSource cts);
 
-    bool PopMessage(out OcppMessage message);
+    bool PopMessage(out byte[] payload);
 
-    void EnqueueMessage(OcppMessage message);
+    void EnqueueMessage(byte[] payload);
 }

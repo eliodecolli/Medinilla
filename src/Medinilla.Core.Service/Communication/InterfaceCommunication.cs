@@ -3,7 +3,6 @@ using Medinilla.Core.Interfaces;
 using Medinilla.Core.Service.Interfaces;
 using Medinilla.Core.Service.Types;
 using Medinilla.Core.SharedContracts.Comms;
-using Medinilla.Core.SharedContracts.Comms.Ocpp;
 using Medinilla.RealTime;
 using Medinilla.RealTime.Redis;
 using Microsoft.Extensions.DependencyInjection;
@@ -47,15 +46,14 @@ internal sealed class CoreInterfaceCommunication(
                     case CommsMessageType.OcppRequest:
                     case CommsMessageType.OcppResponse:
                     {
-                        var ocpp = OcppMessage.Parser.ParseFrom(comms.Payload);
-                        _ = Task.Run(() => ProcessOcppAsync(ocpp.ClientIdentifier, ocpp.Payload.ToByteArray(), responseChannelPrefix));
+                        var ocppBytes = comms.Payload.ToByteArray();
+                        _ = Task.Run(() => ProcessOcppAsync(comms.ClientIdentifier, ocppBytes, responseChannelPrefix));
                         break;
                     }
 
                     case CommsMessageType.ClientDisconnect:
                     {
-                        var dc = ClientDisconnectMessage.Parser.ParseFrom(comms.Payload);
-                        _ = Task.Run(() => DisconnectAsync(dc.ClientIdentifier));
+                        _ = Task.Run(() => DisconnectAsync(comms.ClientIdentifier));
                         break;
                     }
                 }
@@ -75,23 +73,20 @@ internal sealed class CoreInterfaceCommunication(
             var router = scope.ServiceProvider.GetRequiredService<IOcppCallRouter>();
 
             var result = await router.RouteOcppCall(payload, clientIdentifier);
-            if (result is null)
+
+            var responseBytes = result?.Error?.ToByteArray()
+                ?? result?.Result?.ToByteArray();
+
+            if (responseBytes is null)
             {
                 return;
             }
 
-            var proto = new WampResult
-            {
-                ClientIdentifier = clientIdentifier,
-                Result = result.Result?.ToByteArray() is { } r ? ByteString.CopyFrom(r) : ByteString.Empty,
-                Error = result.Error?.ToByteArray() is { } e ? ByteString.CopyFrom(e) : ByteString.Empty,
-                ReturnToCS = result.ReturnToCS,
-            };
-
             var response = new Comms
             {
                 MessageType = CommsMessageType.OcppResponse,
-                Payload = proto.ToByteString(),
+                ClientIdentifier = clientIdentifier,
+                Payload = ByteString.CopyFrom(responseBytes),
             };
 
             var channel = RedisUtils.BuildChannelName(responseChannelPrefix, clientIdentifier);

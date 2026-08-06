@@ -25,11 +25,7 @@
   <ItemGroup>
     <Protobuf Include="Account.proto" />
     <Protobuf Include="ChargingStation.proto" />
-    <Protobuf Include="comms\ClientDisconnectMessage.proto" />
-    <Protobuf Include="comms\CommunicationChannelSignal.proto" />
     <Protobuf Include="comms\CommunicationMessage.proto" />
-    <Protobuf Include="comms\ocpp\OcppMessage.proto" />
-    <Protobuf Include="comms\ocpp\WampResult.proto" />
   </ItemGroup>
 
   <PropertyGroup>

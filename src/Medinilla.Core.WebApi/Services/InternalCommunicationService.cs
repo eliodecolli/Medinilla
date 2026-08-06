@@ -1,6 +1,5 @@
 using Google.Protobuf;
 using Medinilla.Core.SharedContracts.Comms;
-using Medinilla.Core.SharedContracts.Comms.Ocpp;
 using Medinilla.RealTime;
 using Medinilla.WebApi.Interfaces;
 
@@ -21,7 +20,7 @@ public class InternalCommunicationService : IInternalCommunicationService
     private string? _clientIdentifier;
     private string? _inboundQueueName;
     private string? _outboundQueueName;
-    private Func<WampResult, Task>? _onMessage;
+    private Func<Comms, Task>? _onMessage;
 
     public InternalCommunicationService(
         ISender sender,
@@ -37,7 +36,7 @@ public class InternalCommunicationService : IInternalCommunicationService
         string clientIdentifier,
         string inboundQueueName,
         string outboundQueueName,
-        Func<WampResult, Task> onMessage)
+        Func<Comms, Task> onMessage)
     {
         if (_disposed) throw new ObjectDisposedException(nameof(InternalCommunicationService));
         if (_stopped) throw new InvalidOperationException("Service has been stopped and cannot be restarted.");
@@ -81,7 +80,7 @@ public class InternalCommunicationService : IInternalCommunicationService
 
     private async Task RunCommsChannel()
     {
-        while((!_cts.Token.IsCancellationRequested && !_stopped && !_disposed))
+        while (!_cts.Token.IsCancellationRequested && !_stopped && !_disposed)
         {
             byte[]? result;
             try
@@ -104,13 +103,8 @@ public class InternalCommunicationService : IInternalCommunicationService
             {
                 if (result is not null && _onMessage is not null)
                 {
-                    var commsResult = Comms.Parser.ParseFrom(result);
-                    var parsed = WampResult.Parser.ParseFrom(commsResult.Payload.ToByteArray());
-
-                    if (parsed.ClientIdentifier == _clientIdentifier)
-                    {
-                        await _onMessage(parsed);
-                    }
+                    var comms = Comms.Parser.ParseFrom(result);
+                    await _onMessage(comms);
                 }
             }
             catch (Exception ex)

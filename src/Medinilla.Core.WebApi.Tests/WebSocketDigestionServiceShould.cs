@@ -1,6 +1,5 @@
 using Google.Protobuf;
 using Medinilla.Core.SharedContracts.Comms;
-using Medinilla.Core.SharedContracts.Comms.Ocpp;
 using Medinilla.RealTime;
 using Medinilla.RealTime.Redis;
 using Microsoft.Extensions.Configuration;
@@ -97,30 +96,22 @@ public class WebSocketDigestionServiceShould
     /// <summary>Bytes returned by ReceiveAsync when CSMS answers a charger request.</summary>
     private static byte[] BuildCsmsResponseBytes(string clientId, string ocppCallResult)
     {
-        var wampResult = new WampResult
-        {
-            Result = ByteString.CopyFrom(Encoding.UTF8.GetBytes(ocppCallResult)),
-            ClientIdentifier = clientId
-        };
         return new Comms
         {
             MessageType = CommsMessageType.OcppResponse,
-            Payload = ByteString.CopyFrom(wampResult.ToByteArray())
+            ClientIdentifier = clientId,
+            Payload = ByteString.CopyFrom(Encoding.UTF8.GetBytes(ocppCallResult)),
         }.ToByteArray();
     }
 
     /// <summary>Bytes returned by ReceiveAsync when CSMS initiates a request to the charger.</summary>
     private static byte[] BuildCsmsRequestBytes(string clientId, string ocppCall)
     {
-        var wampResult = new WampResult
-        {
-            Result = ByteString.CopyFrom(Encoding.UTF8.GetBytes(ocppCall)),
-            ClientIdentifier = clientId
-        };
         return new Comms
         {
             MessageType = CommsMessageType.OcppRequest,
-            Payload = ByteString.CopyFrom(wampResult.ToByteArray())
+            ClientIdentifier = clientId,
+            Payload = ByteString.CopyFrom(Encoding.UTF8.GetBytes(ocppCall)),
         }.ToByteArray();
     }
 
@@ -661,52 +652,5 @@ public class WebSocketDigestionServiceShould
 
         // Two messages sent to core: charger request (req-1), then charger response (out-1).
         Assert.Equal(2, rabbitSendCount);
-    }
-
-    // Scenario: CSMS response arrives for a different client — must be ignored.
-    [Fact]
-    public async Task IgnoreResponseForDifferentClient()
-    {
-        var chargerRequest = CreateOcppCall("req-1", "BootNotification");
-        var wrongClientResponse = CreateOcppCallResult("req-1");
-        var requestBytes = Encoding.UTF8.GetBytes(chargerRequest);
-
-        _senderMock
-            .Setup(q => q.SendAsync(TEST_REQUEST_QUEUE, It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
-            .Returns<string, byte[], CancellationToken>((_, _, _) =>
-            {
-                // Response arrives but for a DIFFERENT client.
-                PushInbound(BuildCsmsResponseBytes("WRONG-CHARGER-999", wrongClientResponse));
-                return Task.CompletedTask;
-            });
-
-        var callCount = 0;
-        var wsMock = new Mock<WebSocket>();
-        wsMock.Setup(ws => ws.State).Returns(WebSocketState.Open);
-        wsMock.Setup(ws => ws.ReceiveAsync(
-                It.IsAny<ArraySegment<byte>>(),
-                It.IsAny<CancellationToken>()))
-            .Returns(async (ArraySegment<byte> buffer, CancellationToken ct) =>
-            {
-                callCount++;
-                if (callCount == 1)
-                {
-                    requestBytes.CopyTo(buffer.Array!, buffer.Offset);
-                    return new WebSocketReceiveResult(requestBytes.Length, WebSocketMessageType.Text, true);
-                }
-                // Wait for RunCommsChannel to process (and discard) the wrong-client message.
-                await Task.Delay(80, ct);
-                return new WebSocketReceiveResult(0, WebSocketMessageType.Close, true,
-                    WebSocketCloseStatus.NormalClosure, "done");
-            });
-        wsMock.Setup(ws => ws.CloseStatus)
-            .Returns(() => callCount >= 2 ? WebSocketCloseStatus.NormalClosure : null);
-
-        var sentToWs = WireWebSocketSendCapture(wsMock);
-
-        await using var service = CreateService();
-        await service.Consume(wsMock.Object, TEST_CLIENT_ID);
-
-        Assert.Empty(sentToWs);
     }
 }

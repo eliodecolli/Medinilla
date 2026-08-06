@@ -38,7 +38,7 @@ public class OcppCallRouterShould
             .Returns(Task.CompletedTask);
 
         _dispatcherMock
-            .Setup(d => d.SubmitRequest(It.IsAny<string>(), It.IsAny<string>()))
+            .Setup(d => d.SubmitRequest(It.IsAny<string>(), It.IsAny<byte[]>()))
             .Returns(Task.CompletedTask);
     }
 
@@ -282,10 +282,10 @@ public class OcppCallRouterShould
         var request = new OcppCallRequest("Reset-abc123", "Reset", "{}");
 
         string? capturedClientId = null;
-        string? capturedFrame = null;
+        byte[]? capturedFrame = null;
         _dispatcherMock
-            .Setup(d => d.SubmitRequest(It.IsAny<string>(), It.IsAny<string>()))
-            .Callback<string, string>((clientId, frame) =>
+            .Setup(d => d.SubmitRequest(It.IsAny<string>(), It.IsAny<byte[]>()))
+            .Callback<string, byte[]>((clientId, frame) =>
             {
                 capturedClientId = clientId;
                 capturedFrame = frame;
@@ -300,8 +300,9 @@ public class OcppCallRouterShould
         var registeredAction = await table.TryGetValue("Reset-abc123");
         Assert.Equal("Reset", registeredAction);
 
-        Assert.StartsWith("[2,\"Reset-abc123\"", capturedFrame);
-        Assert.Contains("\"Reset\"", capturedFrame);
+        var frameString = Encoding.UTF8.GetString(capturedFrame!);
+        Assert.StartsWith("[2,\"Reset-abc123\"", frameString);
+        Assert.Contains("\"Reset\"", frameString);
     }
 
     [Fact]
@@ -311,16 +312,17 @@ public class OcppCallRouterShould
         const string payload = "{\"type\":\"Full\",\"evseId\":1}";
         var request = new OcppCallRequest("Reset-xyz", "Reset", payload);
 
-        string? capturedFrame = null;
+        byte[]? capturedFrame = null;
         _dispatcherMock
-            .Setup(d => d.SubmitRequest(It.IsAny<string>(), It.IsAny<string>()))
-            .Callback<string, string>((_, frame) => capturedFrame = frame)
+            .Setup(d => d.SubmitRequest(It.IsAny<string>(), It.IsAny<byte[]>()))
+            .Callback<string, byte[]>((_, frame) => capturedFrame = frame)
             .Returns(Task.CompletedTask);
 
         await sut.SubmitAsync(CLIENT_ID, request);
 
         Assert.NotNull(capturedFrame);
-        Assert.Contains(payload, capturedFrame);
+        var frameString = Encoding.UTF8.GetString(capturedFrame!);
+        Assert.Contains(payload, frameString);
     }
 
     [Fact]
@@ -375,7 +377,7 @@ public class OcppCallRouterShould
     {
         var (sut, _) = CreateSut();
         _dispatcherMock
-            .Setup(d => d.SubmitRequest(It.IsAny<string>(), It.IsAny<string>()))
+            .Setup(d => d.SubmitRequest(It.IsAny<string>(), It.IsAny<byte[]>()))
             .Throws(new InvalidOperationException("wire down"));
 
         var request = new OcppCallRequest("Reset-3", "Reset", "{}");

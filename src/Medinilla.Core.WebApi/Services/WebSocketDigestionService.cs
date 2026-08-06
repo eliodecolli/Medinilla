@@ -2,7 +2,6 @@
 using System.Text;
 using Google.Protobuf;
 using Medinilla.Core.SharedContracts.Comms;
-using Medinilla.Core.SharedContracts.Comms.Ocpp;
 using Medinilla.Core.WebApi.Services.Domain;
 using Medinilla.Infrastructure;
 using Medinilla.Infrastructure.Exceptions;
@@ -134,12 +133,13 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService
     #endregion
 
     #region Message Processing
-    private OcppHeader GetMessageHeader(string rawMessage)
+    private OcppHeader GetMessageHeader(byte[] rawMessage)
     {
         try
         {
+            var rawString = Encoding.UTF8.GetString(rawMessage);
             var parser = new OcppMessageParser();
-            parser.LoadRaw(rawMessage);
+            parser.LoadRaw(rawString);
 
             var messageId = parser.TryExtractMessageId();
             if (messageId is null)
@@ -238,8 +238,7 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService
         {
             if (queue.PopMessage(out var next))
             {
-                var rawMessage = Encoding.UTF8.GetString(next.Payload.ToByteArray());
-                header = GetMessageHeader(rawMessage);
+                header = GetMessageHeader(next);
 
                 _logger.LogInformation("[{ClientId}] De-queueing message: {MessageId} ({Direction})",
                     _clientIdentifier, header.MessageId, direction.ToLowerInvariant());
@@ -247,9 +246,9 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService
                 if (!string.IsNullOrEmpty(header.MessageId))
                 {
                     if (direction == InboundDirection) SetProcessingInboundId(header.MessageId);
-                    else                   SetProcessingOutboundId(header.MessageId);
+                    else                              SetProcessingOutboundId(header.MessageId);
                 }
-                payload = next.Payload.ToByteArray();
+                payload = next;
             }
         }
 
@@ -258,15 +257,12 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService
     }
 
     private Task DrainInbound()
-        => DrainQueue(_inbound, InboundDirection, async (header, payload) =>
-            await PublishCommsMessage(new Comms
+        => DrainQueue(_inbound, InboundDirection, (_, payload) =>
+            PublishCommsMessage(new Comms
             {
-                MessageType = header.Type,
-                Payload = new OcppMessage
-                {
-                    ClientIdentifier = _clientIdentifier,
-                    Payload = ByteString.CopyFrom(payload),
-                }.ToByteString()
+                MessageType = CommsMessageType.OcppRequest,
+                ClientIdentifier = _clientIdentifier!,
+                Payload = ByteString.CopyFrom(payload),
             }));
 
     private Task DrainOutbound()
@@ -274,8 +270,8 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService
 
     private Task PublishCommsMessage(Comms message)
         => _comms.PublishCommsMessage(message);
-    
-    private async Task OnWampMessage(WampResult parsed)
+
+    private async Task OnComms(Comms comms)
     {
         if (!IsConnectionOpen())
         {
@@ -283,23 +279,9 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService
             _comms.Stop();
         }
 
-        byte[]? message = null;
-
-        if (parsed.HasResult)
-        {
-            message = parsed.Result.ToByteArray();
-        }
-        else if (parsed.HasError)
-        {
-            message = parsed.Error.ToByteArray();
-        }
-        else if (parsed.HasRequest)
-        {
-            message = parsed.Request.ToByteArray();
-        }
-
-        var rawString = Encoding.UTF8.GetString(message ?? []);
-        var header = GetMessageHeader(rawString);
+        var message = comms.Payload.ToByteArray();
+        var rawString = Encoding.UTF8.GetString(message);
+        var header = GetMessageHeader(message);
 
         var shouldDrainInbound = false;
         var shouldForward = false;
@@ -332,32 +314,19 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService
                 }
                 else
                 {
-                    _outbound.EnqueueMessage(new OcppMessage
-                    {
-                        ClientIdentifier = _clientIdentifier,
-                        Payload = ByteString.CopyFrom(message)
-                    });
+                    _outbound.EnqueueMessage(message);
                 }
             }
         }
 
-        if (shouldForward && message is not null) await SendRaw(message);
+        if (shouldForward) await SendRaw(message);
         if (shouldDrainInbound) await DrainInbound();
     }
 
     private async Task ProcessMessageInbound(byte[] message)
     {
-        // first of all parse the message so we can peek at the current
-        var rawStringMessage = Encoding.UTF8.GetString(message);
-        var header = GetMessageHeader(rawStringMessage);
+        var header = GetMessageHeader(message);
 
-        var payload = new OcppMessage
-        {
-            ClientIdentifier = _clientIdentifier,
-            Payload = ByteString.CopyFrom(message),
-        };
-
-        // now check if the message matches the pending outboound message
         var shouldDrainOutbound = false;
         var shouldForward = false;
         lock (_lock)
@@ -378,7 +347,7 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService
                 }
                 else
                 {
-                    _inbound.EnqueueMessage(payload);
+                    _inbound.EnqueueMessage(message);
                     _logger.LogWarning("[{ClientId}] Protocol violation: Charger sent us a new request before completion of the current one.", _clientIdentifier);
                 }
             }
@@ -390,7 +359,12 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService
             }
         }
 
-        if (shouldForward) await PublishCommsMessage(new Comms() { MessageType = header.Type, Payload = payload.ToByteString() });
+        if (shouldForward) await PublishCommsMessage(new Comms
+        {
+            MessageType = header.Type,
+            ClientIdentifier = _clientIdentifier!,
+            Payload = ByteString.CopyFrom(message),
+        });
         if (shouldDrainOutbound) await DrainOutbound();
     }
     #endregion
@@ -460,8 +434,8 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService
         {
             throw new InvalidOperationException("Response queue name is not configured");
         }
-        
-        _comms.Start(_clientIdentifier, _inboundQueueName!, _outboundQueueName!, OnWampMessage);
+
+        _comms.Start(_clientIdentifier, _inboundQueueName!, _outboundQueueName!, OnComms);
 
         var inboundVacuum = Task.Run(() => _inbound.ScheduleVacuum(_cts));
         var outboundVacuum = Task.Run(() => _outbound.ScheduleVacuum(_cts));

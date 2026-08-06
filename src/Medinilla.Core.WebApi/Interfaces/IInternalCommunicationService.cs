@@ -1,5 +1,4 @@
 using Medinilla.Core.SharedContracts.Comms;
-using Medinilla.Core.SharedContracts.Comms.Ocpp;
 
 namespace Medinilla.WebApi.Interfaces;
 
@@ -9,7 +8,7 @@ public interface IInternalCommunicationService : IAsyncDisposable
         string clientIdentifier,
         string inboundQueueName,
         string outboundQueueName,
-        Func<WampResult, Task> onMessage);
+        Func<Comms, Task> onMessage);
 
     void Stop();
 

@@ -1,8 +1,0 @@
-syntax = "proto3";
-
-package medinilla.core.SharedContracts.comms.ocpp;
-
-message OcppMessage {
-	string ClientIdentifier = 1;
-	bytes Payload = 2;
-}

@@ -1,7 +1,0 @@
-syntax = "proto3";
-
-package medinilla.core.SharedContracts.comms;
-
-message ClientDisconnectMessage {
-  string ClientIdentifier = 1;
-}
