@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
 
 namespace Medinilla.RealTime.Redis;
@@ -17,24 +18,60 @@ internal static class ServiceCollectionExtensions
 
         var redisUri = config.GetSection("Redis")["Uri"] ?? "";
 
-        var producerOptions = ConfigurationOptions.Parse(redisUri);
-        producerOptions.ClientName = $"{RedisUtils.ProducerConnectionMultiplexer}-{Random.Shared.NextInt64()}";
+        static ConfigurationOptions OptionsFor(string uri, string clientName)
+        {
+            var options = ConfigurationOptions.Parse(uri);
+            options.ClientName = $"{clientName}-{Random.Shared.NextInt64()}";
+            return options;
+        }
 
-        var consumerOptions = ConfigurationOptions.Parse(redisUri);
-        consumerOptions.ClientName = $"{RedisUtils.ConsumerConnectionMultiplexer}-{Random.Shared.NextInt64()}";
+        var producerOptions = OptionsFor(redisUri, RedisUtils.ProducerConnectionMultiplexer);
+        var consumerOptions = OptionsFor(redisUri, RedisUtils.ConsumerConnectionMultiplexer);
+        var subscriptionOptions = OptionsFor(redisUri, RedisUtils.SubscriptionConnectionMultiplexer);
 
         services.AddKeyedSingleton(RedisUtils.ProducerConnectionMultiplexer,
             (_, _) => ConnectionMultiplexer.Connect(producerOptions));
         services.AddKeyedSingleton(RedisUtils.ConsumerConnectionMultiplexer,
             (_, _) => ConnectionMultiplexer.Connect(consumerOptions));
 
-        services.AddSingleton<ISender>(sp => new RedisSender(
+        // Lazy: only opened if something actually resolves it, so Core.Service (which
+        // has no subscription receiver) never pays for this connection.
+        services.AddKeyedSingleton(RedisUtils.SubscriptionConnectionMultiplexer,
+            (_, _) => ConnectionMultiplexer.Connect(subscriptionOptions));
+
+        services.AddScoped<ISender>(sp => new RedisSender(
             sp.GetRequiredKeyedService<ConnectionMultiplexer>(RedisUtils.ProducerConnectionMultiplexer))
         );
 
-        services.AddSingleton<IReceiver>(sp => new RedisReceiver(
-            sp.GetRequiredKeyedService<ConnectionMultiplexer>(RedisUtils.ConsumerConnectionMultiplexer))
+        services.AddScoped<IReceiver>(sp => new RedisReceiver(
+            sp.GetRequiredKeyedService<ConnectionMultiplexer>(RedisUtils.ConsumerConnectionMultiplexer),
+            sp.GetRequiredService<ILogger<IReceiver>>())
         );
+
+        return services;
+    }
+
+    // The routing table and the subscription receiver are singletons, so they cannot
+    // take the scoped ISender/IReceiver — they build their own handles off the
+    // singleton multiplexers instead.
+    internal static IServiceCollection AddMedinillaRoutingTable(this IServiceCollection services)
+    {
+        services.AddSingleton<IWebSocketRoutingTable>(sp => new RedisWebSocketRoutingTable(
+            sp.GetRequiredKeyedService<ConnectionMultiplexer>(RedisUtils.ProducerConnectionMultiplexer).GetDatabase(),
+            sp.GetRequiredService<ILogger<RedisWebSocketRoutingTable>>()));
+
+        return services;
+    }
+
+    // Gets its own multiplexer: the dispatch loop sits in a blocking BLPOP permanently,
+    // which would stall every other command sharing that connection.
+    internal static IServiceCollection AddMedinillaSubscriptionReceiver(this IServiceCollection services)
+    {
+        services.AddSingleton<ISubscriptionReceiver>(sp => new RedisSubscriptionReceiver(
+            new RedisReceiver(
+                sp.GetRequiredKeyedService<ConnectionMultiplexer>(RedisUtils.SubscriptionConnectionMultiplexer),
+                sp.GetRequiredService<ILogger<IReceiver>>()),
+            sp.GetRequiredService<ILogger<RedisSubscriptionReceiver>>()));
 
         return services;
     }

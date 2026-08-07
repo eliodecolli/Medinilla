@@ -1,4 +1,3 @@
-using Medinilla.DataTypes.Core.CommandRequests;
 using Medinilla.Infrastructure.WAMP;
 
 namespace Medinilla.Core.Commands;

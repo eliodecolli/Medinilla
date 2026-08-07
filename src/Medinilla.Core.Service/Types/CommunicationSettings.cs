@@ -6,12 +6,9 @@ public sealed class CommunicationSettings
 {
     public string RequestQueue { get; private set; }
 
-    public string ResponseQueue { get; private set; }
-
-    private CommunicationSettings(string requestQueue, string responseQueue)
+    private CommunicationSettings(string requestQueue)
     {
         RequestQueue = requestQueue;
-        ResponseQueue = responseQueue;
     }
 
     public static CommunicationSettings FromSettingsFile(string settingsFile)
@@ -25,9 +22,6 @@ public sealed class CommunicationSettings
         var requestQueue = root.GetProperty("RequestQueue").GetString()
             ?? throw new JsonException("RequestQueue is required in settings file");
 
-        var responseQueue = root.GetProperty("ResponseQueue").GetString()
-            ?? throw new JsonException("ResponseQueue is required in settings file");
-
-        return new CommunicationSettings(requestQueue, responseQueue);
+        return new CommunicationSettings(requestQueue);
     }
 }

@@ -2,5 +2,5 @@
 
 public interface IOcppRequestDispatcher
 {
-    Task SubmitRequest(string clientIdentifier, string payload);
+    Task SubmitRequest(string clientIdentifier, byte[] payload);
 }

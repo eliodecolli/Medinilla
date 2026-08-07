@@ -8,4 +8,5 @@ package medinilla.core.grpc;
 
 service OcppService {
     rpc SetVariables (SetVariablesRequest) returns (SetVariablesResponse) {}
+    rpc GetVariables (GetVariablesRequest) returns (GetVariablesResponse) {}
 }

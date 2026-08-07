@@ -21,7 +21,10 @@ public sealed class OcppCallResult : BaseOcppMessage
             return null;
         }
 
-        return JsonSerializer.Deserialize<T>(Payload);
+        return JsonSerializer.Deserialize<T>(Payload, new JsonSerializerOptions
+        {
+            PropertyNameCaseInsensitive = true,
+        });
     }
 
     public byte[] ToByteArray()

@@ -2,29 +2,60 @@
 using Medinilla.Core.gRPC.Service;
 using Medinilla.Core.Interfaces;
 using Medinilla.Core.Service.Communication.Mapping;
-using Medinilla.Core.Service.Types;
-using Medinilla.Core.v1;
+using Medinilla.Core.Service.Exceptions;
 using Medinilla.Infrastructure.WAMP;
-using Medinilla.RealTime;
-using Medinilla.RealTime.Redis;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using System.Text;
 using System.Text.Json;
+using System.Text.Json.Serialization;
 
 namespace Medinilla.Core.Service.Communication;
 
 internal sealed class MedinillaGrpc(ILogger<MedinillaGrpc> log, IServiceProvider serviceProvider) : OcppService.OcppServiceBase
 {
+    private static readonly JsonSerializerOptions PayloadJsonOptions = new()
+    {
+        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
+        Converters = { new JsonStringEnumConverter() },
+        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
+    };
+
+    private static string SerializePayload<T>(T payload) => JsonSerializer.Serialize(payload, PayloadJsonOptions);
+
+    /// <summary>
+    /// A charger that no instance is hosting can't be called at all, so the request
+    /// fails as an OCPP CALLERROR rather than being queued for nobody.
+    /// </summary>
+    private Error NotConnectedError(ChargerNotConnectedException ex, string actionName)
+    {
+        log.LogWarning("{ci}: {an}: charger is not connected", ex.ClientIdentifier, actionName);
+
+        var callError = new OcppCallError(
+            "-1",
+            OcppCallError.ErrorCodes.GenericError,
+            $"NotConnected: {ex.Message}");
+
+        return new Error
+        {
+            HasError = true,
+            Message = Encoding.UTF8.GetString(callError.ToByteArray()),
+        };
+    }
+
     public override async Task<SetVariablesResponse> SetVariables(SetVariablesRequest request, ServerCallContext context)
     {
-        log.LogInformation("{ci}: {an}", request.ClientIdentifier, OcppActionNames.SetVariables);
-
         try
         {
-            var messageId = new Guid().ToString();
+            var messageId = Guid.NewGuid().ToString();
+            log.LogInformation("Request: {an} msgId={mi} ci={ci}",
+                OcppActionNames.SetVariables,
+                messageId,
+                request.ClientIdentifier);
+
             var payload = MedinillaMapping.MapSetVariables(request);
 
-            var ocppRequest = new OcppCallRequest(messageId, OcppActionNames.SetVariables, JsonSerializer.Serialize(payload));
+            var ocppRequest = new OcppCallRequest(messageId, OcppActionNames.SetVariables, SerializePayload(payload));
             using var scope = serviceProvider.CreateScope();
             var router = scope.ServiceProvider.GetRequiredService<IOcppCallRouter>();
 
@@ -34,14 +65,66 @@ internal sealed class MedinillaGrpc(ILogger<MedinillaGrpc> log, IServiceProvider
                 Error = new Error()
                 {
                     HasError = false,
-                    Message = null,
                 }
+            };
+        }
+        catch (ChargerNotConnectedException e)
+        {
+            return new SetVariablesResponse()
+            {
+                Error = NotConnectedError(e, OcppActionNames.SetVariables)
             };
         }
         catch (Exception e)
         {
             log.LogError("{ci}: {an}: Error: {msg}", request.ClientIdentifier, OcppActionNames.SetVariables, e.Message);
             return new SetVariablesResponse()
+            {
+                Error = new Error()
+                {
+                    HasError = true,
+                    Message = e.Message,
+                }
+            };
+        }
+    }
+
+    public override async Task<GetVariablesResponse> GetVariables(GetVariablesRequest request, ServerCallContext context)
+    {
+        try
+        {
+            var messageId = Guid.NewGuid().ToString();
+            log.LogInformation("Request: {an} msgId={mi} ci={ci}",
+                OcppActionNames.GetVariables,
+                messageId,
+                request.ClientIdentifier);
+
+            var payload = MedinillaMapping.MapGetVariables(request);
+
+            var ocppRequest = new OcppCallRequest(messageId, OcppActionNames.GetVariables, SerializePayload(payload));
+            using var scope = serviceProvider.CreateScope();
+            var router = scope.ServiceProvider.GetRequiredService<IOcppCallRouter>();
+
+            await router.SubmitAsync(request.ClientIdentifier, ocppRequest);
+            return new GetVariablesResponse()
+            {
+                Error = new Error()
+                {
+                    HasError = false,
+                }
+            };
+        }
+        catch (ChargerNotConnectedException e)
+        {
+            return new GetVariablesResponse()
+            {
+                Error = NotConnectedError(e, OcppActionNames.GetVariables)
+            };
+        }
+        catch (Exception e)
+        {
+            log.LogError("{ci}: {an}: Error: {msg}", request.ClientIdentifier, OcppActionNames.GetVariables, e.Message);
+            return new GetVariablesResponse()
             {
                 Error = new Error()
                 {

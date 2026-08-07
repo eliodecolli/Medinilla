@@ -3,9 +3,7 @@ using Medinilla.Core.Interfaces;
 using Medinilla.Core.Service.Interfaces;
 using Medinilla.Core.Service.Types;
 using Medinilla.Core.SharedContracts.Comms;
-using Medinilla.Core.SharedContracts.Comms.Ocpp;
 using Medinilla.RealTime;
-using Medinilla.RealTime.Redis;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -23,41 +21,52 @@ internal sealed class CoreInterfaceCommunication(
     public async Task Run(CancellationToken ct)
     {
         logger.LogInformation("Started core service...");
-        await RunEvent(settings.RequestQueue, settings.ResponseQueue, ct);
+        await RunEvent(settings.RequestQueue, ct);
     }
 
-    private async Task RunEvent(string requestChannel, string responseChannelPrefix, CancellationToken ct)
+    private async Task RunEvent(string requestChannel, CancellationToken ct)
     {
         while (!ct.IsCancellationRequested)
         {
-            var result = await receiver.ReceiveAsync(requestChannel, ct);
-            if (result is null)
+            try
             {
-                continue;
+                var result = await receiver.ReceiveAsync(requestChannel, ct);
+                if (result is null)
+                {
+                    continue;
+                }
+
+                logger.LogInformation("[{rc}]: {len} bytes", requestChannel, result.Length);
+
+                var request = QueuedMessageRequest.Parser.ParseFrom(result);
+                var comms = request.Payload;
+
+                switch (comms.MessageType)
+                {
+                    case CommsMessageType.OcppRequest:
+                    case CommsMessageType.OcppResponse:
+                    {
+                        var ocppBytes = comms.Payload.ToByteArray();
+                        _ = Task.Run(() => ProcessOcppAsync(
+                            request.ClientIdentifier, ocppBytes, request.ResponseQueue));
+                        break;
+                    }
+
+                    case CommsMessageType.ClientDisconnect:
+                    {
+                        _ = Task.Run(() => DisconnectAsync(request.ClientIdentifier));
+                        break;
+                    }
+                }
             }
-
-            var comms = Comms.Parser.ParseFrom(result);
-
-            switch (comms.MessageType)
+            catch (Exception ex)
             {
-                case CommsMessageType.OcppResponse:
-                {
-                    var ocpp = OcppMessage.Parser.ParseFrom(comms.Payload);
-                    _ = Task.Run(() => ProcessOcppAsync(ocpp.ClientIdentifier, ocpp.Payload.ToByteArray(), responseChannelPrefix));
-                    break;
-                }
-
-                case CommsMessageType.ClientDisconnect:
-                {
-                    var dc = ClientDisconnectMessage.Parser.ParseFrom(comms.Payload);
-                    _ = Task.Run(() => DisconnectAsync(dc.ClientIdentifier));
-                    break;
-                }
+                logger.LogError("InterfaceComms: [{rc}]: Error: {msg}", requestChannel, ex.Message);
             }
         }
     }
 
-    private async Task ProcessOcppAsync(string clientIdentifier, byte[] payload, string responseChannelPrefix)
+    private async Task ProcessOcppAsync(string clientIdentifier, byte[] payload, string responseQueue)
     {
         try
         {
@@ -65,27 +74,29 @@ internal sealed class CoreInterfaceCommunication(
             var router = scope.ServiceProvider.GetRequiredService<IOcppCallRouter>();
 
             var result = await router.RouteOcppCall(payload, clientIdentifier);
-            if (result is null)
+
+            var responseBytes = result?.Error?.ToByteArray()
+                ?? result?.Result?.ToByteArray();
+
+            if (responseBytes is null)
             {
                 return;
             }
 
-            var proto = new WampResult
-            {
-                ClientIdentifier = clientIdentifier,
-                Result = result.Result?.ToByteArray() is { } r ? ByteString.CopyFrom(r) : ByteString.Empty,
-                Error = result.Error?.ToByteArray() is { } e ? ByteString.CopyFrom(e) : ByteString.Empty,
-                ReturnToCS = result.ReturnToCS,
-            };
-
-            var response = new Comms
+            var responseComms = new Comms
             {
                 MessageType = CommsMessageType.OcppResponse,
-                Payload = proto.ToByteString(),
+                ClientIdentifier = clientIdentifier,
+                Payload = ByteString.CopyFrom(responseBytes),
             };
 
-            var channel = RedisUtils.BuildChannelName(responseChannelPrefix, clientIdentifier);
-            await sender.SendAsync(channel, response.ToByteArray());
+            var queued = new QueuedMessageResponse
+            {
+                ClientIdentifier = clientIdentifier,
+                Payload = responseComms,
+            };
+
+            await sender.SendAsync(responseQueue, queued.ToByteArray());
         }
         catch (Exception ex)
         {

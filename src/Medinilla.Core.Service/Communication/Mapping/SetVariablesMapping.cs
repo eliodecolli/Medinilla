@@ -9,23 +9,24 @@ public partial class MedinillaMapping
     {
         return new SetVariablesRequest
         {
-            SetVariableData = request.SetVariableData
+            SetVariableData = request.SetVariableData?
+                .Where(d => d is not null)
                 .Select(d => new SetVariableData
                 {
                     Component = new Component
                     {
-                        Name = d.ComponentName,
-                        Instance = d.ComponentInstance,
+                        Name = d.ComponentName ?? string.Empty,
+                        Instance = string.IsNullOrEmpty(d.ComponentInstance) ? null : d.ComponentInstance,
                     },
                     Variable = new Variable
                     {
-                        Name = d.VariableName,
-                        Instance = d.VariableInstance,
+                        Name = d.VariableName ?? string.Empty,
+                        Instance = string.IsNullOrEmpty(d.VariableInstance) ? null : d.VariableInstance,
                     },
                     AttributeType = Enum.TryParse<AttributeEnum>(d.AttributeType, out var attr) ? attr : null,
                     AttributeValue = d.AttributeValue,
                 })
-                .ToList(),
+                .ToList() ?? [],
         };
     }
 }

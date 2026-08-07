@@ -1,5 +1,6 @@
 ﻿using Medinilla.Core;
 using Medinilla.Core.Interfaces;
+using Medinilla.Core.Service;
 using Medinilla.Core.Service.Communication;
 using Medinilla.Core.Service.Interfaces;
 using Medinilla.Core.Service.Types;
@@ -7,48 +8,43 @@ using Medinilla.Core.v1;
 using Medinilla.DataAccess;
 using Medinilla.Infrastructure;
 using Medinilla.RealTime;
+using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
-using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
+using Serilog;
 
-var hostApplicationBuilder = Host.CreateApplicationBuilder(args);
+var builder = WebApplication.CreateBuilder(args);
 
-var builder = new ConfigurationBuilder();
+var cfgBuilder = new ConfigurationBuilder();
 using var stream = typeof(Program).Assembly.GetManifestResourceStream("Medinilla.Core.Service.settings.json");
 
-builder.AddJsonStream(stream);
-var config = builder.Build();
+cfgBuilder.AddJsonStream(stream);
+var config = cfgBuilder.Build();
 
-hostApplicationBuilder.Configuration.AddConfiguration(config);
+builder.Configuration.AddConfiguration(config);
 
-hostApplicationBuilder.Logging.AddSimpleConsole(options =>
-{
-    options.SingleLine = true;
-    options.IncludeScopes = false;
-    options.TimestampFormat = "[HH:mm:ss]: ";
-});
-
-// Filter noisy namespaces
-hostApplicationBuilder.Logging.SetMinimumLevel(LogLevel.Debug);
-hostApplicationBuilder.Logging.AddFilter("Microsoft", LogLevel.Warning);
+builder.Host.UseSerilog((ctx, lc) => lc.ReadFrom.Configuration(ctx.Configuration));
 
 
-hostApplicationBuilder.Services.AddMedinillaInfrastructure();
-hostApplicationBuilder.Services.AddMedinillaDataAccess();
-hostApplicationBuilder.Services.AddMedinillaServices();
-hostApplicationBuilder.Services.AddRealTimeServices();
+builder.Services.AddMedinillaInfrastructure();
+builder.Services.AddMedinillaDataAccess();
+builder.Services.AddMedinillaServices();
+builder.Services.AddRealTimeServices();
+builder.Services.AddWebSocketRoutingTable();
 
-hostApplicationBuilder.Services.AddSingleton(CommunicationSettings.FromSettingsFile("settings.json"));
-hostApplicationBuilder.Services.AddScoped<IOcppRequestDispatcher, OcppRequestDispatcher>();
-hostApplicationBuilder.Services.AddScoped<BaseOcppRoutingTable, RedisRoutingTable>();
-hostApplicationBuilder.Services.AddSingleton<IInterfaceCommunication, CoreInterfaceCommunication>();
+builder.Services.AddSingleton(CommunicationSettings.FromSettingsFile("settings.json"));
+builder.Services.AddScoped<IOcppRequestDispatcher, OcppRequestDispatcher>();
+builder.Services.AddSingleton<MedinillaGrpc>();
+builder.Services.AddScoped<BaseOcppRoutingTable, RedisRoutingTable>();
+builder.Services.AddSingleton<IInterfaceCommunication, CoreInterfaceCommunication>();
 
-using var host = hostApplicationBuilder.Build();
+builder.Services.AddHostedService<InboundWorker>();
 
-var interfaceComms = host.Services.GetRequiredService<IInterfaceCommunication>();
-var lifetime = host.Services.GetRequiredService<IHostApplicationLifetime>();
+builder.Services.AddGrpc();
 
-await interfaceComms.Run(lifetime.ApplicationStopping);
+var app = builder.Build();
 
-await host.WaitForShutdownAsync();
+app.MapGrpcService<MedinillaGrpc>();
+
+await app.RunAsync();

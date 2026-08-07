@@ -1,7 +1,7 @@
 ﻿using Medinilla.DataTypes.Contracts;
+using Medinilla.DataTypes.Contracts.Common;
 using Medinilla.Infrastructure.WAMP;
 using Microsoft.Extensions.Logging;
-using Medinilla.DataTypes.Contracts.Common;
 
 namespace Medinilla.Core.Commands.Ocpp201;
 

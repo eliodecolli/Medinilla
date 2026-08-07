@@ -1,17 +1,16 @@
-using System.Collections.Concurrent;
-using Medinilla.Core.SharedContracts.Comms.Ocpp;
 using Medinilla.WebApi.Interfaces;
+using System.Collections.Concurrent;
 
 namespace Medinilla.Core.WebApi.Services;
 
 public class MessageQueue(uint ttl = 5) : IMessageQueue
 {
-    private readonly ConcurrentQueue<OcppMessage> _queue = new();
+    private readonly ConcurrentQueue<byte[]> _queue = new();
     private readonly Lock _lock = new();
-    
+
     private readonly PeriodicTimer _timer = new(TimeSpan.FromSeconds(5));
     private DateTime? _lastAdded;
-    
+
     public Func<Task>? OnDrainQueue { get; set; }
 
     public async Task ScheduleVacuum(CancellationTokenSource cts)
@@ -31,16 +30,16 @@ public class MessageQueue(uint ttl = 5) : IMessageQueue
         }
     }
 
-    public bool PopMessage(out OcppMessage message)
+    public bool PopMessage(out byte[] payload)
     {
-        return _queue.TryDequeue(out message!);
+        return _queue.TryDequeue(out payload!);
     }
-    
-    public void EnqueueMessage(OcppMessage message)
+
+    public void EnqueueMessage(byte[] payload)
     {
         lock (_lock)
         {
-            _queue.Enqueue(message);
+            _queue.Enqueue(payload);
             _lastAdded = DateTime.Now;
         }
     }

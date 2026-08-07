@@ -15,4 +15,6 @@ public static class OcppActionNames
     public const string TransactionEvent = "TransactionEvent";
 
     public const string SetVariables = "SetVariables";
+
+    public const string GetVariables = "GetVariables";
 }

@@ -2,7 +2,6 @@
 using Medinilla.DataAccess.Relational.Models;
 using Medinilla.DataTypes.Contracts.Common;
 using Medinilla.DataTypes.Core;
-using Medinilla.DataTypes.Core.Enums;
 using IdToken = Medinilla.DataAccess.Relational.Models.Authorization.IdToken;
 
 namespace Medinilla.DataAccess.Relational.UnitOfWork;

@@ -1,14 +1,14 @@
-﻿using Medinilla.Core.Actions.Ocpp201;
+﻿using Medinilla.Core.Actions;
+using Medinilla.Core.Actions.Ocpp201;
 using Medinilla.Core.Commands;
+using Medinilla.Core.Commands.Ocpp201;
 using Medinilla.Core.Interfaces;
+using Medinilla.Core.Interfaces.Services;
 using Medinilla.Core.Logic.Authorization;
 using Medinilla.Core.Logic.Authorization.Algorithms;
-using Medinilla.Core.v1.Transactions;
-using Medinilla.Core.Actions;
-using Medinilla.Core.Interfaces.Services;
-using Medinilla.Services.Interfaces;
 using Medinilla.Core.v1;
 using Medinilla.Core.v1.Services;
+using Medinilla.Core.v1.Transactions;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Medinilla.Core;
@@ -28,7 +28,9 @@ public static class ServiceExtensions
 
     private static void AddOcppChargerCommands(IServiceCollection services)
     {
-        // empty for now — populate as concrete commands land (ResetCommand, TriggerMessageCommand, ...)
+        services.AddScoped<IOcppChargerCommand, SetVariablesCommand>();
+        services.AddScoped<IOcppChargerCommand, GetVariablesCommand>();
+        //...add more
     }
 
     private static void AddAuthAlgos(IServiceCollection services)

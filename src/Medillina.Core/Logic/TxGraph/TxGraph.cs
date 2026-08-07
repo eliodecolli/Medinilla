@@ -1,5 +1,4 @@
 using Medinilla.Core.Interfaces.Transactions;
-using Medinilla.Core.v1.TxGraph;
 using MessagePack;
 
 namespace Medinilla.Core.Logic.TxGraph;

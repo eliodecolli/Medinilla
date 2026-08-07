@@ -5,6 +5,8 @@ using Medinilla.RealTime;
 using Medinilla.WebApi;
 using Medinilla.WebApi.Interfaces;
 
+using Serilog;
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.WebHost.ConfigureKestrel(options =>
@@ -15,35 +17,25 @@ builder.WebHost.ConfigureKestrel(options =>
     });
 });
 
-// Add services to the container.
+builder.Host.UseSerilog((ctx, lc) => lc.ReadFrom.Configuration(ctx.Configuration));
 
 builder.Services.AddControllers(options => options.InputFormatters.Add(new PlainTextFormatter()));
-// Learn more about configuring Swagger/OpenAPI at https://aka.ms/aspnetcore/swashbuckle
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
-
-builder.Logging.AddSimpleConsole(options =>
-{
-    options.SingleLine = true;
-    options.IncludeScopes = false;
-    options.TimestampFormat = "HH:mm:ss ";
-});
-
-// Filter noisy namespaces
-builder.Logging.SetMinimumLevel(LogLevel.Debug);
-builder.Logging.AddFilter("Microsoft", LogLevel.Warning);
-builder.Logging.AddFilter("Microsoft.AspNetCore", LogLevel.Warning);
-builder.Logging.AddFilter("Microsoft.Hosting.Lifetime", LogLevel.Information);
 
 
 builder.Services.AddMedinillaInfrastructure();
 builder.Services.AddRealTimeServices();
 builder.Services.AddMedinillaDataAccess();
 
+builder.Services.AddWebSocketRoutingTable();
+builder.Services.AddSubscriptionReceiver();
+
+builder.Services.AddSingleton<IInstanceIdentifier, InstanceIdentifier>();
 builder.Services.AddSingleton<IMessageQueueFactory, MessageQueueFactory>();
+builder.Services.AddHostedService<SubscriptionReceiverHostedService>();
 
 builder.Services.AddScoped<IWSDigestionServiceCollection, WSDigestionServiceCollection>();
-builder.Services.AddScoped<IInternalCommunicationService, InternalCommunicationService>();
 builder.Services.AddScoped<IBasicWebSocketDigestionService, WebSocketDigestionService>();
 
 var app = builder.Build();

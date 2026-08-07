@@ -1,0 +1,19 @@
+syntax = "proto3";
+
+package medinilla.core.SharedContracts.comms;
+
+import "comms/CommunicationMessage.proto";
+
+// WebApi -> CSMS. Carries the routing metadata the CSMS needs to answer
+// without inferring anything from the payload.
+message QueuedMessageRequest {
+	string ClientIdentifier = 1;
+	string ResponseQueue = 2;
+	Comms Payload = 3;
+}
+
+// CSMS -> WebApi. The receiving instance fans out by ClientIdentifier.
+message QueuedMessageResponse {
+	string ClientIdentifier = 1;
+	Comms Payload = 2;
+}

@@ -5,11 +5,12 @@ package medinilla.core.SharedContracts.comms;
 enum CommsMessageType {
 	OcppRequest = 0;
 	OcppResponse = 1;
-  
+
   ClientDisconnect = 2;
 }
 
 message Comms {
 	CommsMessageType MessageType = 1;
-	bytes Payload = 2;
+	string ClientIdentifier = 2;
+	bytes Payload = 3;
 }

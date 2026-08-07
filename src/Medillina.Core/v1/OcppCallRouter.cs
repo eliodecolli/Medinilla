@@ -131,6 +131,11 @@ public class OcppCallRouter(
 
             await outboundTable.Remove(message.MessageId);
             await dispatch(command);
+
+            _logger.LogInformation("Response: action={action} msgId={msgId} ci={ci}",
+                pending,
+                message.MessageId,
+                clientIdentifier);
         }
         else
         {
@@ -141,7 +146,20 @@ public class OcppCallRouter(
     public async Task SubmitAsync(string clientIdentifier, OcppCallRequest request)
     {
         await outboundTable.Add(request.MessageId, request.Action).ConfigureAwait(false);
-        await dispatcher.SubmitRequest(clientIdentifier, request.Serialize()).ConfigureAwait(false);
+
+        var payload = Encoding.UTF8.GetBytes(request.Serialize());
+
+        try
+        {
+            await dispatcher.SubmitRequest(clientIdentifier, payload).ConfigureAwait(false);
+        }
+        catch
+        {
+            // Dispatch never happened, so nothing will ever reply — don't leave the
+            // message sitting in the in-flight table.
+            await outboundTable.Remove(request.MessageId).ConfigureAwait(false);
+            throw;
+        }
     }
 
     public async Task DisconnectClient(string clientIdentifier)

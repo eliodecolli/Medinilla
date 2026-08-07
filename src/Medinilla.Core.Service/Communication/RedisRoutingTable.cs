@@ -20,7 +20,7 @@ internal class RedisRoutingTable(IServiceProvider sp) : BaseOcppRoutingTable
     {
         AssertMux();
         var connection = mux!.GetDatabase();
-        await connection.StringSetAsync(GetKey(messageId), value);
+        await connection.StringSetAsync(GetKey(messageId), value, TimeSpan.FromSeconds(100));
     }
 
     public override async Task Remove(string messageId)

@@ -1,5 +1,4 @@
 using Medinilla.WebApi.Interfaces;
-using Microsoft.Extensions.Configuration;
 
 namespace Medinilla.Core.WebApi.Services;
 

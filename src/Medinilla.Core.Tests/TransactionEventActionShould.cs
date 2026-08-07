@@ -1,7 +1,7 @@
-﻿using System.Text.Json;
-using Medinilla.Core.v1.Transactions;
+﻿using Medinilla.Core.v1.Transactions;
 using Medinilla.DataTypes.Contracts;
 using Medinilla.Infrastructure;
+using System.Text.Json;
 using Xunit.Abstractions;
 
 namespace Medinilla.Core.Tests;
