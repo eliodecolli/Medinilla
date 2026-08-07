@@ -1,9 +1,6 @@
 ﻿using Medinilla.Core.Interfaces.Services;
 using Medinilla.Core.Logic.Authorization;
-using Medinilla.Core.v1;
-using Medinilla.Core.v1.Services;
 using Medinilla.Core.v1.Transactions;
-using Medinilla.DataAccess.Relational.Models;
 using Medinilla.DataAccess.Relational.UnitOfWork;
 using Medinilla.DataTypes.Contracts;
 using Medinilla.DataTypes.Contracts.Common;

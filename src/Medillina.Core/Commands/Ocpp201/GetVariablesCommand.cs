@@ -1,9 +1,8 @@
-using System.Text.Json;
-using System.Text.Json.Serialization;
 using Medinilla.DataTypes.Contracts;
 using Medinilla.DataTypes.Contracts.Common;
 using Medinilla.Infrastructure.WAMP;
 using Microsoft.Extensions.Logging;
+using System.Text.Json;
 
 namespace Medinilla.Core.Commands.Ocpp201;
 

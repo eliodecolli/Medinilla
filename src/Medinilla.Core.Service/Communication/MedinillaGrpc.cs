@@ -2,11 +2,7 @@
 using Medinilla.Core.gRPC.Service;
 using Medinilla.Core.Interfaces;
 using Medinilla.Core.Service.Communication.Mapping;
-using Medinilla.Core.Service.Types;
-using Medinilla.Core.v1;
 using Medinilla.Infrastructure.WAMP;
-using Medinilla.RealTime;
-using Medinilla.RealTime.Redis;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Text.Json;
@@ -30,10 +26,10 @@ internal sealed class MedinillaGrpc(ILogger<MedinillaGrpc> log, IServiceProvider
         try
         {
             var messageId = Guid.NewGuid().ToString();
-            log.LogInformation("{ci}: {an} - {mi}",
-                request.ClientIdentifier,
+            log.LogInformation("Request: {an} msgId={mi} ci={ci}",
                 OcppActionNames.SetVariables,
-                messageId);
+                messageId,
+                request.ClientIdentifier);
 
             var payload = MedinillaMapping.MapSetVariables(request);
 
@@ -69,10 +65,10 @@ internal sealed class MedinillaGrpc(ILogger<MedinillaGrpc> log, IServiceProvider
         try
         {
             var messageId = Guid.NewGuid().ToString();
-            log.LogInformation("{ci}: {an} - {mi}",
-                request.ClientIdentifier,
+            log.LogInformation("Request: {an} msgId={mi} ci={ci}",
                 OcppActionNames.GetVariables,
-                messageId);
+                messageId,
+                request.ClientIdentifier);
 
             var payload = MedinillaMapping.MapGetVariables(request);
 

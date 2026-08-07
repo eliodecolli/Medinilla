@@ -1,6 +1,4 @@
-﻿using System.Text.Json.Serialization;
-
-namespace Medinilla.DataTypes.Contracts.Common;
+﻿namespace Medinilla.DataTypes.Contracts.Common;
 
 /// <summary>
 /// This contains the reason why the transaction was stopped.

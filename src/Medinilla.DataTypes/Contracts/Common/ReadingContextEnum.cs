@@ -1,6 +1,4 @@
-﻿using System.Text.Json.Serialization;
-
-namespace Medinilla.DataTypes.Contracts.Common;
+﻿namespace Medinilla.DataTypes.Contracts.Common;
 
 /// <summary>
 /// Type of detail value: start, end or sample

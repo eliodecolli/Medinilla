@@ -1,5 +1,4 @@
 ﻿using Medinilla.DataTypes.Contracts;
-using Medinilla.DataTypes.Core;
 using Medinilla.Infrastructure.WAMP;
 using Microsoft.Extensions.Logging;
 

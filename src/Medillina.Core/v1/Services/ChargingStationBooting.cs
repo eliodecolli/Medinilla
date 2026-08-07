@@ -1,10 +1,10 @@
-using System.Text.Json;
 using Medinilla.Core.Interfaces.Services;
 using Medinilla.Core.Logic.Configuration;
 using Medinilla.DataAccess.Relational.Models;
 using Medinilla.DataAccess.Relational.Models.Authorization;
 using Medinilla.DataAccess.Relational.UnitOfWork;
 using Medinilla.DataTypes.Contracts;
+using System.Text.Json;
 
 namespace Medinilla.Core.v1.Services;
 

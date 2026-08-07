@@ -2,9 +2,6 @@
 using Medinilla.DataAccess.Interfaces;
 using Medinilla.DataAccess.Relational.Models;
 using Medinilla.DataAccess.Relational.Models.Authorization;
-using Microsoft.Extensions.Configuration;
-using Microsoft.Extensions.Logging;
-using System.Text.Json;
 
 namespace Medinilla.DataAccess.Relational.UnitOfWork;
 

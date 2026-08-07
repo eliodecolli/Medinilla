@@ -1,12 +1,12 @@
-﻿using System.Net.WebSockets;
-using System.Text;
-using Google.Protobuf;
+﻿using Google.Protobuf;
 using Medinilla.Core.SharedContracts.Comms;
 using Medinilla.Core.WebApi.Services.Domain;
 using Medinilla.Infrastructure;
 using Medinilla.Infrastructure.Exceptions;
 using Medinilla.RealTime.Redis;
 using Medinilla.WebApi.Interfaces;
+using System.Net.WebSockets;
+using System.Text;
 
 namespace Medinilla.Core.WebApi.Services;
 

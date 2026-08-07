@@ -1,3 +1,4 @@
+using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
 
 namespace Medinilla.RealTime.Redis;
@@ -24,13 +25,15 @@ public sealed class RedisSender : ISender
 public sealed class RedisReceiver : IReceiver
 {
     private readonly IDatabase _db;
+    private readonly ILogger<IReceiver> _log;
 
-    private const string BRPOP = "BRPOP";
-    private const int BrpopTimeoutSeconds = 3;
+    private const string BLPOP = "BLPOP";
+    private const int BlpopTimeoutSeconds = 3;
 
-    public RedisReceiver(ConnectionMultiplexer consumerMux)
+    public RedisReceiver(ConnectionMultiplexer consumerMux, ILogger<IReceiver> log)
     {
         _db = consumerMux.GetDatabase();
+        _log = log;
     }
 
     public async Task<byte[]?> ReceiveAsync(string queue, CancellationToken ct = default)
@@ -39,7 +42,7 @@ public sealed class RedisReceiver : IReceiver
         {
             try
             {
-                var result = await _db.ExecuteAsync(BRPOP, queue, BrpopTimeoutSeconds.ToString())
+                var result = await _db.ExecuteAsync(BLPOP, queue, BlpopTimeoutSeconds.ToString())
                     .WaitAsync(ct);
                 if (result is not null && !result.IsNull)
                 {
@@ -48,6 +51,10 @@ public sealed class RedisReceiver : IReceiver
             }
             catch (RedisTimeoutException)
             {
+            }
+            catch (Exception ex)
+            {
+                _log.LogError("RedisReceiver: {queue}: {error}", queue, ex.Message);
             }
         }
 

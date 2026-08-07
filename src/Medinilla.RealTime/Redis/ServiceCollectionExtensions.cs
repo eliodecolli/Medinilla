@@ -1,5 +1,6 @@
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.DependencyInjection;
+using Microsoft.Extensions.Logging;
 using StackExchange.Redis;
 
 namespace Medinilla.RealTime.Redis;
@@ -28,12 +29,13 @@ internal static class ServiceCollectionExtensions
         services.AddKeyedSingleton(RedisUtils.ConsumerConnectionMultiplexer,
             (_, _) => ConnectionMultiplexer.Connect(consumerOptions));
 
-        services.AddSingleton<ISender>(sp => new RedisSender(
+        services.AddScoped<ISender>(sp => new RedisSender(
             sp.GetRequiredKeyedService<ConnectionMultiplexer>(RedisUtils.ProducerConnectionMultiplexer))
         );
 
-        services.AddSingleton<IReceiver>(sp => new RedisReceiver(
-            sp.GetRequiredKeyedService<ConnectionMultiplexer>(RedisUtils.ConsumerConnectionMultiplexer))
+        services.AddScoped<IReceiver>(sp => new RedisReceiver(
+            sp.GetRequiredKeyedService<ConnectionMultiplexer>(RedisUtils.ConsumerConnectionMultiplexer),
+            sp.GetRequiredService<ILogger<IReceiver>>())
         );
 
         return services;

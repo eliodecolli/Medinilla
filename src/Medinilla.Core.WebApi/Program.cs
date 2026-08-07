@@ -5,6 +5,8 @@ using Medinilla.RealTime;
 using Medinilla.WebApi;
 using Medinilla.WebApi.Interfaces;
 
+using Serilog;
+
 var builder = WebApplication.CreateBuilder(args);
 
 builder.WebHost.ConfigureKestrel(options =>
@@ -15,16 +17,11 @@ builder.WebHost.ConfigureKestrel(options =>
     });
 });
 
+builder.Host.UseSerilog((ctx, lc) => lc.ReadFrom.Configuration(ctx.Configuration));
+
 builder.Services.AddControllers(options => options.InputFormatters.Add(new PlainTextFormatter()));
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();
-
-builder.Logging.AddSimpleConsole(options =>
-{
-    options.SingleLine = true;
-    options.IncludeScopes = false;
-    options.TimestampFormat = "HH:mm:ss ";
-});
 
 
 builder.Services.AddMedinillaInfrastructure();

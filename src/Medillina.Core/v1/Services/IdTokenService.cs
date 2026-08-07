@@ -1,5 +1,4 @@
 using Medinilla.Core.Interfaces.Services;
-using Medinilla.DataAccess.Relational.Models;
 using Medinilla.DataAccess.Relational.UnitOfWork;
 using Medinilla.DataTypes.Contracts.Common;
 using DbChargingStation = Medinilla.DataAccess.Relational.Models.ChargingStation;

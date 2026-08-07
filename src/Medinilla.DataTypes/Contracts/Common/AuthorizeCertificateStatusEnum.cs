@@ -1,10 +1,4 @@
-﻿using System;
-using System.Collections.Generic;
-using System.Linq;
-using System.Text;
-using System.Threading.Tasks;
-
-namespace Medinilla.DataTypes.Contracts.Common;
+﻿namespace Medinilla.DataTypes.Contracts.Common;
 
 /// <summary>
 /// Certificate status information.

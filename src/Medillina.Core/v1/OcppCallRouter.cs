@@ -131,6 +131,11 @@ public class OcppCallRouter(
 
             await outboundTable.Remove(message.MessageId);
             await dispatch(command);
+
+            _logger.LogInformation("Response: action={action} msgId={msgId} ci={ci}",
+                pending,
+                message.MessageId,
+                clientIdentifier);
         }
         else
         {

@@ -1,5 +1,5 @@
-using System.Collections.Concurrent;
 using Medinilla.WebApi.Interfaces;
+using System.Collections.Concurrent;
 
 namespace Medinilla.Core.WebApi.Services;
 

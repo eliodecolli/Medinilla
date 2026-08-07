@@ -1,15 +1,15 @@
 using Google.Protobuf;
 using Medinilla.Core.SharedContracts.Comms;
+using Medinilla.Core.WebApi.Services;
 using Medinilla.RealTime;
 using Medinilla.RealTime.Redis;
+using Medinilla.WebApi.Interfaces;
 using Microsoft.Extensions.Configuration;
 using Microsoft.Extensions.Logging;
 using Moq;
 using System.Collections.Concurrent;
 using System.Net.WebSockets;
 using System.Text;
-using Medinilla.Core.WebApi.Services;
-using Medinilla.WebApi.Interfaces;
 using Xunit.Abstractions;
 
 namespace Medinilla.Core.WebApi.Tests;
