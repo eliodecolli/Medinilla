@@ -1,6 +1,5 @@
 {
   "RequestQueue": "medinilla.core.request",
-  "ResponseQueue": "medinilla.core.response",
 
   "ConnectionStrings": {
     "MedinillaCore": "Server=127.0.0.1;Port=5432;Database=medinilla;User Id=medinilla;Password=medinilla;"

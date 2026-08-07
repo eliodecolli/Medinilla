@@ -4,7 +4,6 @@ using Medinilla.Core.Service.Interfaces;
 using Medinilla.Core.Service.Types;
 using Medinilla.Core.SharedContracts.Comms;
 using Medinilla.RealTime;
-using Medinilla.RealTime.Redis;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 
@@ -22,10 +21,10 @@ internal sealed class CoreInterfaceCommunication(
     public async Task Run(CancellationToken ct)
     {
         logger.LogInformation("Started core service...");
-        await RunEvent(settings.RequestQueue, settings.ResponseQueue, ct);
+        await RunEvent(settings.RequestQueue, ct);
     }
 
-    private async Task RunEvent(string requestChannel, string responseChannelPrefix, CancellationToken ct)
+    private async Task RunEvent(string requestChannel, CancellationToken ct)
     {
         while (!ct.IsCancellationRequested)
         {
@@ -39,7 +38,8 @@ internal sealed class CoreInterfaceCommunication(
 
                 logger.LogInformation("[{rc}]: {len} bytes", requestChannel, result.Length);
 
-                var comms = Comms.Parser.ParseFrom(result);
+                var request = QueuedMessageRequest.Parser.ParseFrom(result);
+                var comms = request.Payload;
 
                 switch (comms.MessageType)
                 {
@@ -47,13 +47,14 @@ internal sealed class CoreInterfaceCommunication(
                     case CommsMessageType.OcppResponse:
                     {
                         var ocppBytes = comms.Payload.ToByteArray();
-                        _ = Task.Run(() => ProcessOcppAsync(comms.ClientIdentifier, ocppBytes, responseChannelPrefix));
+                        _ = Task.Run(() => ProcessOcppAsync(
+                            request.ClientIdentifier, ocppBytes, request.ResponseQueue));
                         break;
                     }
 
                     case CommsMessageType.ClientDisconnect:
                     {
-                        _ = Task.Run(() => DisconnectAsync(comms.ClientIdentifier));
+                        _ = Task.Run(() => DisconnectAsync(request.ClientIdentifier));
                         break;
                     }
                 }
@@ -65,7 +66,7 @@ internal sealed class CoreInterfaceCommunication(
         }
     }
 
-    private async Task ProcessOcppAsync(string clientIdentifier, byte[] payload, string responseChannelPrefix)
+    private async Task ProcessOcppAsync(string clientIdentifier, byte[] payload, string responseQueue)
     {
         try
         {
@@ -82,15 +83,20 @@ internal sealed class CoreInterfaceCommunication(
                 return;
             }
 
-            var response = new Comms
+            var responseComms = new Comms
             {
                 MessageType = CommsMessageType.OcppResponse,
                 ClientIdentifier = clientIdentifier,
                 Payload = ByteString.CopyFrom(responseBytes),
             };
 
-            var channel = RedisUtils.BuildChannelName(responseChannelPrefix, clientIdentifier);
-            await sender.SendAsync(channel, response.ToByteArray());
+            var queued = new QueuedMessageResponse
+            {
+                ClientIdentifier = clientIdentifier,
+                Payload = responseComms,
+            };
+
+            await sender.SendAsync(responseQueue, queued.ToByteArray());
         }
         catch (Exception ex)
         {

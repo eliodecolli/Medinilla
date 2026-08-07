@@ -149,7 +149,17 @@ public class OcppCallRouter(
 
         var payload = Encoding.UTF8.GetBytes(request.Serialize());
 
-        await dispatcher.SubmitRequest(clientIdentifier, payload).ConfigureAwait(false);
+        try
+        {
+            await dispatcher.SubmitRequest(clientIdentifier, payload).ConfigureAwait(false);
+        }
+        catch
+        {
+            // Dispatch never happened, so nothing will ever reply — don't leave the
+            // message sitting in the in-flight table.
+            await outboundTable.Remove(request.MessageId).ConfigureAwait(false);
+            throw;
+        }
     }
 
     public async Task DisconnectClient(string clientIdentifier)

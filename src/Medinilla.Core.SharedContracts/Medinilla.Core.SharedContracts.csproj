@@ -26,6 +26,7 @@
     <Protobuf Include="Account.proto" />
     <Protobuf Include="ChargingStation.proto" />
     <Protobuf Include="comms\CommunicationMessage.proto" />
+    <Protobuf Include="comms\QueuedMessage.proto" />
   </ItemGroup>
 
   <PropertyGroup>

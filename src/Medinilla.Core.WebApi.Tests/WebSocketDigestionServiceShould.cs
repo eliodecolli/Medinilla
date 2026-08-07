@@ -2,9 +2,9 @@ using Google.Protobuf;
 using Medinilla.Core.SharedContracts.Comms;
 using Medinilla.Core.WebApi.Services;
 using Medinilla.RealTime;
-using Medinilla.RealTime.Redis;
 using Medinilla.WebApi.Interfaces;
 using Microsoft.Extensions.Configuration;
+using Microsoft.Extensions.Hosting;
 using Microsoft.Extensions.Logging;
 using Moq;
 using System.Collections.Concurrent;
@@ -14,7 +14,7 @@ using Xunit.Abstractions;
 
 namespace Medinilla.Core.WebApi.Tests;
 
-public class WebSocketDigestionServiceShould
+public class WebSocketDigestionServiceShould : IAsyncLifetime
 {
     private readonly ITestOutputHelper _testOutputHelper;
 
@@ -22,21 +22,23 @@ public class WebSocketDigestionServiceShould
     private readonly Mock<IConfigurationSection> _commsSectionMock;
     private readonly Mock<IConfigurationSection> _generalSectionMock;
     private readonly Mock<ILogger<WebSocketDigestionService>> _loggerMock;
-    private readonly Mock<ILogger<InternalCommunicationService>> _commsLoggerMock;
-    private readonly Mock<IReceiver> _receiverMock;
     private readonly Mock<ISender> _senderMock;
+    private readonly Mock<ISubscriptionReceiver> _subscriptionMock;
+    private readonly Mock<IWebSocketRoutingTable> _routingMock;
+    private readonly Mock<IInstanceIdentifier> _instanceMock;
+    private readonly Mock<IHostApplicationLifetime> _hostLifetimeMock;
 
-    // Inbound channel synchronization: RunCommsChannel blocks here until PushInbound() releases it.
-    private readonly ConcurrentQueue<byte[]?> _inboundMessages = new();
+    // Stands in for RedisSubscriptionReceiver's dispatch loop: PushInbound() queues a
+    // message, the pump hands it to whatever callback the service subscribed with.
+    private readonly ConcurrentQueue<QueuedMessageResponse> _inboundMessages = new();
     private readonly SemaphoreSlim _inboundSemaphore = new(0);
+    private readonly CancellationTokenSource _pumpCts = new();
+    private Func<QueuedMessageResponse, CancellationToken, Task>? _subscriberCallback;
+    private Task? _pump;
 
     private const string TEST_CLIENT_ID = "TEST-CHARGER-001";
     private const string TEST_REQUEST_QUEUE = "test-request-queue";
-    private const string TEST_RESPONSE_QUEUE = "test-response-queue";
-
-    // "test-response-queue-TEST-CHARGER-001"
-    private static readonly string TEST_INBOUND_QUEUE =
-        RedisUtils.BuildChannelName(TEST_RESPONSE_QUEUE, TEST_CLIENT_ID);
+    private const string TEST_RESPONSE_QUEUE = "medinilla.ws.deadbeef.response";
 
     public WebSocketDigestionServiceShould(ITestOutputHelper testOutputHelper)
     {
@@ -46,41 +48,105 @@ public class WebSocketDigestionServiceShould
         _commsSectionMock = new Mock<IConfigurationSection>();
         _generalSectionMock = new Mock<IConfigurationSection>();
         _loggerMock = new Mock<ILogger<WebSocketDigestionService>>();
-        _commsLoggerMock = new Mock<ILogger<InternalCommunicationService>>();
-        _receiverMock = new Mock<IReceiver>();
         _senderMock = new Mock<ISender>();
+        _subscriptionMock = new Mock<ISubscriptionReceiver>();
+        _routingMock = new Mock<IWebSocketRoutingTable>();
+        _instanceMock = new Mock<IInstanceIdentifier>();
+        _hostLifetimeMock = new Mock<IHostApplicationLifetime>();
 
         _commsSectionMock.Setup(s => s["RequestQueue"]).Returns(TEST_REQUEST_QUEUE);
-        _commsSectionMock.Setup(s => s["ResponseQueue"]).Returns(TEST_RESPONSE_QUEUE);
         _configMock.Setup(c => c.GetSection("Comms")).Returns(_commsSectionMock.Object);
 
         _generalSectionMock.Setup(s => s["MessageQueueTTL"]).Returns("5");
         _configMock.Setup(c => c.GetSection("General")).Returns(_generalSectionMock.Object);
 
-        // ReceiveAsync blocks on the semaphore until PushInbound() releases it.
-        _receiverMock
-            .Setup(q => q.ReceiveAsync(TEST_INBOUND_QUEUE, It.IsAny<CancellationToken>()))
-            .Returns<string, CancellationToken>(async (_, ct) =>
-            {
-                await _inboundSemaphore.WaitAsync(ct);
-                _inboundMessages.TryDequeue(out var msg);
-                return msg;
-            });
+        _instanceMock.Setup(i => i.InstanceId).Returns("deadbeef");
+        _instanceMock.Setup(i => i.ResponseQueue).Returns(TEST_RESPONSE_QUEUE);
+
+        _hostLifetimeMock.Setup(h => h.ApplicationStopping).Returns(CancellationToken.None);
 
         _senderMock
-            .Setup(q => q.SendAsync(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
+            .Setup(s => s.SendAsync(It.IsAny<string>(), It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
             .Returns(Task.CompletedTask);
+
+        _routingMock
+            .Setup(r => r.RegisterAsync(It.IsAny<string>(), It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        _routingMock
+            .Setup(r => r.UnregisterAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+        _routingMock
+            .Setup(r => r.RefreshEntryAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .Returns(Task.CompletedTask);
+
+        _subscriptionMock
+            .Setup(s => s.Subscribe(
+                It.IsAny<string>(),
+                It.IsAny<Func<QueuedMessageResponse, CancellationToken, Task>>()))
+            .Callback<string, Func<QueuedMessageResponse, CancellationToken, Task>>((_, callback) =>
+            {
+                _subscriberCallback = callback;
+                _pump ??= Task.Run(PumpInbound);
+            });
+
+        _subscriptionMock
+            .Setup(s => s.Unsubscribe(It.IsAny<string>()))
+            .Callback<string>(_ => _subscriberCallback = null);
+    }
+
+    public Task InitializeAsync() => Task.CompletedTask;
+
+    public async Task DisposeAsync()
+    {
+        await _pumpCts.CancelAsync();
+
+        if (_pump is not null)
+        {
+            try { await _pump; } catch (OperationCanceledException) { }
+        }
+
+        _pumpCts.Dispose();
+        _inboundSemaphore.Dispose();
     }
 
     // ----------------------------------------------------------------
     // Helpers — inbound channel control
     // ----------------------------------------------------------------
 
-    /// <summary>Delivers a message to the next ReceiveAsync call.</summary>
-    private void PushInbound(byte[] message)
+    /// <summary>Delivers a message to the subscribed callback.</summary>
+    private void PushInbound(QueuedMessageResponse message)
     {
         _inboundMessages.Enqueue(message);
         _inboundSemaphore.Release();
+    }
+
+    private async Task PumpInbound()
+    {
+        while (!_pumpCts.IsCancellationRequested)
+        {
+            try
+            {
+                await _inboundSemaphore.WaitAsync(_pumpCts.Token);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+
+            if (!_inboundMessages.TryDequeue(out var message)) continue;
+
+            var callback = _subscriberCallback;
+            if (callback is null) continue;
+
+            try
+            {
+                await callback(message, _pumpCts.Token);
+            }
+            catch (Exception ex)
+            {
+                _testOutputHelper.WriteLine($"Subscriber threw: {ex.Message}");
+            }
+        }
     }
 
     // ----------------------------------------------------------------
@@ -93,27 +159,25 @@ public class WebSocketDigestionServiceShould
     private static string CreateOcppCallResult(string messageId, string payload = "{}")
         => $"[3,\"{messageId}\",{payload}]";
 
-    /// <summary>Bytes returned by ReceiveAsync when CSMS answers a charger request.</summary>
-    private static byte[] BuildCsmsResponseBytes(string clientId, string ocppCallResult)
-    {
-        return new Comms
+    private static QueuedMessageResponse BuildQueued(string clientId, CommsMessageType type, string ocpp)
+        => new()
         {
-            MessageType = CommsMessageType.OcppResponse,
             ClientIdentifier = clientId,
-            Payload = ByteString.CopyFrom(Encoding.UTF8.GetBytes(ocppCallResult)),
-        }.ToByteArray();
-    }
+            Payload = new Comms
+            {
+                MessageType = type,
+                ClientIdentifier = clientId,
+                Payload = ByteString.CopyFrom(Encoding.UTF8.GetBytes(ocpp)),
+            },
+        };
 
-    /// <summary>Bytes returned by ReceiveAsync when CSMS initiates a request to the charger.</summary>
-    private static byte[] BuildCsmsRequestBytes(string clientId, string ocppCall)
-    {
-        return new Comms
-        {
-            MessageType = CommsMessageType.OcppRequest,
-            ClientIdentifier = clientId,
-            Payload = ByteString.CopyFrom(Encoding.UTF8.GetBytes(ocppCall)),
-        }.ToByteArray();
-    }
+    /// <summary>Envelope delivered when CSMS answers a charger request.</summary>
+    private static QueuedMessageResponse BuildCsmsResponse(string clientId, string ocppCallResult)
+        => BuildQueued(clientId, CommsMessageType.OcppResponse, ocppCallResult);
+
+    /// <summary>Envelope delivered when CSMS initiates a request to the charger.</summary>
+    private static QueuedMessageResponse BuildCsmsRequest(string clientId, string ocppCall)
+        => BuildQueued(clientId, CommsMessageType.OcppRequest, ocppCall);
 
     // ----------------------------------------------------------------
     // Helpers — WebSocket mocks
@@ -156,14 +220,18 @@ public class WebSocketDigestionServiceShould
         return sentToWs;
     }
 
-    private InternalCommunicationService CreateCommsService() =>
-        new(_senderMock.Object, _receiverMock.Object, _commsLoggerMock.Object);
-
     private IMessageQueueFactory CreateQueueFactory() =>
         new MessageQueueFactory(_configMock.Object);
 
     private WebSocketDigestionService CreateService() =>
-        new(_configMock.Object, _loggerMock.Object, CreateCommsService(), CreateQueueFactory());
+        new(_configMock.Object,
+            _loggerMock.Object,
+            _senderMock.Object,
+            _subscriptionMock.Object,
+            _routingMock.Object,
+            _instanceMock.Object,
+            _hostLifetimeMock.Object,
+            CreateQueueFactory());
 
     // ================================================================
     // Constructor validation
@@ -173,49 +241,72 @@ public class WebSocketDigestionServiceShould
     public void ThrowOnNullConfiguration()
     {
         Assert.Throws<ArgumentNullException>(() =>
-            new WebSocketDigestionService(null!, _loggerMock.Object, CreateCommsService(), CreateQueueFactory()));
+            new WebSocketDigestionService(null!, _loggerMock.Object, _senderMock.Object,
+                _subscriptionMock.Object, _routingMock.Object, _instanceMock.Object,
+                _hostLifetimeMock.Object, CreateQueueFactory()));
     }
 
     [Fact]
     public void ThrowOnNullLogger()
     {
         Assert.Throws<ArgumentNullException>(() =>
-            new WebSocketDigestionService(_configMock.Object, null!, CreateCommsService(), CreateQueueFactory()));
-    }
-
-    [Fact]
-    public void ThrowOnNullComms()
-    {
-        Assert.Throws<ArgumentNullException>(() =>
-            new WebSocketDigestionService(_configMock.Object, _loggerMock.Object, null!, CreateQueueFactory()));
-    }
-
-    [Fact]
-    public void ThrowOnNullQueueFactory()
-    {
-        Assert.Throws<ArgumentNullException>(() =>
-            new WebSocketDigestionService(_configMock.Object, _loggerMock.Object, CreateCommsService(), (IMessageQueueFactory)null!));
+            new WebSocketDigestionService(_configMock.Object, null!, _senderMock.Object,
+                _subscriptionMock.Object, _routingMock.Object, _instanceMock.Object,
+                _hostLifetimeMock.Object, CreateQueueFactory()));
     }
 
     [Fact]
     public void ThrowOnNullSender()
     {
         Assert.Throws<ArgumentNullException>(() =>
-            new InternalCommunicationService(null!, _receiverMock.Object, _commsLoggerMock.Object));
+            new WebSocketDigestionService(_configMock.Object, _loggerMock.Object, null!,
+                _subscriptionMock.Object, _routingMock.Object, _instanceMock.Object,
+                _hostLifetimeMock.Object, CreateQueueFactory()));
     }
 
     [Fact]
-    public void ThrowOnNullReceiver()
+    public void ThrowOnNullSubscriptionReceiver()
     {
         Assert.Throws<ArgumentNullException>(() =>
-            new InternalCommunicationService(_senderMock.Object, null!, _commsLoggerMock.Object));
+            new WebSocketDigestionService(_configMock.Object, _loggerMock.Object, _senderMock.Object,
+                null!, _routingMock.Object, _instanceMock.Object,
+                _hostLifetimeMock.Object, CreateQueueFactory()));
     }
 
     [Fact]
-    public void ThrowOnNullCommsLogger()
+    public void ThrowOnNullRoutingTable()
     {
         Assert.Throws<ArgumentNullException>(() =>
-            new InternalCommunicationService(_senderMock.Object, _receiverMock.Object, null!));
+            new WebSocketDigestionService(_configMock.Object, _loggerMock.Object, _senderMock.Object,
+                _subscriptionMock.Object, null!, _instanceMock.Object,
+                _hostLifetimeMock.Object, CreateQueueFactory()));
+    }
+
+    [Fact]
+    public void ThrowOnNullInstanceIdentifier()
+    {
+        Assert.Throws<ArgumentNullException>(() =>
+            new WebSocketDigestionService(_configMock.Object, _loggerMock.Object, _senderMock.Object,
+                _subscriptionMock.Object, _routingMock.Object, null!,
+                _hostLifetimeMock.Object, CreateQueueFactory()));
+    }
+
+    [Fact]
+    public void ThrowOnNullHostLifetime()
+    {
+        Assert.Throws<ArgumentNullException>(() =>
+            new WebSocketDigestionService(_configMock.Object, _loggerMock.Object, _senderMock.Object,
+                _subscriptionMock.Object, _routingMock.Object, _instanceMock.Object,
+                null!, CreateQueueFactory()));
+    }
+
+    [Fact]
+    public void ThrowOnNullQueueFactory()
+    {
+        Assert.Throws<ArgumentNullException>(() =>
+            new WebSocketDigestionService(_configMock.Object, _loggerMock.Object, _senderMock.Object,
+                _subscriptionMock.Object, _routingMock.Object, _instanceMock.Object,
+                _hostLifetimeMock.Object, (IMessageQueueFactory)null!));
     }
 
     // ================================================================
@@ -250,16 +341,6 @@ public class WebSocketDigestionServiceShould
     }
 
     [Fact]
-    public async Task ThrowWhenResponseQueueNotConfigured()
-    {
-        _commsSectionMock.Setup(s => s["ResponseQueue"]).Returns((string?)null);
-        var wsMock = new Mock<WebSocket>();
-        await using var service = CreateService();
-        await Assert.ThrowsAsync<InvalidOperationException>(
-            () => service.Consume(wsMock.Object, TEST_CLIENT_ID));
-    }
-
-    [Fact]
     public async Task ThrowWhenRequestQueueNotConfigured()
     {
         _commsSectionMock.Setup(s => s["RequestQueue"]).Returns((string?)null);
@@ -287,6 +368,63 @@ public class WebSocketDigestionServiceShould
         var wsMock = CreateClosingWebSocketMock();
         await using var service = CreateService();
         await service.Consume(wsMock.Object, TEST_CLIENT_ID);
+        await service.DisposeAsync();
+
+        wsMock.Verify(ws => ws.CloseAsync(
+            WebSocketCloseStatus.NormalClosure,
+            "Service disposing",
+            CancellationToken.None), Times.AtLeastOnce);
+    }
+
+    // Consume must claim the charger on the routing table and subscribe to this
+    // instance's response queue; disposal must give both back.
+    [Fact]
+    public async Task RegisterAndSubscribeOnConsumeThenReleaseOnDispose()
+    {
+        var wsMock = CreateClosingWebSocketMock();
+        var service = CreateService();
+
+        await service.Consume(wsMock.Object, TEST_CLIENT_ID);
+
+        _routingMock.Verify(
+            r => r.RegisterAsync(TEST_CLIENT_ID, TEST_RESPONSE_QUEUE, It.IsAny<CancellationToken>()),
+            Times.Once);
+        _subscriptionMock.Verify(
+            s => s.Subscribe(TEST_CLIENT_ID, It.IsAny<Func<QueuedMessageResponse, CancellationToken, Task>>()),
+            Times.Once);
+
+        await service.DisposeAsync();
+
+        _subscriptionMock.Verify(s => s.Unsubscribe(TEST_CLIENT_ID), Times.AtLeastOnce);
+        _routingMock.Verify(
+            r => r.UnregisterAsync(TEST_CLIENT_ID, It.IsAny<CancellationToken>()),
+            Times.Once);
+    }
+
+    // A charger that never connected must not touch the routing table.
+    [Fact]
+    public async Task NotUnregisterWhenNeverConsumed()
+    {
+        var service = CreateService();
+        await service.DisposeAsync();
+
+        _routingMock.Verify(
+            r => r.UnregisterAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()), Times.Never);
+        _subscriptionMock.Verify(s => s.Unsubscribe(It.IsAny<string>()), Times.Never);
+    }
+
+    // A failing routing unregister must not prevent the socket from closing down.
+    [Fact]
+    public async Task SurviveRoutingUnregisterFailureOnDispose()
+    {
+        _routingMock
+            .Setup(r => r.UnregisterAsync(It.IsAny<string>(), It.IsAny<CancellationToken>()))
+            .ThrowsAsync(new InvalidOperationException("redis is down"));
+
+        var wsMock = CreateClosingWebSocketMock();
+        var service = CreateService();
+        await service.Consume(wsMock.Object, TEST_CLIENT_ID);
+
         await service.DisposeAsync();
 
         wsMock.Verify(ws => ws.CloseAsync(
@@ -369,6 +507,58 @@ public class WebSocketDigestionServiceShould
     }
 
     // ================================================================
+    // Envelope shape
+    // ================================================================
+
+    // Everything published to the CSMS must be a QueuedMessageRequest carrying this
+    // instance's response queue — that's how the CSMS knows where to reply.
+    [Fact]
+    public async Task WrapOutboundMessagesInQueuedRequestEnvelope()
+    {
+        var chargerRequest = CreateOcppCall("req-1", "BootNotification");
+        var requestBytes = Encoding.UTF8.GetBytes(chargerRequest);
+
+        var published = new List<byte[]>();
+        _senderMock
+            .Setup(q => q.SendAsync(TEST_REQUEST_QUEUE, It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
+            .Callback<string, byte[], CancellationToken>((_, payload, _) => published.Add(payload))
+            .Returns(Task.CompletedTask);
+
+        var callCount = 0;
+        var wsMock = new Mock<WebSocket>();
+        wsMock.Setup(ws => ws.State).Returns(WebSocketState.Open);
+        wsMock.Setup(ws => ws.ReceiveAsync(
+                It.IsAny<ArraySegment<byte>>(),
+                It.IsAny<CancellationToken>()))
+            .Returns((ArraySegment<byte> buffer, CancellationToken ct) =>
+            {
+                callCount++;
+                if (callCount == 1)
+                {
+                    requestBytes.CopyTo(buffer.Array!, buffer.Offset);
+                    return Task.FromResult(
+                        new WebSocketReceiveResult(requestBytes.Length, WebSocketMessageType.Text, true));
+                }
+                return Task.FromResult(
+                    new WebSocketReceiveResult(0, WebSocketMessageType.Close, true,
+                        WebSocketCloseStatus.NormalClosure, "done"));
+            });
+        wsMock.Setup(ws => ws.CloseStatus)
+            .Returns(() => callCount >= 2 ? WebSocketCloseStatus.NormalClosure : null);
+        WireWebSocketSendCapture(wsMock);
+
+        await using var service = CreateService();
+        await service.Consume(wsMock.Object, TEST_CLIENT_ID);
+
+        var envelope = QueuedMessageRequest.Parser.ParseFrom(Assert.Single(published));
+
+        Assert.Equal(TEST_CLIENT_ID, envelope.ClientIdentifier);
+        Assert.Equal(TEST_RESPONSE_QUEUE, envelope.ResponseQueue);
+        Assert.Equal(CommsMessageType.OcppRequest, envelope.Payload.MessageType);
+        Assert.Equal(chargerRequest, envelope.Payload.Payload.ToStringUtf8());
+    }
+
+    // ================================================================
     // OCPP synchronization protocol
     // ================================================================
 
@@ -386,7 +576,7 @@ public class WebSocketDigestionServiceShould
             .Setup(q => q.SendAsync(TEST_REQUEST_QUEUE, It.IsAny<byte[]>(), It.IsAny<CancellationToken>()))
             .Returns<string, byte[], CancellationToken>((_, _, _) =>
             {
-                PushInbound(BuildCsmsResponseBytes(TEST_CLIENT_ID, csmsResponse));
+                PushInbound(BuildCsmsResponse(TEST_CLIENT_ID, csmsResponse));
                 return Task.CompletedTask;
             });
 
@@ -404,7 +594,7 @@ public class WebSocketDigestionServiceShould
                     requestBytes.CopyTo(buffer.Array!, buffer.Offset);
                     return new WebSocketReceiveResult(requestBytes.Length, WebSocketMessageType.Text, true);
                 }
-                // Wait long enough for RunCommsChannel to deliver the CSMS response.
+                // Wait long enough for the subscription pump to deliver the CSMS response.
                 await Task.Delay(100, ct);
                 return new WebSocketReceiveResult(0, WebSocketMessageType.Close, true,
                     WebSocketCloseStatus.NormalClosure, "done");
@@ -432,8 +622,8 @@ public class WebSocketDigestionServiceShould
         var chargerResponse = CreateOcppCallResult("out-1");
         var responseBytes = Encoding.UTF8.GetBytes(chargerResponse);
 
-        // Pre-queue the CSMS request so RunCommsChannel delivers it immediately.
-        PushInbound(BuildCsmsRequestBytes(TEST_CLIENT_ID, csmsRequest));
+        // Pre-queue the CSMS request so the pump delivers it as soon as we subscribe.
+        PushInbound(BuildCsmsRequest(TEST_CLIENT_ID, csmsRequest));
 
         var callCount = 0;
         var wsMock = new Mock<WebSocket>();
@@ -446,7 +636,7 @@ public class WebSocketDigestionServiceShould
                 callCount++;
                 if (callCount == 1)
                 {
-                    // Give RunCommsChannel time to deliver csmsRequest and set _processingOutboundId.
+                    // Give the pump time to deliver csmsRequest and set _processingOutboundId.
                     await Task.Delay(60, ct);
                     responseBytes.CopyTo(buffer.Array!, buffer.Offset);
                     return new WebSocketReceiveResult(
@@ -506,7 +696,7 @@ public class WebSocketDigestionServiceShould
                     return new WebSocketReceiveResult(bytes2.Length, WebSocketMessageType.Text, true);
                 }
                 // Inject CSMS response to req-1, then wait for DrainInbound to fire before closing.
-                PushInbound(BuildCsmsResponseBytes(TEST_CLIENT_ID, csmsResponse1));
+                PushInbound(BuildCsmsResponse(TEST_CLIENT_ID, csmsResponse1));
                 await Task.Delay(150, ct);
                 return new WebSocketReceiveResult(0, WebSocketMessageType.Close, true,
                     WebSocketCloseStatus.NormalClosure, "done");
@@ -537,9 +727,9 @@ public class WebSocketDigestionServiceShould
         var chargerResponse = CreateOcppCallResult("out-1");
         var responseBytes = Encoding.UTF8.GetBytes(chargerResponse);
 
-        // Pre-queue both CSMS requests. RunCommsChannel processes them in order.
-        PushInbound(BuildCsmsRequestBytes(TEST_CLIENT_ID, csmsReq1));
-        PushInbound(BuildCsmsRequestBytes(TEST_CLIENT_ID, csmsReq2));
+        // Pre-queue both CSMS requests. The pump delivers them in order.
+        PushInbound(BuildCsmsRequest(TEST_CLIENT_ID, csmsReq1));
+        PushInbound(BuildCsmsRequest(TEST_CLIENT_ID, csmsReq2));
 
         var callCount = 0;
         var wsMock = new Mock<WebSocket>();
@@ -552,7 +742,7 @@ public class WebSocketDigestionServiceShould
                 callCount++;
                 if (callCount == 1)
                 {
-                    // Wait for RunCommsChannel to deliver both CSMS requests.
+                    // Wait for the pump to deliver both CSMS requests.
                     await Task.Delay(100, ct);
                     responseBytes.CopyTo(buffer.Array!, buffer.Offset);
                     return new WebSocketReceiveResult(
@@ -603,9 +793,9 @@ public class WebSocketDigestionServiceShould
             {
                 rabbitSendCount++;
                 if (rabbitSendCount == 1)
-                    PushInbound(BuildCsmsRequestBytes(TEST_CLIENT_ID, csmsReq));
+                    PushInbound(BuildCsmsRequest(TEST_CLIENT_ID, csmsReq));
                 else if (rabbitSendCount == 2)
-                    PushInbound(BuildCsmsResponseBytes(TEST_CLIENT_ID, csmsResp));
+                    PushInbound(BuildCsmsResponse(TEST_CLIENT_ID, csmsResp));
                 return Task.CompletedTask;
             });
 
@@ -626,13 +816,13 @@ public class WebSocketDigestionServiceShould
                 }
                 if (callCount == 2)
                 {
-                    // Wait for RunCommsChannel to deliver csmsReq and set _processingOutboundId.
+                    // Wait for the pump to deliver csmsReq and set _processingOutboundId.
                     await Task.Delay(60, ct);
                     // Step 3: charger responds to CSMS request.
                     respBytes.CopyTo(buffer.Array!, buffer.Offset);
                     return new WebSocketReceiveResult(respBytes.Length, WebSocketMessageType.Text, true);
                 }
-                // Wait for RunCommsChannel to deliver csmsResp to charger.
+                // Wait for the pump to deliver csmsResp to charger.
                 await Task.Delay(60, ct);
                 return new WebSocketReceiveResult(0, WebSocketMessageType.Close, true,
                     WebSocketCloseStatus.NormalClosure, "done");

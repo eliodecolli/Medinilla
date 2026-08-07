@@ -28,10 +28,14 @@ builder.Services.AddMedinillaInfrastructure();
 builder.Services.AddRealTimeServices();
 builder.Services.AddMedinillaDataAccess();
 
+builder.Services.AddWebSocketRoutingTable();
+builder.Services.AddSubscriptionReceiver();
+
+builder.Services.AddSingleton<IInstanceIdentifier, InstanceIdentifier>();
 builder.Services.AddSingleton<IMessageQueueFactory, MessageQueueFactory>();
+builder.Services.AddHostedService<SubscriptionReceiverHostedService>();
 
 builder.Services.AddScoped<IWSDigestionServiceCollection, WSDigestionServiceCollection>();
-builder.Services.AddScoped<IInternalCommunicationService, InternalCommunicationService>();
 builder.Services.AddScoped<IBasicWebSocketDigestionService, WebSocketDigestionService>();
 
 var app = builder.Build();

@@ -31,6 +31,7 @@ builder.Services.AddMedinillaInfrastructure();
 builder.Services.AddMedinillaDataAccess();
 builder.Services.AddMedinillaServices();
 builder.Services.AddRealTimeServices();
+builder.Services.AddWebSocketRoutingTable();
 
 builder.Services.AddSingleton(CommunicationSettings.FromSettingsFile("settings.json"));
 builder.Services.AddScoped<IOcppRequestDispatcher, OcppRequestDispatcher>();

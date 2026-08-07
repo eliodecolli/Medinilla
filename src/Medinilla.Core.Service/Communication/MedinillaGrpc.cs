@@ -2,9 +2,11 @@
 using Medinilla.Core.gRPC.Service;
 using Medinilla.Core.Interfaces;
 using Medinilla.Core.Service.Communication.Mapping;
+using Medinilla.Core.Service.Exceptions;
 using Medinilla.Infrastructure.WAMP;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
+using System.Text;
 using System.Text.Json;
 using System.Text.Json.Serialization;
 
@@ -20,6 +22,26 @@ internal sealed class MedinillaGrpc(ILogger<MedinillaGrpc> log, IServiceProvider
     };
 
     private static string SerializePayload<T>(T payload) => JsonSerializer.Serialize(payload, PayloadJsonOptions);
+
+    /// <summary>
+    /// A charger that no instance is hosting can't be called at all, so the request
+    /// fails as an OCPP CALLERROR rather than being queued for nobody.
+    /// </summary>
+    private Error NotConnectedError(ChargerNotConnectedException ex, string actionName)
+    {
+        log.LogWarning("{ci}: {an}: charger is not connected", ex.ClientIdentifier, actionName);
+
+        var callError = new OcppCallError(
+            "-1",
+            OcppCallError.ErrorCodes.GenericError,
+            $"NotConnected: {ex.Message}");
+
+        return new Error
+        {
+            HasError = true,
+            Message = Encoding.UTF8.GetString(callError.ToByteArray()),
+        };
+    }
 
     public override async Task<SetVariablesResponse> SetVariables(SetVariablesRequest request, ServerCallContext context)
     {
@@ -44,6 +66,13 @@ internal sealed class MedinillaGrpc(ILogger<MedinillaGrpc> log, IServiceProvider
                 {
                     HasError = false,
                 }
+            };
+        }
+        catch (ChargerNotConnectedException e)
+        {
+            return new SetVariablesResponse()
+            {
+                Error = NotConnectedError(e, OcppActionNames.SetVariables)
             };
         }
         catch (Exception e)
@@ -83,6 +112,13 @@ internal sealed class MedinillaGrpc(ILogger<MedinillaGrpc> log, IServiceProvider
                 {
                     HasError = false,
                 }
+            };
+        }
+        catch (ChargerNotConnectedException e)
+        {
+            return new GetVariablesResponse()
+            {
+                Error = NotConnectedError(e, OcppActionNames.GetVariables)
             };
         }
         catch (Exception e)

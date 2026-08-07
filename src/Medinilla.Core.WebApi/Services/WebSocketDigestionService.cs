@@ -3,7 +3,7 @@ using Medinilla.Core.SharedContracts.Comms;
 using Medinilla.Core.WebApi.Services.Domain;
 using Medinilla.Infrastructure;
 using Medinilla.Infrastructure.Exceptions;
-using Medinilla.RealTime.Redis;
+using Medinilla.RealTime;
 using Medinilla.WebApi.Interfaces;
 using System.Net.WebSockets;
 using System.Text;
@@ -19,7 +19,11 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService
     private WebSocket? _webSocket;
     private string? _clientIdentifier;
 
-    private readonly IInternalCommunicationService _comms;
+    private readonly ISender _sender;
+    private readonly ISubscriptionReceiver _subscription;
+    private readonly IWebSocketRoutingTable _routing;
+    private readonly IInstanceIdentifier _instance;
+    private readonly IHostApplicationLifetime _hostLifetime;
 
     private bool _disposed;
 
@@ -27,12 +31,13 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService
     private string? _processingInboundId;
     private string? _processingOutboundId;
 
-    // RealTime queues
-    // Core -> Us
-    private string? _inboundQueueName;
-
     // Us -> Core
     private string? _outboundQueueName;
+
+    // keeps this charger's routing entry alive for as long as the WS is connected
+    private CancellationTokenSource? _heartbeatCts;
+
+    private static readonly TimeSpan HeartbeatInterval = TimeSpan.FromSeconds(30);
 
     // semaphore to coordinate sending data
     private readonly SemaphoreSlim _sendLock;
@@ -48,12 +53,20 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService
     public WebSocketDigestionService(
         IConfiguration config,
         ILogger<WebSocketDigestionService> logger,
-        IInternalCommunicationService comms,
+        ISender sender,
+        ISubscriptionReceiver subscription,
+        IWebSocketRoutingTable routing,
+        IInstanceIdentifier instance,
+        IHostApplicationLifetime hostLifetime,
         IMessageQueueFactory queueFactory)
     {
         _config = config ?? throw new ArgumentNullException(nameof(config));
         _logger = logger ?? throw new ArgumentNullException(nameof(logger));
-        _comms = comms ?? throw new ArgumentNullException(nameof(comms));
+        _sender = sender ?? throw new ArgumentNullException(nameof(sender));
+        _subscription = subscription ?? throw new ArgumentNullException(nameof(subscription));
+        _routing = routing ?? throw new ArgumentNullException(nameof(routing));
+        _instance = instance ?? throw new ArgumentNullException(nameof(instance));
+        _hostLifetime = hostLifetime ?? throw new ArgumentNullException(nameof(hostLifetime));
         ArgumentNullException.ThrowIfNull(queueFactory);
 
         _inbound = queueFactory.Create();
@@ -67,35 +80,7 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService
         _outbound.OnDrainQueue = DrainOutbound;
     }
 
-    #region Assertions
-    private void AssertInboundChannelName()
-    {
-        if (_inboundQueueName is null) throw new NullReferenceException("Inbound Channel Name is not set.");
-    }
-
-    private void AssertOutboundChannelName()
-    {
-        if (_outboundQueueName is null) throw new NullReferenceException("Outbound Channel Name is not set.");
-    }
-    #endregion
-
     #region Setup
-    private void SetupChannelNames()
-    {
-        var outboundPrefix = _config.GetSection("Comms")["RequestQueue"];
-        var inboundPrefix = _config.GetSection("Comms")["ResponseQueue"];
-
-        if (outboundPrefix is null) throw new InvalidOperationException("'RequestQueue' configuration is not set.");
-        if (inboundPrefix is null) throw new InvalidOperationException("'ResponseQueue' configuration is not set.");
-
-        if (_clientIdentifier is null) throw new NullReferenceException("Client Identifier is not set.");
-
-        // we only use a single channel to broadcast events
-        _outboundQueueName = outboundPrefix;
-
-        _inboundQueueName = RedisUtils.BuildChannelName(inboundPrefix, _clientIdentifier);
-    }
-
     private bool IsConnectionOpen()
     {
         return (_webSocket is not null) && _webSocket.State == WebSocketState.Open;
@@ -268,15 +253,30 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService
     private Task DrainOutbound()
         => DrainQueue(_outbound, OutboundDirection, (_, payload) => SendRaw(payload));
 
-    private Task PublishCommsMessage(Comms message)
-        => _comms.PublishCommsMessage(message);
+    private async Task PublishCommsMessage(Comms message)
+    {
+        var envelope = new QueuedMessageRequest
+        {
+            ClientIdentifier = _clientIdentifier!,
+            ResponseQueue = _instance.ResponseQueue,
+            Payload = message,
+        };
+
+        await _sender.SendAsync(_outboundQueueName!, envelope.ToByteArray());
+
+        _logger.LogInformation(
+            "[{ClientId}] Comms: Sent {Type} to {Queue}",
+            _clientIdentifier,
+            Enum.GetName(message.MessageType),
+            _outboundQueueName);
+    }
 
     private async Task OnComms(Comms comms)
     {
         if (!IsConnectionOpen())
         {
-            // stop the comms but finish processing the message
-            _comms.Stop();
+            // stop taking new work but finish processing this message
+            if (_clientIdentifier is not null) _subscription.Unsubscribe(_clientIdentifier);
         }
 
         var message = comms.Payload.ToByteArray();
@@ -386,6 +386,22 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService
                 _cts.Cancel();
             }
 
+            _heartbeatCts?.Cancel();
+
+            if (_clientIdentifier is not null)
+            {
+                _subscription.Unsubscribe(_clientIdentifier);
+
+                try
+                {
+                    await _routing.UnregisterAsync(_clientIdentifier);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "[{ClientId}] Routing unregister failed", _clientIdentifier);
+                }
+            }
+
             if (_webSocket != null)
             {
                 if (_webSocket.State == WebSocketState.Open)
@@ -408,10 +424,32 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService
             _outbound.Dispose();
             _sendLock.Dispose();
             _cts.Dispose();
-            await _comms.DisposeAsync();
+            _heartbeatCts?.Dispose();
         }
     }
     #endregion
+
+    // Routing entries only exist while a WS is connected, so the heartbeat is owned
+    // here rather than at instance level.
+    private async Task HeartbeatLoop(CancellationToken ct)
+    {
+        while (!ct.IsCancellationRequested)
+        {
+            try
+            {
+                await Task.Delay(HeartbeatInterval, ct);
+                await _routing.RefreshEntryAsync(_clientIdentifier!, ct);
+            }
+            catch (OperationCanceledException)
+            {
+                return;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogWarning(ex, "[{ClientId}] Routing heartbeat failed", _clientIdentifier);
+            }
+        }
+    }
 
     public async Task Consume(WebSocket webSocket, string clientIdentifier)
     {
@@ -423,19 +461,14 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService
         _webSocket = webSocket ?? throw new ArgumentNullException(nameof(webSocket));
         _clientIdentifier = clientIdentifier ?? throw new ArgumentNullException(nameof(clientIdentifier));
 
-        SetupChannelNames();
+        _outboundQueueName = _config.GetSection("Comms")["RequestQueue"]
+            ?? throw new InvalidOperationException("'RequestQueue' configuration is not set.");
 
-        if (string.IsNullOrEmpty(_inboundQueueName))
-        {
-            throw new InvalidOperationException("Request queue name is not configured");
-        }
+        await _routing.RegisterAsync(_clientIdentifier, _instance.ResponseQueue, _hostLifetime.ApplicationStopping);
+        _subscription.Subscribe(_clientIdentifier, (response, _) => OnComms(response.Payload));
 
-        if (string.IsNullOrEmpty(_outboundQueueName))
-        {
-            throw new InvalidOperationException("Response queue name is not configured");
-        }
-
-        _comms.Start(_clientIdentifier, _inboundQueueName!, _outboundQueueName!, OnComms);
+        _heartbeatCts = new CancellationTokenSource();
+        _ = Task.Run(() => HeartbeatLoop(_heartbeatCts.Token), CancellationToken.None);
 
         var inboundVacuum = Task.Run(() => _inbound.ScheduleVacuum(_cts));
         var outboundVacuum = Task.Run(() => _outbound.ScheduleVacuum(_cts));
@@ -480,6 +513,7 @@ public class WebSocketDigestionService : IBasicWebSocketDigestionService
             _logger.LogDebug("[{ClientId}] Vacuum Task ended.", _clientIdentifier);
         }
 
-        _comms.Stop();
+        _heartbeatCts?.Cancel();
+        _subscription.Unsubscribe(_clientIdentifier);
     }
 }
