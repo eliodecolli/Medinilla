@@ -1,14 +1,19 @@
+using Medinilla.Core.Interfaces;
 using Medinilla.Core.Interfaces.Services;
 using Medinilla.Core.Logic.Configuration;
 using Medinilla.DataAccess.Relational.Models;
 using Medinilla.DataAccess.Relational.Models.Authorization;
 using Medinilla.DataAccess.Relational.UnitOfWork;
 using Medinilla.DataTypes.Contracts;
+using Medinilla.DataTypes.Core.Enums;
+using Medinilla.Infrastructure.WAMP;
+using Microsoft.Extensions.Logging;
+using System.Diagnostics.Metrics;
 using System.Text.Json;
 
 namespace Medinilla.Core.v1.Services;
 
-public class ChargingStationBooting(ChargingStationUnitOfWork unitOfWork) : IChargingStationBootingService
+public class ChargingStationBooting(ChargingStationUnitOfWork unitOfWork, ILogger<ChargingStationBooting> log) : IChargingStationBootingService
 {
     private string GetBootupReason(BootNotificationRequest request)
     {
@@ -76,13 +81,14 @@ public class ChargingStationBooting(ChargingStationUnitOfWork unitOfWork) : ICha
         }
 
         await unitOfWork.ChargingStationRepository.Update(entity);
-        await unitOfWork.Save();
     }
-    
-    public async Task ProcessBootup(string clientIdentifier, BootNotificationRequest request)
+
+    public async Task<BootupResult> ProcessBootup(string clientIdentifier, BootNotificationRequest request)
     {
         var result = await unitOfWork.ChargingStationRepository.Filter(c => c.ClientIdentifier == clientIdentifier);
         var entity = result.FirstOrDefault();
+
+        var bootStatus = BootupResult.Ok;
 
         if (entity == null)
         {
@@ -92,22 +98,31 @@ public class ChargingStationBooting(ChargingStationUnitOfWork unitOfWork) : ICha
             entity.AccountId = account.Id;
             entity.CreatedAt = DateTime.UtcNow;
             entity.LatestBootNotificationReason = GetBootupReason(request);
-            entity.ModifiedAt = DateTime.UtcNow;
             entity.Booted = true;
 
             entity = await unitOfWork.ChargingStationRepository.Create(entity);
-            await unitOfWork.Save();
 
+            await unitOfWork.Save();  // gotta trigger a save so the next thing proceeds
             await TryBootstrapChargingStatation(entity);
+
+            bootStatus = BootupResult.FirstBoot;
         }
         else
         {
             entity.LatestBootNotificationReason = GetBootupReason(request);
-            entity.ModifiedAt = DateTime.UtcNow;
             entity.Booted = true;
+
+            if (entity.ModifiedAt is null)
+            {
+                bootStatus = BootupResult.FirstBoot;
+            }
+
+            entity.ModifiedAt = DateTime.UtcNow;
             await unitOfWork.ChargingStationRepository.Update(entity);
-            await unitOfWork.Save();
         }
+
+        await unitOfWork.Save();
+        return bootStatus;
     }
 
     public async Task DisconnectClient(string clientIdentifier)

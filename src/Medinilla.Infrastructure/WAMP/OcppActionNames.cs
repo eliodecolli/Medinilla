@@ -17,4 +17,8 @@ public static class OcppActionNames
     public const string SetVariables = "SetVariables";
 
     public const string GetVariables = "GetVariables";
+
+    public const string GetBaseReport = "GetBaseReport";
+
+    public const string NotifyReport = "NotifyReport";
 }
