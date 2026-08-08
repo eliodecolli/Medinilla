@@ -2,6 +2,7 @@
 using Medinilla.Core.Commands;
 using Medinilla.Core.Interfaces;
 using Medinilla.Core.Interfaces.Services;
+using Medinilla.DataTypes.Core;
 using Medinilla.Infrastructure;
 using Medinilla.Infrastructure.WAMP;
 using Microsoft.Extensions.Logging;
@@ -15,7 +16,8 @@ public class OcppCallRouter(
     IOcppActionsFactory actionsFactory,
     IOcppChargerCommandFactory commandFactory,
     IOcppRequestDispatcher dispatcher,
-    BaseOcppRoutingTable outboundTable) : IOcppCallRouter
+    BaseOcppRoutingTable outboundTable,
+    ICommandExecutionService executionService) : IOcppCallRouter
 {
     public async Task<RpcResult?> RouteOcppCall(byte[] buffer, string? clientIdentifier)
     {
@@ -45,7 +47,7 @@ public class OcppCallRouter(
             case OcppJMessageType.CALL_RESULT:
                 {
                     var result = parser.ParseResult();
-                    await DispatchCommandReplyAsync(clientIdentifier, result, cmd => cmd.HandleResponse(result))
+                    await DispatchCommandReplyAsync(clientIdentifier, result, cmd => cmd.HandleResponse(clientIdentifier, result, executionService))
                         .ConfigureAwait(false);
 
                     return null;
@@ -54,7 +56,7 @@ public class OcppCallRouter(
             case OcppJMessageType.CALL_ERROR:
             {
                 var error = parser.ParseError();
-                await DispatchCommandReplyAsync(clientIdentifier, error, cmd => cmd.HandleError(error))
+                await DispatchCommandReplyAsync(clientIdentifier, error, cmd => cmd.HandleError(clientIdentifier, error, executionService))
                         .ConfigureAwait(false);
 
                 return null;
@@ -151,6 +153,7 @@ public class OcppCallRouter(
 
         try
         {
+            await executionService.RegisterExecution(clientIdentifier, request.MessageId, request.Action);
             await dispatcher.SubmitRequest(clientIdentifier, payload).ConfigureAwait(false);
         }
         catch
@@ -158,6 +161,7 @@ public class OcppCallRouter(
             // Dispatch never happened, so nothing will ever reply — don't leave the
             // message sitting in the in-flight table.
             await outboundTable.Remove(request.MessageId).ConfigureAwait(false);
+            await executionService.SetExecutionResult(clientIdentifier, new ExecutionResult(request.MessageId, true, "Error contacting charging station"));
             throw;
         }
     }

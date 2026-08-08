@@ -1,7 +1,10 @@
+using Medinilla.Core.Interfaces.Services;
 using Medinilla.DataTypes.Contracts;
 using Medinilla.DataTypes.Contracts.Common;
+using Medinilla.DataTypes.Core;
 using Medinilla.Infrastructure.WAMP;
 using Microsoft.Extensions.Logging;
+using System.Text;
 using System.Text.Json;
 
 namespace Medinilla.Core.Commands.Ocpp201;
@@ -10,25 +13,33 @@ internal sealed class GetVariablesCommand(ILogger<GetVariablesCommand> log) : IO
 {
     public string Action => OcppActionNames.GetVariables;
 
-    public Task HandleError(OcppCallError error)
+    public async Task HandleError(string clientIdentifier, OcppCallError error, ICommandExecutionService executionService)
     {
-        // TODO: react to OCPP error
-        return Task.CompletedTask;
+        log.LogError("(GetVariables) {mi}: Errored: {err}, Error Details: {errd}, Error Code: {errc}",
+            error.MessageId, error.ErrorDescription, error.ErrorDetails ?? "None", error.ErrorCode);
+
+        await executionService.SetExecutionResult(clientIdentifier, new ExecutionResult(error.MessageId, true, error.ErrorDescription));
     }
 
-    public Task HandleResponse(OcppCallResult result)
+    public async Task HandleResponse(string clientIdentifier, OcppCallResult result, ICommandExecutionService executionService)
     {
         var variables = result.As<GetVariablesResponse>();
         if (variables is null)
         {
             log.LogError("{mid} could not be deserialized.", result.MessageId);
-            return Task.CompletedTask;
+
+            await executionService.SetExecutionResult(clientIdentifier,
+                new ExecutionResult(result.MessageId, true, "Incoming charger response could not be serialized."));
+
+            return;
         }
 
         var accepted = 0;
         var unknown = 0;
         var rejected = 0;
         var unrecognized = 0;
+
+        var sb = new StringBuilder();
 
         foreach (var v in variables.GetVariableResult ?? Enumerable.Empty<GetVariableResult>())
         {
@@ -64,6 +75,8 @@ internal sealed class GetVariablesCommand(ILogger<GetVariablesCommand> log) : IO
                         evseId,
                         connectorId,
                         v.AttributeType);
+
+                    sb.AppendLine($"[{v.Component.Name}.{v.Component.Instance}.{v.Variable.Name}: {v.AttributeStatus}]");
                     break;
 
                 case GetVariableStatusEnum.Unknown:
@@ -77,6 +90,8 @@ internal sealed class GetVariablesCommand(ILogger<GetVariablesCommand> log) : IO
                         evseId,
                         connectorId,
                         v.AttributeType);
+
+                    sb.AppendLine($"[{v.Component.Name}.{v.Component.Instance}.{v.Variable.Name}: {v.AttributeStatus}]");
                     break;
 
                 default:
@@ -91,6 +106,8 @@ internal sealed class GetVariablesCommand(ILogger<GetVariablesCommand> log) : IO
                         evseId,
                         connectorId,
                         v.AttributeType);
+
+                    sb.AppendLine($"[{v.Component.Name}.{v.Component.Instance}.{v.Variable.Name}: {v.AttributeStatus}]");
                     break;
             }
         }
@@ -114,22 +131,7 @@ internal sealed class GetVariablesCommand(ILogger<GetVariablesCommand> log) : IO
                 result.Payload);
         }
 
-#if DEBUG
-        try
-        {
-            var logsDir = Path.Combine(AppContext.BaseDirectory, "logs");
-            Directory.CreateDirectory(logsDir);
-            var pretty = JsonDocument.Parse(result.Payload ?? "{}").RootElement;
-            File.WriteAllText(
-                Path.Combine(logsDir, $"GetVariables-{result.MessageId}.txt"),
-                JsonSerializer.Serialize(pretty, new JsonSerializerOptions { WriteIndented = true }));
-        }
-        catch (Exception ex)
-        {
-            log.LogWarning(ex, "(GetVariables) {mid}: failed to dump response payload to logs folder.", result.MessageId);
-        }
-#endif
-
-        return Task.CompletedTask;
+        await executionService.SetExecutionResult(clientIdentifier,
+            new ExecutionResult(result.MessageId, rejected + unknown + unrecognized > 0, sb.Length > 0 ? sb.ToString() : null));
     }
 }
