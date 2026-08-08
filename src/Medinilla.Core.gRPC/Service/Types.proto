@@ -4,6 +4,7 @@ option csharp_namespace = "Medinilla.Core.gRPC.Service";
 
 import "Contracts/UserSetVariablesRequest.proto";
 import "Contracts/UserGetVariablesRequest.proto";
+import "Contracts/CommandExecution.proto";
 
 package medinilla.core.grpc;
 
@@ -28,4 +29,12 @@ message GetVariablesRequest {
 
 message GetVariablesResponse {
     Error error = 1;
+}
+
+message FetchExecutedCommandsRequest {
+    string client_identifier = 1;
+}
+
+message FetchExecutedCommandsResponse {
+    repeated CommandExecution executions = 1;
 }

@@ -13,7 +13,18 @@ Everything needed to add a new outbound OCPP action (CSMS -> charger):
 5. The command class in `Medillina.Core/Commands/Ocpp201/` (response handlers only — no mapping, no call-building).
 6. Registration in `AddOcppChargerCommands` and the action constant in `OcppActionNames`.
 
-The skill does **not** implement `HandleResponse` / `HandleError` logic — those are left as empty stubs for the developer to fill in. The command does **no mapping**: a single `OcppCallRequest` is built in the gRPC service method and handed to the router.
+The skill does **not** implement the rich `HandleResponse` / `HandleError` logic — those are left as empty stubs for the developer to fill in. However, every command **must** call `executionService.SetExecutionResult(...)` so the audit row is closed. The command does **no mapping**: a single `OcppCallRequest` is built in the gRPC service method and handed to the router.
+
+## CSMS -> charger audit (mandatory)
+
+Every outbound OCPP call (CSMS -> charger) is audited end-to-end via `ICommandExecutionService`:
+
+- When the gRPC method submits the call to the router and the router successfully dispatches it, the router calls `executionService.RegisterExecution(clientIdentifier, messageId, action)` (see `src/Medillina.Core/v1/OcppCallRouter.cs:156`). This writes a `CommandExecution` row (`Completed = false`, `Error = false`) so callers can later correlate the audit by message id.
+- When the charger replies, the matching `IOcppChargerCommand.HandleResponse` / `HandleError` is invoked. That handler **must** call `executionService.SetExecutionResult(clientIdentifier, new ExecutionResult(messageId, error, errorMessage))` to close the row (`Completed = true`, `Error = error`, `EndTime = UtcNow`).
+
+`ExecutionResult` (`src/Medinilla.DataTypes/Core/ExecutionResult.cs`) is `record ExecutionResult(string MessageId, bool Error, string? ErrorMessage)`.
+
+If the handler doesn't call `SetExecutionResult` the audit row stays open forever — so treat it as required, not optional.
 
 Do not explore other already-implemented commands unless you are told the scaffold is wrong. Follow the directions in this skill end-to-end.
 
@@ -40,12 +51,12 @@ Use `<NewAction>` as the placeholder for the new OCPP action's PascalCase name (
 public interface IOcppChargerCommand
 {
     string Action { get; }
-    Task HandleResponse(OcppCallResult result);
-    Task HandleError(OcppCallError error);
+    Task HandleResponse(string clientIdentifier, OcppCallResult result, ICommandExecutionService executionService);
+    Task HandleError(string clientIdentifier, OcppCallError error, ICommandExecutionService executionService);
 }
 ```
 
-There is **no `BuildCall`** and **no payload mapping** on the command. Commands are thin: they only react to the response.
+There is **no `BuildCall`** and **no payload mapping** on the command. Commands are thin: they only react to the response and **must** call `executionService.SetExecutionResult(...)` to close the audit row (see [CSMS -> charger audit](#csms---charger-audit-mandatory)).
 
 ## Architecture (outbound flow)
 `gRPC caller -> MedinillaGrpc.<NewAction>(request) -> MedinillaMapping.Map<NewAction>(request) -> OcppCallRequest -> IOcppCallRouter.SubmitAsync -> RoutingTable (msgId -> action) -> Charger -> ... -> IOcppCallRouter.RouteOcppCall -> RoutingTable lookup -> IOcppChargerCommand.HandleResponse/HandleError`
@@ -219,10 +230,12 @@ public class <NewAction>Response
 ---
 
 ## Step 5 — Command skeleton
-`src/Medillina.Core/Commands/Ocpp201/<NewAction>Command.cs`:
+`src/Medillina.Core/Commands/Ocpp201/<NewAction>Command.cs`. The signatures take `clientIdentifier` and `ICommandExecutionService` so the handler can close the audit row. Both handlers **must** call `executionService.SetExecutionResult(...)` before returning — otherwise the audit stays open.
 
 ```csharp
+using Medinilla.Core.Interfaces.Services;
 using Medinilla.DataTypes.Contracts;
+using Medinilla.DataTypes.Core;
 using Medinilla.Infrastructure.WAMP;
 using Microsoft.Extensions.Logging;
 
@@ -232,19 +245,42 @@ internal sealed class <NewAction>Command(ILogger<<NewAction>Command> log) : IOcp
 {
     public string Action => OcppActionNames.<NewAction>;
 
-    public Task HandleResponse(OcppCallResult result)
+    public async Task HandleError(string clientIdentifier, OcppCallError error, ICommandExecutionService executionService)
     {
-        // TODO: deserialize result.Payload (e.g. result.As<<NewAction>Response>()) and act on it
-        return Task.CompletedTask;
+        log.LogError("(<NewAction>) {mi}: Errored: {err}, Error Details: {errd}, Error Code: {errc}",
+            error.MessageId, error.ErrorDescription, error.ErrorDetails ?? "None", error.ErrorCode);
+
+        await executionService.SetExecutionResult(clientIdentifier, new ExecutionResult(error.MessageId, true, error.ErrorDescription));
     }
 
-    public Task HandleError(OcppCallError error)
+    public async Task HandleResponse(string clientIdentifier, OcppCallResult result, ICommandExecutionService executionService)
     {
-        // TODO: react to OCPP error
-        return Task.CompletedTask;
+        var response = result.As<<NewAction>Response>();
+        if (response is null)
+        {
+            log.LogError("{mid} could not be deserialized.", result.MessageId);
+
+            await executionService.SetExecutionResult(clientIdentifier,
+                new ExecutionResult(result.MessageId, true, "Incoming charger response could not be serialized."));
+
+            return;
+        }
+
+        // TODO: react to response (per-status logging, counters, etc.)
+
+        await executionService.SetExecutionResult(clientIdentifier,
+            new ExecutionResult(result.MessageId, /* error: */ false, /* errorMessage: */ null));
     }
 }
 ```
+
+Audit rules for the success path:
+
+- If deserialization succeeds and every item is `Accepted`: `Error = false`, `ErrorMessage = null`.
+- If any item is not `Accepted` (charger refused, unknown component / variable, or any status outside the OCPP 2.0.1 spec for the action): `Error = true`, and pass a human-readable summary of the failing items as `ErrorMessage`. Mirror the pattern used by `SetVariablesCommand`/`GetVariablesCommand` — collect the failing items into a `StringBuilder` and pass `sb.Length > 0 ? sb.ToString() : null`. Even "unknown" statuses (`UnknownComponent`, `UnknownVariable`, or anything outside the spec) count as failures: from a CSMS perspective, asking the charger for something it doesn't know about is a real configuration / support problem worth surfacing.
+- If deserialization fails: `Error = true`, `ErrorMessage = "Incoming charger response could not be serialized."` (matches the existing commands).
+
+For `HandleError`: the OCPP layer already failed, so always `Error = true`, `ErrorMessage = error.ErrorDescription`.
 
 ---
 

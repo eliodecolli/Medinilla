@@ -55,6 +55,7 @@ gRPC SetVariables / GetVariables
         ▼
 OcppCallRouter.SubmitAsync
    BaseOcppRoutingTable.Add(messageId, action)
+   ICommandExecutionService.RegisterExecution(clientId, messageId, action)
         │
         ▼
 OcppRequestDispatcher.SubmitRequest
@@ -77,8 +78,15 @@ charger ──[3,"out-1",{}]──► ProcessMessageInbound
 RPUSH medinilla.core.request  (QueuedMessageRequest, OcppResponse)
         │
         ▼
-CoreInterfaceCommunication ──► RouteOcppCall ──► command HandleResponse
+CoreInterfaceCommunication ──► RouteOcppCall
+   lookup action by messageId in BaseOcppRoutingTable
+        │
+        ▼
+IOcppChargerCommand.HandleResponse(clientId, result, executionService)
+   ICommandExecutionService.SetExecutionResult(clientId, ExecutionResult{...})
 ```
+
+Each OCPP command owns the audit row it opened. See [Command audit](#command-audit) below.
 
 ## Offline charger
 
@@ -86,8 +94,29 @@ CoreInterfaceCommunication ──► RouteOcppCall ──► command HandleRespo
 | --- | --- | --- |
 | 1 | `OcppRequestDispatcher` | `GetResponseQueueAsync` returns `null` |
 | 2 | `OcppRequestDispatcher` | Throws `ChargerNotConnectedException`; nothing is sent |
-| 3 | `OcppCallRouter` | Removes the message ID from `BaseOcppRoutingTable`, rethrows |
+| 3 | `OcppCallRouter` | Removes the message ID from `BaseOcppRoutingTable`, closes the audit row with `SetExecutionResult(clientId, ExecutionResult{MessageId, Error=true, ErrorMessage="Error contacting charging station"})`, rethrows |
 | 4 | `MedinillaGrpc` | Returns `Error` carrying an OCPP `CALLERROR` |
+
+A dispatch failure always closes the audit row synchronously with `Error = true`. `ErrorMessage = "Error contacting charging station"` covers the `ChargerNotConnectedException` path; other dispatcher exceptions fall through the same `catch` and get the same audit result.
+
+## Command audit
+
+Every CSMS → charger call is audited via `ICommandExecutionService` so callers can correlate results by `MessageId`.
+
+| Phase | Component | Call | Row state |
+| --- | --- | --- | --- |
+| Dispatch | `OcppCallRouter.SubmitAsync` | `RegisterExecution(clientId, messageId, action)` | `Completed = false`, `Error = false` |
+| Dispatch failure | `OcppCallRouter.SubmitAsync` (`catch` arm) | `SetExecutionResult(clientId, ExecutionResult{MessageId, Error=true, ErrorMessage="Error contacting charging station"})` | `Completed = true`, `Error = true` |
+| Reply (success) | `IOcppChargerCommand.HandleResponse` | `SetExecutionResult(clientId, ExecutionResult{MessageId, Error=false, ErrorMessage=null})` | `Completed = true`, `Error = false` |
+| Reply (partial) | `IOcppChargerCommand.HandleResponse` | `SetExecutionResult(clientId, ExecutionResult{MessageId, Error=true, ErrorMessage="<failing items>"})` | `Completed = true`, `Error = true` |
+| Reply (deserialize fail) | `IOcppChargerCommand.HandleResponse` | `SetExecutionResult(clientId, ExecutionResult{MessageId, Error=true, ErrorMessage="Incoming charger response could not be serialized."})` | `Completed = true`, `Error = true` |
+| OCPP error | `IOcppChargerCommand.HandleError` | `SetExecutionResult(clientId, ExecutionResult{MessageId, Error=true, ErrorMessage=error.ErrorDescription})` | `Completed = true`, `Error = true` |
+
+Audit rules the handler is responsible for:
+
+- `Error = false` only when every per-item status is `Accepted`. Anything else (`Rejected`, `NotSupportedAttribute`, `Unknown`, `UnknownComponent`, `UnknownVariable`, or any status outside the OCPP 2.0.1 spec for the action) sets `Error = true` and contributes a one-line entry to `ErrorMessage`. Unknown statuses are real problems from a CSMS perspective — asking the charger for something it does not know about is a configuration / support issue worth surfacing.
+- `HandleError` always sets `Error = true`; `ErrorMessage` is the OCPP error description.
+- If the handler does not call `SetExecutionResult`, the row stays open with `Completed = false`. Treat handlers as required, not optional.
 
 ## Concurrent requests in one direction
 

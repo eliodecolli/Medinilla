@@ -55,6 +55,7 @@ public static class ServiceExtensions
         serviceCollection.AddScoped<IRouterServices, RouterServices>();
         serviceCollection.AddScoped<IIdTokenService, IdTokenService>();
         serviceCollection.AddScoped<ITariffService, TariffService>();
+        serviceCollection.AddScoped<ICommandExecutionService, CommandExecutionService>();
 
         serviceCollection.AddScoped<IOcppActionsFactory, OcppActionsFactory>();
         serviceCollection.AddScoped<IOcppChargerCommandFactory, OcppChargerCommandsFactory>();

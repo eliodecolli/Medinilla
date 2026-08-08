@@ -101,7 +101,9 @@ A `null` lookup throws `ChargerNotConnectedException`. There is no retry and no 
 Task SubmitAsync(string clientIdentifier, OcppCallRequest request)
 ```
 
-Adds the message ID to `BaseOcppRoutingTable`, then calls `dispatcher.SubmitRequest`. If dispatch throws, the entry is removed and the exception rethrown.
+Adds the message ID to `BaseOcppRoutingTable`, then calls `executionService.RegisterExecution(clientId, messageId, action)` to open the audit row, then calls `dispatcher.SubmitRequest`. If either call throws, the routing-table entry is removed, the audit row is closed via `executionService.SetExecutionResult(clientId, ExecutionResult{MessageId, Error=true, ErrorMessage="Error contacting charging station"})`, and the exception is rethrown.
+
+The corresponding `IOcppChargerCommand.HandleResponse` / `HandleError` is responsible for closing the audit row via `executionService.SetExecutionResult(...)` when the charger replies. See [Command audit](./message-flows.md#command-audit).
 
 ## Exception
 
@@ -113,6 +115,36 @@ public sealed class ChargerNotConnectedException(string clientIdentifier) : Exce
     public string ClientIdentifier { get; }
 }
 ```
+
+## Command execution audit
+
+Outbound calls are audited through `ICommandExecutionService` (`Medillina.Core/Interfaces/Services/ICommandExecutionService.cs`):
+
+```csharp
+public interface ICommandExecutionService
+{
+    Task RegisterExecution(string clientIdentifier, string messageId, string actionName);
+    Task SetExecutionResult(string clientIdentifier, ExecutionResult result);
+    Task<IEnumerable<ExecutionResult>> FetchExecutionsForCharger(string clientIdentifier);
+}
+```
+
+| Method | Caller | Effect |
+| --- | --- | --- |
+| `RegisterExecution` | `OcppCallRouter.SubmitAsync` | Inserts a `CommandExecution` row (`Completed = false`, `Error = false`, `StartTime = UtcNow`) |
+| `SetExecutionResult` | `OcppCallRouter.SubmitAsync` (on dispatch failure), `IOcppChargerCommand.HandleResponse` / `HandleError` | Updates the row by `MessageId` (`Completed = true`, `Error`, `ErrorMessage`, `EndTime = UtcNow`) |
+| `FetchExecutionsForCharger` | callers | Reads back the rows for a charger |
+
+The full state machine and per-handler rules live in [Message Flows → Command audit](./message-flows.md#command-audit).
+
+Implementation pieces:
+
+| File | Role |
+| --- | --- |
+| `Medinilla.DataTypes/Core/ExecutionResult.cs` | `record ExecutionResult(string MessageId, bool Error, string? ErrorMessage)` |
+| `Medinilla.DataAccess/Relational/Models/Audit/CommandExecution.cs` | EF entity; mapped to table `core_command_executions` with an index on `MessageId` |
+| `Medinilla.DataAccess/Relational/UnitOfWork/CommandExecutionUnitOfWork.cs` | `CreateExecution` / `FetchExecution` / `FetchExecutions` |
+| `Medillina.Core/v1/Services/CommandExecutionService.cs` | `ICommandExecutionService` implementation |
 
 ## gRPC mapping
 

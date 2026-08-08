@@ -81,14 +81,24 @@ builder.Services.AddScoped<IBasicWebSocketDigestionService, WebSocketDigestionSe
 `Medinilla.Core.Service/Program.cs`
 
 ```csharp
+builder.Services.AddMedinillaInfrastructure();
+builder.Services.AddMedinillaDataAccess();
+builder.Services.AddMedinillaServices();
 builder.Services.AddRealTimeServices();
 builder.Services.AddWebSocketRoutingTable();
 
 builder.Services.AddSingleton(CommunicationSettings.FromSettingsFile("settings.json"));
 builder.Services.AddScoped<IOcppRequestDispatcher, OcppRequestDispatcher>();
+builder.Services.AddSingleton<MedinillaGrpc>();
+builder.Services.AddScoped<BaseOcppRoutingTable, RedisRoutingTable>();
 builder.Services.AddSingleton<IInterfaceCommunication, CoreInterfaceCommunication>();
+
 builder.Services.AddHostedService<InboundWorker>();
+
+builder.Services.AddGrpc();
 ```
+
+`ICommandExecutionService` (the command audit service) is registered by `AddMedinillaServices()` as a scoped dependency. It depends on `CommandExecutionUnitOfWork`, which uses `MedinillaOcppDbContext` and `IRepository<CommandExecution>` — both provided by `AddMedinillaDataAccess()`. The `CommandExecution` entity is mapped to table `core_command_executions` (indexed on `MessageId`) in `MedinillaOcppDbContext.OnModelCreating`. Without `AddMedinillaDataAccess()` the audit pipeline will fail at runtime.
 
 ## Extension methods
 

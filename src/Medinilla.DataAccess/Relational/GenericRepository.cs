@@ -3,7 +3,7 @@
 namespace Medinilla.DataAccess.Relational
 {
     public sealed class GenericRepository<T>(MedinillaOcppDbContext context) : IRepository<T>
-        where T : class, new()
+        where T : class
     {
         public async Task<T> Create(T entity)
         {

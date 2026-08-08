@@ -1,4 +1,5 @@
 ﻿using Medinilla.DataAccess.Relational.Models;
+using Medinilla.DataAccess.Relational.Models.Audit;
 using Medinilla.DataAccess.Relational.Models.Authorization;
 using Microsoft.EntityFrameworkCore;
 
@@ -89,5 +90,9 @@ public class MedinillaOcppDbContext(DbContextOptions<MedinillaOcppDbContext> opt
         modelBuilder.Entity<IdToken>().HasMany(c => c.TransactionSnapshots)
             .WithOne(c => c.IdToken)
             .HasForeignKey(c => c.IdTokenId);
+
+        // configure command execution auditing
+        modelBuilder.Entity<CommandExecution>().ToTable("core_command_executions");
+        modelBuilder.Entity<CommandExecution>().HasIndex(ce => ce.MessageId);
     }
 }

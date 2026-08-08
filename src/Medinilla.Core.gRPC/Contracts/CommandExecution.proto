@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+option csharp_namespace = "Medinilla.Core.gRPC.Contracts";
+
+package medinilla.core.grpc;
+
+message CommandExecution {
+    string client_identifier = 1;
+    string action_name = 2;
+    bool error = 3;
+    optional string error_message = 4;
+}

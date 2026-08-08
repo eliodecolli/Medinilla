@@ -1,4 +1,5 @@
-﻿using Medinilla.DataAccess.Relational.Models.Authorization;
+﻿using Medinilla.DataAccess.Relational.Models.Audit;
+using Medinilla.DataAccess.Relational.Models.Authorization;
 
 namespace Medinilla.DataAccess.Relational.Models;
 
@@ -41,4 +42,6 @@ public class ChargingStation
     public virtual ICollection<Tariff> Tariffs { get; set; }
 
     public virtual ICollection<IdToken> IdTokens { get; set; }
+
+    public virtual ICollection<CommandExecution> CommandExecutions { get; set; }
 }
