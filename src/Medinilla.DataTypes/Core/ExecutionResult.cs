@@ -4,4 +4,4 @@ using System.Text;
 
 namespace Medinilla.DataTypes.Core;
 
-public sealed record ExecutionResult(string MessageId, bool Error, string? ErrorMessage);
+public sealed record ExecutionResult(string MessageId, string ActionName, bool Error, string? ErrorMessage);

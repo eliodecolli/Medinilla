@@ -3,6 +3,7 @@ using Medinilla.Core.Commands;
 using Medinilla.Core.Interfaces;
 using Medinilla.Core.Interfaces.Services;
 using Medinilla.Core.v1;
+using Medinilla.DataTypes.Core;
 using Medinilla.Infrastructure.WAMP;
 using Microsoft.Extensions.Logging;
 using Moq;
@@ -20,6 +21,7 @@ public class OcppCallRouterShould
     private readonly Mock<IOcppChargerCommandFactory> _commandsFactoryMock = new();
     private readonly Mock<IRouterServices> _routerServicesMock = new();
     private readonly Mock<IOcppRequestDispatcher> _dispatcherMock = new();
+    private readonly Mock<ICommandExecutionService> _executionServiceMock = new();
 
     private const string CLIENT_ID = "TEST-CHARGER-001";
     private const string KNOWN_ACTION = "Heartbeat";
@@ -51,7 +53,8 @@ public class OcppCallRouterShould
             _actionsFactoryMock.Object,
             _commandsFactoryMock.Object,
             _dispatcherMock.Object,
-            table);
+            table,
+            _executionServiceMock.Object);
         return (router, table);
     }
 
@@ -386,6 +389,73 @@ public class OcppCallRouterShould
             () => sut.SubmitAsync(CLIENT_ID, request));
     }
 
+    [Fact]
+    public async Task SubmitAsync_RegistersAuditRow_BeforeDispatching()
+    {
+        var (sut, _) = CreateSut();
+
+        await sut.SubmitAsync(CLIENT_ID, new OcppCallRequest("Reset-audit-1", "Reset", "{}"));
+
+        _executionServiceMock.Verify(
+            s => s.RegisterExecution(CLIENT_ID, "Reset-audit-1", "Reset"),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task SubmitAsync_WhenDispatcherThrows_ClosesAuditRowWithError()
+    {
+        var (sut, _) = CreateSut();
+        _dispatcherMock
+            .Setup(d => d.SubmitRequest(It.IsAny<string>(), It.IsAny<byte[]>()))
+            .Throws(new InvalidOperationException("wire down"));
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => sut.SubmitAsync(CLIENT_ID, new OcppCallRequest("Reset-audit-2", "Reset", "{}")));
+
+        _executionServiceMock.Verify(
+            s => s.SetExecutionResult(
+                CLIENT_ID,
+                It.Is<ExecutionResult>(r =>
+                    r.MessageId == "Reset-audit-2" &&
+                    r.Error == true &&
+                    r.ErrorMessage == "Error contacting charging station")),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task RouteOcppCall_ForCallResult_PassesClientIdentifierAndExecutionServiceToCommand()
+    {
+        var fakeCommand = new FakeCommand("Reset");
+        _commandsFactoryMock.Setup(f => f.GetCommand("Reset")).Returns(fakeCommand);
+
+        var (sut, table) = CreateSut();
+        await table.Add("Reset-audit-3", "Reset");
+
+        var frame = Encoding.UTF8.GetBytes(BuildCallResult("Reset-audit-3", "{\"status\":\"Accepted\"}"));
+        await sut.RouteOcppCall(frame, CLIENT_ID);
+
+        Assert.Equal(1, fakeCommand.HandleResponseCallCount);
+        Assert.Equal(CLIENT_ID, fakeCommand.LastClientIdentifier);
+        Assert.Same(_executionServiceMock.Object, fakeCommand.LastExecutionService);
+    }
+
+    [Fact]
+    public async Task RouteOcppCall_ForCallError_PassesClientIdentifierAndExecutionServiceToCommand()
+    {
+        var fakeCommand = new FakeCommand("Reset");
+        _commandsFactoryMock.Setup(f => f.GetCommand("Reset")).Returns(fakeCommand);
+
+        var (sut, table) = CreateSut();
+        await table.Add("Reset-audit-4", "Reset");
+
+        var frame = Encoding.UTF8.GetBytes(BuildCallError("Reset-audit-4", "GenericError", "x", "{}"));
+        await sut.RouteOcppCall(frame, CLIENT_ID);
+
+        Assert.Equal(1, fakeCommand.HandleErrorCallCount);
+        Assert.Equal(CLIENT_ID, fakeCommand.LastClientIdentifier);
+        Assert.Same(_executionServiceMock.Object, fakeCommand.LastExecutionService);
+    }
+
     // ----------------------------------------------------------------
     // DisconnectClient
     // ----------------------------------------------------------------
@@ -441,19 +511,25 @@ public class OcppCallRouterShould
         public string Action { get; }
         public string? LastResponsePayload { get; private set; }
         public OcppCallError? LastError { get; private set; }
+        public string? LastClientIdentifier { get; private set; }
+        public ICommandExecutionService? LastExecutionService { get; private set; }
         public int HandleResponseCallCount { get; private set; }
         public int HandleErrorCallCount { get; private set; }
 
-        public Task HandleResponse(OcppCallResult result)
+        public Task HandleResponse(string clientIdentifier, OcppCallResult result, ICommandExecutionService executionService)
         {
             HandleResponseCallCount++;
+            LastClientIdentifier = clientIdentifier;
+            LastExecutionService = executionService;
             LastResponsePayload = result.Payload;
             return Task.CompletedTask;
         }
 
-        public Task HandleError(OcppCallError error)
+        public Task HandleError(string clientIdentifier, OcppCallError error, ICommandExecutionService executionService)
         {
             HandleErrorCallCount++;
+            LastClientIdentifier = clientIdentifier;
+            LastExecutionService = executionService;
             LastError = error;
             return Task.CompletedTask;
         }

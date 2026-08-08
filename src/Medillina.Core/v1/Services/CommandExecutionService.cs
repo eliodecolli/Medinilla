@@ -16,7 +16,7 @@ public sealed class CommandExecutionService(
     public async Task<IEnumerable<ExecutionResult>> FetchExecutionsForCharger(string clientIdentifier)
     {
         return (await unitOfWork.FetchExecutions(clientIdentifier).ConfigureAwait(false))
-            .Select(e => new ExecutionResult(e.MessageId, e.Error, e.ErrorMessage));
+            .Select(e => new ExecutionResult(e.MessageId, e.ActionName, e.Error, e.ErrorMessage));
     }
 
     public async Task RegisterExecution(string clientIdentifier, string messageId, string actionName)

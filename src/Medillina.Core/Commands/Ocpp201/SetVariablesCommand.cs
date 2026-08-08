@@ -17,7 +17,7 @@ internal sealed class SetVariablesCommand(ILogger<SetVariablesCommand> log) : IO
         log.LogError("(SetVariables) {mi}: Errored: {err}, Error Details: {errd}, Error Code: {errc}",
             error.MessageId, error.ErrorDescription, error.ErrorDetails ?? "None", error.ErrorCode);
 
-        await executionService.SetExecutionResult(clientIdentifier, new ExecutionResult(error.MessageId, true, error.ErrorDescription));
+        await executionService.SetExecutionResult(clientIdentifier, new ExecutionResult(error.MessageId, Action, true, error.ErrorDescription));
     }
 
     public async Task HandleResponse(string clientIdentifier, OcppCallResult result, ICommandExecutionService executionService)
@@ -28,7 +28,7 @@ internal sealed class SetVariablesCommand(ILogger<SetVariablesCommand> log) : IO
             log.LogError("{mid} could not be deserialized.", result.MessageId);
 
             await executionService.SetExecutionResult(clientIdentifier,
-                new ExecutionResult(result.MessageId, true, "Incoming charger response could not be serialized."));
+                new ExecutionResult(result.MessageId, Action, true, "Incoming charger response could not be serialized."));
             
             return;
         }
@@ -91,7 +91,7 @@ internal sealed class SetVariablesCommand(ILogger<SetVariablesCommand> log) : IO
         }
 
         await executionService.SetExecutionResult(clientIdentifier,
-            new ExecutionResult(result.MessageId, notAccepted > 0, sb.Length > 0 ? sb.ToString() : null));
+            new ExecutionResult(result.MessageId, Action, notAccepted > 0, sb.Length > 0 ? sb.ToString() : null));
 
         log.LogInformation(
             "(SetVariables) {mi}: {ok}/{total} accepted, {rr} reboot-required, {failed} not accepted",

@@ -1,6 +1,8 @@
 ﻿using Grpc.Core;
+using Medinilla.Core.gRPC.Contracts;
 using Medinilla.Core.gRPC.Service;
 using Medinilla.Core.Interfaces;
+using Medinilla.Core.Interfaces.Services;
 using Medinilla.Core.Service.Communication.Mapping;
 using Medinilla.Core.Service.Exceptions;
 using Medinilla.Infrastructure.WAMP;
@@ -133,5 +135,23 @@ internal sealed class MedinillaGrpc(ILogger<MedinillaGrpc> log, IServiceProvider
                 }
             };
         }
+    }
+
+    public override async Task<FetchExecutedCommandsResponse> FetchExecutedCommands(FetchExecutedCommandsRequest request, ServerCallContext context)
+    {
+        using var scope = serviceProvider.CreateScope();
+        var service = scope.ServiceProvider.GetRequiredService<ICommandExecutionService>();
+
+        var result = await service.FetchExecutionsForCharger(request.ClientIdentifier);
+        var retval = new FetchExecutedCommandsResponse();
+        retval.Executions.AddRange(result.Select(r => new CommandExecution()
+        {
+            ActionName = r.ActionName,
+            ClientIdentifier = request.ClientIdentifier,
+            Error = r.Error,
+            ErrorMessage = r.ErrorMessage ?? ""
+        }));
+
+        return retval;
     }
 }

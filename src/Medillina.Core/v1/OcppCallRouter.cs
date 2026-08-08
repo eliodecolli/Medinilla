@@ -161,7 +161,7 @@ public class OcppCallRouter(
             // Dispatch never happened, so nothing will ever reply — don't leave the
             // message sitting in the in-flight table.
             await outboundTable.Remove(request.MessageId).ConfigureAwait(false);
-            await executionService.SetExecutionResult(clientIdentifier, new ExecutionResult(request.MessageId, true, "Error contacting charging station"));
+            await executionService.SetExecutionResult(clientIdentifier, new ExecutionResult(request.MessageId, request.Action, true, "Error contacting charging station"));
             throw;
         }
     }
