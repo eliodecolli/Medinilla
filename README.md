@@ -11,9 +11,16 @@ Medinilla is a CSMS backend built on top of ASP .NET Core. It aims to be a compr
 Currently implemented OCPP messages:
 - Boot Notification
 - Heartbeat
-- Security Event
+- Security Event Notification
 - Authorize
+- Status Notification
 - Transaction Event
+- Notify Report
+- Set Variables
+- Get Variables
+- Get Base Report
+
+For the full per-message and per-use-case coverage breakdown see [`docs/ocpp-coverage.md`](docs/ocpp-coverage.md).
 
 ## Medinilla - Architecture
 The most fundamental idea behind the architectural decisions on this project was scalability, and fault tolerance.

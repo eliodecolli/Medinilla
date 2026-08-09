@@ -32,7 +32,7 @@ the messages they need.
 |---|---|---|
 | B05 - Set Variables | SetVariables | Implemented |
 | B06 - Get Variables | GetVariables | Implemented |
-| B07 - Get Base Report | GetBaseReport, NotifyReport | **Missing** |
+| B07 - Get Base Report | GetBaseReport, NotifyReport | Implemented |
 
 ### Charging Station Reset
 
@@ -88,9 +88,9 @@ the messages they need.
 | P01 - Data Transfer to the Charging Station | DataTransfer | **Missing** |
 | P02 - Data Transfer to the CSMS | DataTransfer | **Missing** |
 
-**Base compliance result: 14 of 17 use case groups covered.** The missing
-ones are B07 (Get Base Report), B11/B12 (Reset), G03/G04 (ChangeAvailability),
-N07 (Alert Event), and P01/P02 (Data Transfer).
+**Base compliance result: 15 of 17 use case groups covered.** The missing
+ones are B11/B12 (Reset), G03/G04 (ChangeAvailability), N07 (Alert Event), and
+P01/P02 (Data Transfer).
 
 Extra messages implemented beyond the base: Heartbeat (G02), SecurityEventNotification (A04).
 
@@ -99,7 +99,7 @@ Extra messages implemented beyond the base: Heartbeat (G02), SecurityEventNotifi
 | Block | Use cases | Medinilla coverage |
 |---|---|---|
 | A. Security | A01–A05 | **Partial** — `SecurityEventNotification` (A04) only |
-| B. Provisioning | B01–B12 | **Partial** — BootNotification (B01–B03), GetVariables (B06), SetVariables (B05) |
+| B. Provisioning | B01–B12 | **Partial** — BootNotification (B01–B03), SetVariables (B05), GetVariables (B06), GetBaseReport/NotifyReport (B07) |
 | C. Authorization | C01–C16 | **Partial** — Authorize (C01) only |
 | D. LocalAuthorizationList Management | D01–D02 | **None** |
 | E. Transactions | E01–E15 | **Partial** — TransactionEvent (E01–E13) |
@@ -134,7 +134,7 @@ Extra messages implemented beyond the base: Heartbeat (G02), SecurityEventNotifi
 | 11 | NotifyEVChargingSchedule | K. SmartCharging | p. 369 | Missing |
 | 12 | NotifyEvent | N. Diagnostics | p. 370 | Missing |
 | 13 | NotifyMonitoringReport | N. Diagnostics | p. 370 | Missing |
-| 14 | NotifyReport | B. Provisioning | p. 371 | Missing |
+| 14 | NotifyReport | B. Provisioning | p. 371 | Implemented |
 | 15 | PublishFirmwareStatusNotification | L. FirmwareManagement | p. 372 | Missing |
 | 16 | ReportChargingProfiles | K. SmartCharging | p. 372 | Missing |
 | 17 | ReservationStatusUpdate | H. Reservation | p. 374 | Missing |
@@ -159,7 +159,7 @@ Extra messages implemented beyond the base: Heartbeat (G02), SecurityEventNotifi
 | 11 | DataTransfer | P. DataTransfer | p. 358 | Missing |
 | 12 | DeleteCertificate | M. ISO 15118 CertMgmt | p. 359 | Missing |
 | 13 | Get15118EVCertificate | M. ISO 15118 CertMgmt | p. 360 | Missing |
-| 14 | GetBaseReport | B. Provisioning | p. 360 | Missing |
+| 14 | GetBaseReport | B. Provisioning | p. 360 | Implemented |
 | 15 | GetCertificateStatus | M. ISO 15118 CertMgmt | p. 361 | Missing |
 | 16 | GetChargingProfiles | K. SmartCharging | p. 361 | Missing |
 | 17 | GetCompositeSchedule | K. SmartCharging | p. 362 | Missing |
@@ -195,6 +195,6 @@ Extra messages implemented beyond the base: Heartbeat (G02), SecurityEventNotifi
 
 | Bucket | Total | Implemented | Missing |
 |---|---|---|---|
-| Charger → CSMS (Actions) | 20 | 6 | 14 |
-| CSMS → Charger (Commands) | 44 | 2 | 42 |
-| **Overall** | **64** | **8** | **56** |
+| Charger → CSMS (Actions) | 20 | 7 | 13 |
+| CSMS → Charger (Commands) | 44 | 3 | 41 |
+| **Overall** | **64** | **10** | **54** |
