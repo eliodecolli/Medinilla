@@ -4,6 +4,7 @@ using Medinilla.DataTypes.Contracts.Common;
 using Medinilla.DataTypes.Core;
 using Medinilla.Infrastructure.WAMP;
 using Microsoft.Extensions.Logging;
+using System.Text.Json;
 
 namespace Medinilla.Core.Actions.Ocpp201;
 
@@ -30,7 +31,7 @@ public sealed class BootNotificationAction(IChargingStationBootingService servic
             _logger.LogError($"[{clientIdentifier}]: Error while processing BootNotification request: {ex}");
             return new RpcResult()
             {
-                Result = call.CreateResult(new BootNotificationResponse(1440, RegistrationStatusEnum.Rejected, new StatusInfo()
+                Result = call.CreateResult(new BootNotificationResponse(60, RegistrationStatusEnum.Rejected, new StatusInfo()
                 {
                     ReasonCode = BootReasonCode.BootError.Code,
                     AdditionalInfo = BootReasonCode.BootError.Detail,
@@ -42,7 +43,7 @@ public sealed class BootNotificationAction(IChargingStationBootingService servic
 
         return new RpcResult()
         {
-            Result = call.CreateResult(new BootNotificationResponse(1440, RegistrationStatusEnum.Accepted, new StatusInfo()
+            Result = call.CreateResult(new BootNotificationResponse(60, RegistrationStatusEnum.Accepted, new StatusInfo()
             {
                 ReasonCode = BootReasonCode.BootOk.Code,
                 AdditionalInfo = BootReasonCode.BootOk.Detail,

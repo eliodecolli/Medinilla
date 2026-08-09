@@ -35,12 +35,7 @@ public sealed class OcppCallRequest : BaseOcppMessage
     public OcppCallResult CreateResult<T>(T payload)
         where T : class
     {
-        return new OcppCallResult(MessageId, JsonSerializer.Serialize(payload, new JsonSerializerOptions()
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            Converters = { new JsonStringEnumConverter() },
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-        }));
+        return new OcppCallResult(MessageId, OcppPayloadSerializer.SerializePayload(payload));
     }
 
     public string Serialize()

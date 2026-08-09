@@ -31,6 +31,16 @@ message GetVariablesResponse {
     Error error = 1;
 }
 
+message GetBaseReportRequest {
+    string client_identifier = 1;
+    int32 request_id = 2;
+    string report_base = 3;
+}
+
+message GetBaseReportResponse {
+    Error error = 1;
+}
+
 message FetchExecutedCommandsRequest {
     string client_identifier = 1;
 }

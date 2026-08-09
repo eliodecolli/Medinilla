@@ -5,26 +5,16 @@ using Medinilla.Core.Interfaces;
 using Medinilla.Core.Interfaces.Services;
 using Medinilla.Core.Service.Communication.Mapping;
 using Medinilla.Core.Service.Exceptions;
+using Medinilla.Infrastructure;
 using Medinilla.Infrastructure.WAMP;
 using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Text;
-using System.Text.Json;
-using System.Text.Json.Serialization;
 
 namespace Medinilla.Core.Service.Communication;
 
 internal sealed class MedinillaGrpc(ILogger<MedinillaGrpc> log, IServiceProvider serviceProvider) : OcppService.OcppServiceBase
 {
-    private static readonly JsonSerializerOptions PayloadJsonOptions = new()
-    {
-        PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-        Converters = { new JsonStringEnumConverter() },
-        DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-    };
-
-    private static string SerializePayload<T>(T payload) => JsonSerializer.Serialize(payload, PayloadJsonOptions);
-
     /// <summary>
     /// A charger that no instance is hosting can't be called at all, so the request
     /// fails as an OCPP CALLERROR rather than being queued for nobody.
@@ -57,7 +47,7 @@ internal sealed class MedinillaGrpc(ILogger<MedinillaGrpc> log, IServiceProvider
 
             var payload = MedinillaMapping.MapSetVariables(request);
 
-            var ocppRequest = new OcppCallRequest(messageId, OcppActionNames.SetVariables, SerializePayload(payload));
+            var ocppRequest = new OcppCallRequest(messageId, OcppActionNames.SetVariables, OcppPayloadSerializer.SerializePayload(payload));
             using var scope = serviceProvider.CreateScope();
             var router = scope.ServiceProvider.GetRequiredService<IOcppCallRouter>();
 
@@ -103,7 +93,7 @@ internal sealed class MedinillaGrpc(ILogger<MedinillaGrpc> log, IServiceProvider
 
             var payload = MedinillaMapping.MapGetVariables(request);
 
-            var ocppRequest = new OcppCallRequest(messageId, OcppActionNames.GetVariables, SerializePayload(payload));
+            var ocppRequest = new OcppCallRequest(messageId, OcppActionNames.GetVariables, OcppPayloadSerializer.SerializePayload(payload));
             using var scope = serviceProvider.CreateScope();
             var router = scope.ServiceProvider.GetRequiredService<IOcppCallRouter>();
 
@@ -127,6 +117,52 @@ internal sealed class MedinillaGrpc(ILogger<MedinillaGrpc> log, IServiceProvider
         {
             log.LogError("{ci}: {an}: Error: {msg}", request.ClientIdentifier, OcppActionNames.GetVariables, e.Message);
             return new GetVariablesResponse()
+            {
+                Error = new Error()
+                {
+                    HasError = true,
+                    Message = e.Message,
+                }
+            };
+        }
+    }
+
+    public override async Task<GetBaseReportResponse> GetBaseReport(GetBaseReportRequest request, ServerCallContext context)
+    {
+        try
+        {
+            var messageId = Guid.NewGuid().ToString();
+            log.LogInformation("Request: {an} msgId={mi} ci={ci}",
+                OcppActionNames.GetBaseReport,
+                messageId,
+                request.ClientIdentifier);
+
+            var payload = MedinillaMapping.MapGetBaseReport(request);
+
+            var ocppRequest = new OcppCallRequest(messageId, OcppActionNames.GetBaseReport, OcppPayloadSerializer.SerializePayload(payload));
+            using var scope = serviceProvider.CreateScope();
+            var router = scope.ServiceProvider.GetRequiredService<IOcppCallRouter>();
+
+            await router.SubmitAsync(request.ClientIdentifier, ocppRequest);
+            return new GetBaseReportResponse()
+            {
+                Error = new Error()
+                {
+                    HasError = false,
+                }
+            };
+        }
+        catch (ChargerNotConnectedException e)
+        {
+            return new GetBaseReportResponse()
+            {
+                Error = NotConnectedError(e, OcppActionNames.GetBaseReport)
+            };
+        }
+        catch (Exception e)
+        {
+            log.LogError("{ci}: {an}: Error: {msg}", request.ClientIdentifier, OcppActionNames.GetBaseReport, e.Message);
+            return new GetBaseReportResponse()
             {
                 Error = new Error()
                 {

@@ -1,6 +1,7 @@
 ﻿using Medinilla.DataAccess.Relational.Models;
 using Medinilla.DataAccess.Relational.Models.Audit;
 using Medinilla.DataAccess.Relational.Models.Authorization;
+using Medinilla.DataAccess.Relational.Models.ChargerConfig;
 using Microsoft.EntityFrameworkCore;
 
 namespace Medinilla.DataAccess.Relational;
@@ -94,5 +95,36 @@ public class MedinillaOcppDbContext(DbContextOptions<MedinillaOcppDbContext> opt
         // configure command execution auditing
         modelBuilder.Entity<CommandExecution>().ToTable("core_command_executions");
         modelBuilder.Entity<CommandExecution>().HasIndex(ce => ce.MessageId);
+        
+        // configure charger configs
+        // report status
+        modelBuilder.Entity<ReportBaseStatus>().ToTable("core_report_base_statuses");
+        modelBuilder.Entity<ReportBaseStatus>().HasIndex(r => r.RequestId);
+        modelBuilder.Entity<ReportBaseStatus>().HasIndex(r => new { r.RequestId, r.SeqNo })
+            .IsUnique();
+        
+        // charger component
+        modelBuilder.Entity<ChargerComponent>().ToTable("core_charger_components");
+        modelBuilder.Entity<ChargerComponent>().HasIndex(cc => cc.ClientIdentifier);
+        modelBuilder.Entity<ChargerComponent>().HasIndex(cc => new { cc.ComponentName, cc.ComponentInstance });
+        modelBuilder.Entity<ChargerComponent>().HasOne(cc => cc.Connector)
+            .WithMany(ec => ec.Components)
+            .HasForeignKey(cc => cc.EvseConnectorId);
+        modelBuilder.Entity<ChargerComponent>().HasOne(cc => cc.ChargingStation)
+            .WithMany()
+            .HasForeignKey(cc => cc.ChargingStationId);
+
+        // component variable
+        modelBuilder.Entity<ComponentVariable>().ToTable("core_component_variables");
+        modelBuilder.Entity<ComponentVariable>().HasIndex(cc => new { cc.Name, cc.AttributeType });
+        modelBuilder.Entity<ComponentVariable>().HasIndex(cc => new { cc.Name, cc.Instance });
+        
+        modelBuilder.Entity<ComponentVariable>().Property(cv => cv.AttributeType)
+            .HasConversion<string>();
+        modelBuilder.Entity<ComponentVariable>().Property(cv => cv.Mutability)
+            .HasConversion<string>();
+        modelBuilder.Entity<ComponentVariable>().HasOne(cv => cv.Component)
+            .WithMany(cc => cc.ComponentVariables)
+            .HasForeignKey(cv => cv.ChargerComponentId);
     }
 }

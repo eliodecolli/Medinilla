@@ -23,6 +23,7 @@ public static class ServiceExtensions
         services.AddScoped<IOcppAction, AuthorizeAction>();
         services.AddScoped<IOcppAction, TransactionEventAction>();
         services.AddScoped<IOcppAction, StatusNotificationAction>();
+        services.AddScoped<IOcppAction, NotifyReportAction>();
         //...add more
     }
 
@@ -30,6 +31,7 @@ public static class ServiceExtensions
     {
         services.AddScoped<IOcppChargerCommand, SetVariablesCommand>();
         services.AddScoped<IOcppChargerCommand, GetVariablesCommand>();
+        services.AddScoped<IOcppChargerCommand, GetBaseReportCommand>();
         //...add more
     }
 

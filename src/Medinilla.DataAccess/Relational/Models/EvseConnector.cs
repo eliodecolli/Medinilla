@@ -1,4 +1,6 @@
-﻿namespace Medinilla.DataAccess.Relational.Models;
+﻿using Medinilla.DataAccess.Relational.Models.ChargerConfig;
+
+namespace Medinilla.DataAccess.Relational.Models;
 
 public class EvseConnector
 {
@@ -15,4 +17,6 @@ public class EvseConnector
     public DateTime ModifiedAt { get; set; }
 
     public virtual ChargingStation ChargingStation { get; set; }
+    
+    public virtual IEnumerable<ChargerComponent>? Components { get; set; }
 }

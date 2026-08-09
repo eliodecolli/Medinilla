@@ -225,7 +225,7 @@ public class <NewAction>Response
 }
 ```
 
-**DTO generation rule:** Populate the `Request` and `Response` property types from the action's OCPP JSON schema (OCPP 1.6 / 2.0.1 spec). Reuse existing common types under `Contracts/Common/` wherever the schema references them — don't redefine them. If the schema introduces a new common type, add it under `src/Medinilla.DataTypes/Contracts/Common/`.
+**DTO generation rule — read the JSON schema, do not invent.** Populate the `Request` and `Response` property types from the action's OCPP JSON schema in `docs/OCPP-2.0.1_part3_JSON_schemas/OCPP-2.0.1_part3_JSON_schemas/<NewAction>Request.json` and `.../<NewAction>Response.json`. Read both files **before** writing any DTO — the schema is the source of truth for field names, types, optionality, enums, and references to common types. Reuse existing common types under `Contracts/Common/` wherever the schema's `$ref` points to them — don't redefine them. If the schema references a common type that doesn't exist yet, add it under `src/Medinilla.DataTypes/Contracts/Common/`, again shaped by the schema.
 
 ---
 

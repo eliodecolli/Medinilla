@@ -4,6 +4,7 @@ using System.Text.Json;
 using Medinilla.DataAccess.Relational;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Medinilla.DataAccess.Migrations
 {
     [DbContext(typeof(MedinillaOcppDbContext))]
-    partial class MedinillaOcppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260809190343_ChargerConfig_RemoveComponentVariableChargingStationFK")]
+    partial class ChargerConfig_RemoveComponentVariableChargingStationFK
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -198,8 +201,23 @@ namespace Medinilla.DataAccess.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
+                    b.Property<string>("DataType")
+                        .HasColumnType("text");
+
                     b.Property<Guid?>("EvseConnectorId")
                         .HasColumnType("uuid");
+
+                    b.Property<decimal?>("MaxLimit")
+                        .HasColumnType("numeric");
+
+                    b.Property<decimal?>("MinLimit")
+                        .HasColumnType("numeric");
+
+                    b.Property<string>("Unit")
+                        .HasColumnType("text");
+
+                    b.Property<string>("ValuesList")
+                        .HasColumnType("text");
 
                     b.HasKey("Id");
 
@@ -230,17 +248,8 @@ namespace Medinilla.DataAccess.Migrations
                     b.Property<bool?>("Constant")
                         .HasColumnType("boolean");
 
-                    b.Property<string>("DataType")
-                        .HasColumnType("text");
-
                     b.Property<string>("Instance")
                         .HasColumnType("text");
-
-                    b.Property<decimal?>("MaxLimit")
-                        .HasColumnType("numeric");
-
-                    b.Property<decimal?>("MinLimit")
-                        .HasColumnType("numeric");
 
                     b.Property<string>("Mutability")
                         .IsRequired()
@@ -250,13 +259,7 @@ namespace Medinilla.DataAccess.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("Unit")
-                        .HasColumnType("text");
-
                     b.Property<string>("Value")
-                        .HasColumnType("text");
-
-                    b.Property<string>("ValuesList")
                         .HasColumnType("text");
 
                     b.HasKey("Id");

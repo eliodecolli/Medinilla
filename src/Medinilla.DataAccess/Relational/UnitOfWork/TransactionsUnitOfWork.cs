@@ -36,8 +36,8 @@ public sealed class TransactionsUnitOfWork(MedinillaOcppDbContext context)
 
     public async Task<IdToken?> TryGetIdTokenForTransaction(string transactionId)
     {
-        var query = await _transactionRepository.Filter(tx => tx.TransactionId == transactionId && 
-                                                              tx.IdTokenId is not null);
+        var query = await _transactionRepository.Filter(tx => tx.TransactionId == transactionId &&
+                                                              tx.IdTokenId != null);
         return query.FirstOrDefault()?.IdToken;
     }
 

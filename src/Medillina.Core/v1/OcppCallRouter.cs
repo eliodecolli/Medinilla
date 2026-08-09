@@ -5,6 +5,7 @@ using Medinilla.Core.Interfaces.Services;
 using Medinilla.DataTypes.Core;
 using Medinilla.Infrastructure;
 using Medinilla.Infrastructure.WAMP;
+using Microsoft.Extensions.DependencyInjection;
 using Microsoft.Extensions.Logging;
 using System.Text;
 
@@ -144,7 +145,7 @@ public class OcppCallRouter(
             _logger.LogError("Received message reply, however in-flight message was not present in our table. Message ID: {msgId}, Client ID: {clientId}", message.MessageId, clientIdentifier);
         }
     }
-
+    
     public async Task SubmitAsync(string clientIdentifier, OcppCallRequest request)
     {
         await outboundTable.Add(request.MessageId, request.Action).ConfigureAwait(false);

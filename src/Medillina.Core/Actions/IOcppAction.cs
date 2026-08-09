@@ -1,4 +1,5 @@
-﻿using Medinilla.Infrastructure.WAMP;
+﻿using Medinilla.Core.Interfaces;
+using Medinilla.Infrastructure.WAMP;
 
 namespace Medinilla.Core.Actions;
 
