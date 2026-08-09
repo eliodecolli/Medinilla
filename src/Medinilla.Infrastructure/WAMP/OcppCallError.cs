@@ -103,7 +103,7 @@ public sealed class OcppCallError : BaseOcppMessage
 
     public byte[] ToByteArray()
     {
-        var details = string.Compare(ErrorDetails, "null") != 0 ? ErrorDetails : "{}";
+        var details = String.CompareOrdinal(ErrorDetails, "null") != 0 ? ErrorDetails : "{}";
         var responseString = $"[{(int)MessageType},\"{MessageId}\",\"{ErrorCode}\",\"{ErrorDescription}\",{details}]";
         return Encoding.UTF8.GetBytes(responseString);
     }
