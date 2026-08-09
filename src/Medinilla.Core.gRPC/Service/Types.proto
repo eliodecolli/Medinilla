@@ -33,8 +33,7 @@ message GetVariablesResponse {
 
 message GetBaseReportRequest {
     string client_identifier = 1;
-    int32 request_id = 2;
-    string report_base = 3;
+    string report_base = 2;
 }
 
 message GetBaseReportResponse {
