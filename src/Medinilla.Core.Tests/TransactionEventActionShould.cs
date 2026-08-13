@@ -15,8 +15,8 @@ public class TransactionEventActionShould
         _testOutputHelper = testOutputHelper;
     }
     
-    private const float EXPECTED_TOTAL_CONSUMPTION_KWH_1 = 0.051f; // Total: 51 Wh = 0.051 kWh
-    private const float EXPECTED_TOTAL_CONSUMPTION_KWH_2 = 0.041f; // Ditto
+    private const float EXPECTED_TOTAL_CONSUMPTION_WH_1 = 51f; // Total: 51 Wh
+    private const float EXPECTED_TOTAL_CONSUMPTION_WH_2 = 41f; // Ditto
 
     private async Task<TransactionEventRequest> GetRequest(string fileName)
     {
@@ -65,8 +65,8 @@ public class TransactionEventActionShould
     [Fact]
     public async Task CalculateCorrectConsumptionFromTransactionEventEndJson()
     {
-        await AssertCalculation("TransactionEventEnd.json", EXPECTED_TOTAL_CONSUMPTION_KWH_1);
-        await AssertCalculation("TransactionEventEnd2.json", EXPECTED_TOTAL_CONSUMPTION_KWH_2);
+        await AssertCalculation("TransactionEventEnd.json", EXPECTED_TOTAL_CONSUMPTION_WH_1);
+        await AssertCalculation("TransactionEventEnd2.json", EXPECTED_TOTAL_CONSUMPTION_WH_2);
     }
 
     [Fact]
@@ -84,10 +84,10 @@ public class TransactionEventActionShould
         var graph2 =  txService.GetConsumptionGraph(request2.MeterValue);
         Assert.NotNull(graph2);
         
-        Assert.Equal(EXPECTED_TOTAL_CONSUMPTION_KWH_1, txService.GetTransactionConsumption(graph1).Consumption);
-        Assert.Equal(EXPECTED_TOTAL_CONSUMPTION_KWH_2, txService.GetTransactionConsumption(graph2).Consumption);
+        Assert.Equal(EXPECTED_TOTAL_CONSUMPTION_WH_1, txService.GetTransactionConsumption(graph1).Consumption);
+        Assert.Equal(EXPECTED_TOTAL_CONSUMPTION_WH_2, txService.GetTransactionConsumption(graph2).Consumption);
         
-        var expected = EXPECTED_TOTAL_CONSUMPTION_KWH_1 + EXPECTED_TOTAL_CONSUMPTION_KWH_2;
+        var expected = EXPECTED_TOTAL_CONSUMPTION_WH_1 + EXPECTED_TOTAL_CONSUMPTION_WH_2;
         Assert.Equal(expected, txService.GetTransactionConsumption(request2.MeterValue, graph1).Consumption);
     }
 
@@ -106,10 +106,10 @@ public class TransactionEventActionShould
         var graph2 =  txService.GetConsumptionGraph(request2.MeterValue);
         Assert.NotNull(graph2);
         
-        Assert.Equal(EXPECTED_TOTAL_CONSUMPTION_KWH_1, txService.GetTransactionConsumption(graph1).Consumption);
-        Assert.Equal(EXPECTED_TOTAL_CONSUMPTION_KWH_2, txService.GetTransactionConsumption(graph2).Consumption);
+        Assert.Equal(EXPECTED_TOTAL_CONSUMPTION_WH_1, txService.GetTransactionConsumption(graph1).Consumption);
+        Assert.Equal(EXPECTED_TOTAL_CONSUMPTION_WH_2, txService.GetTransactionConsumption(graph2).Consumption);
         
-        var expected = EXPECTED_TOTAL_CONSUMPTION_KWH_1 + EXPECTED_TOTAL_CONSUMPTION_KWH_2;
+        var expected = EXPECTED_TOTAL_CONSUMPTION_WH_1 + EXPECTED_TOTAL_CONSUMPTION_WH_2;
         
         var finalGraph = graph1 << graph2;
         Assert.NotNull(finalGraph);
