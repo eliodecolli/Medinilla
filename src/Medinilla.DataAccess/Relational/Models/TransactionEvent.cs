@@ -21,7 +21,13 @@ public class TransactionEvent
 
     public bool? Offline { get; set; }
 
-    public decimal TotalConsuption { get; set; }
+    public decimal RegisterValue { get; set; }
+    
+    public decimal? PhaseOneValue { get; set; }
+    
+    public decimal? PhaseTwoValue { get; set; }
+    
+    public decimal? PhaseThreeValue { get; set; }
 
     public ConsumptionType? ConsumptionType { get; set; }
 

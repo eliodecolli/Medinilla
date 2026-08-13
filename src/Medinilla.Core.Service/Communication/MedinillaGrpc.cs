@@ -173,6 +173,52 @@ internal sealed class MedinillaGrpc(ILogger<MedinillaGrpc> log, IServiceProvider
         }
     }
 
+    public override async Task<ResetResponse> Reset(ResetRequest request, ServerCallContext context)
+    {
+        try
+        {
+            var messageId = Guid.NewGuid().ToString();
+            log.LogInformation("Request: {an} msgId={mi} ci={ci}",
+                OcppActionNames.Reset,
+                messageId,
+                request.ClientIdentifier);
+
+            var payload = MedinillaMapping.MapReset(request);
+
+            var ocppRequest = new OcppCallRequest(messageId, OcppActionNames.Reset, OcppPayloadSerializer.SerializePayload(payload));
+            using var scope = serviceProvider.CreateScope();
+            var router = scope.ServiceProvider.GetRequiredService<IOcppCallRouter>();
+
+            await router.SubmitAsync(request.ClientIdentifier, ocppRequest);
+            return new ResetResponse()
+            {
+                Error = new Error()
+                {
+                    HasError = false,
+                }
+            };
+        }
+        catch (ChargerNotConnectedException e)
+        {
+            return new ResetResponse()
+            {
+                Error = NotConnectedError(e, OcppActionNames.Reset)
+            };
+        }
+        catch (Exception e)
+        {
+            log.LogError("{ci}: {an}: Error: {msg}", request.ClientIdentifier, OcppActionNames.Reset, e.Message);
+            return new ResetResponse()
+            {
+                Error = new Error()
+                {
+                    HasError = true,
+                    Message = e.Message,
+                }
+            };
+        }
+    }
+
     public override async Task<FetchExecutedCommandsResponse> FetchExecutedCommands(FetchExecutedCommandsRequest request, ServerCallContext context)
     {
         using var scope = serviceProvider.CreateScope();

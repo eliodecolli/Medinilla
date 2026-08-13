@@ -5,6 +5,7 @@ option csharp_namespace = "Medinilla.Core.gRPC.Service";
 import "Contracts/UserSetVariablesRequest.proto";
 import "Contracts/UserGetVariablesRequest.proto";
 import "Contracts/CommandExecution.proto";
+import "Contracts/ResetType.proto";
 
 package medinilla.core.grpc;
 
@@ -37,6 +38,16 @@ message GetBaseReportRequest {
 }
 
 message GetBaseReportResponse {
+    Error error = 1;
+}
+
+message ResetRequest {
+    string client_identifier = 1;
+    ResetType type = 2;
+    optional int32 evse_id = 3;
+}
+
+message ResetResponse {
     Error error = 1;
 }
 

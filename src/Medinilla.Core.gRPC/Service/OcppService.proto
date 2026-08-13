@@ -10,6 +10,7 @@ service OcppService {
     rpc SetVariables (SetVariablesRequest) returns (SetVariablesResponse) {}
     rpc GetVariables (GetVariablesRequest) returns (GetVariablesResponse) {}
     rpc GetBaseReport (GetBaseReportRequest) returns (GetBaseReportResponse) {}
+    rpc Reset (ResetRequest) returns (ResetResponse) {}
 
     rpc FetchExecutedCommands (FetchExecutedCommandsRequest) returns (FetchExecutedCommandsResponse) {}
 }

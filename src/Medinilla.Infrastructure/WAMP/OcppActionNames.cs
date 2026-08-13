@@ -20,5 +20,7 @@ public static class OcppActionNames
 
     public const string GetBaseReport = "GetBaseReport";
 
+    public const string Reset = "Reset";
+
     public const string NotifyReport = "NotifyReport";
 }

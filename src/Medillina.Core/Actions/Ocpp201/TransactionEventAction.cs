@@ -24,6 +24,13 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
 {
     public string ActionName => OcppActionNames.TransactionEvent;
 
+    private decimal? GetPhaseConsumption(float?[]? phases, int index)
+    {
+        if (phases is null) return null;
+        var phase = phases[index];
+        return phase.HasValue ? Convert.ToDecimal(phase) : null;
+    }
+
     public async Task<RpcResult> Execute(OcppCallRequest call, string clientIdentifier)
     {
 #if DEBUG
@@ -45,7 +52,11 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
         }
         else
         {
-            var idToken = await idTokenService.TryGetForTransaction(request.TransactionInfo.TransactionId, request.IdToken?.Token ?? "");
+            var requestIdToken = request.IdToken?.Token;
+            var idToken = !string.IsNullOrEmpty(requestIdToken)
+                ? await idTokenService.TryGetForTransaction(request.TransactionInfo.TransactionId, requestIdToken)
+                : null;
+            
             if (idToken is null)
             {
                 _logger.LogWarning($"IdToken for transaction {request.TransactionInfo.TransactionId}, event '{Enum.GetName(request.EventType)}' not found ('{request.IdToken?.Token}' was found in request)");
@@ -86,7 +97,11 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
                 {
                     var consumption = GetTransactionConsumption(request);
 
-                    transaction.TotalConsuption = Convert.ToDecimal(consumption?.Consumption ?? 0.0);
+                    transaction.RegisterValue = Convert.ToDecimal(consumption?.Consumption ?? 0.0);
+                    transaction.PhaseOneValue = GetPhaseConsumption(consumption?.PhaseConsumption, 0);
+                    transaction.PhaseTwoValue = GetPhaseConsumption(consumption?.PhaseConsumption, 1);
+                    transaction.PhaseThreeValue = GetPhaseConsumption(consumption?.PhaseConsumption, 2);
+                    
                     transaction.ConsumptionType = (ConsumptionTypeDb?)consumption?.ConsumptionType;
 
                     transaction = await unitOfWork.TransactionSubUnit.RegisterTransaction(transaction, context.IdToken);

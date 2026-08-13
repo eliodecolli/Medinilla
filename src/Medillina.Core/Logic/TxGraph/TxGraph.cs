@@ -31,6 +31,17 @@ public class TxGraph
         return Register?.Compute() ?? Interval?.Compute() ?? 0;
     }
 
+    private float? ComputePhase(int index)
+    {
+        return Register?.Phases?.Children?[index].Compute() ?? Interval?.Phases?.Children?[index].Compute() ?? null;
+    }
+
+    public float? ComputeL1() => ComputePhase(0);
+    
+    public float? ComputeL2() => ComputePhase(1);
+    
+    public float? ComputeL3() => ComputePhase(2);
+
     public TxGraph Copy()
     {
         return new TxGraph()

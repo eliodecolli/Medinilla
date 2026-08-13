@@ -29,7 +29,7 @@ internal sealed class RedisWebSocketRoutingTable(
 
         if (_entries.TryRemove(clientId, out var previous))
         {
-            previous.Cts.Cancel();
+            await previous.Cts.CancelAsync();
         }
 
         _entries[clientId] = entry;
@@ -42,7 +42,7 @@ internal sealed class RedisWebSocketRoutingTable(
         if (_entries.TryRemove(clientId, out var entry))
         {
             // The loop owns disposal, so cancelling here cannot race it.
-            entry.Cts.Cancel();
+           await entry.Cts.CancelAsync();
         }
 
         await db.KeyDeleteAsync(Key(clientId));
