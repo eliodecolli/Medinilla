@@ -11,14 +11,17 @@ public sealed class ConsumptionService
 {
     private float ScaleToKW(SampledValue value)
     {
-        if (value.UnitOfMeasure.Unit.ToLower() == "wh")
-        {
-            return Convert.ToSingle(value.Value) / 1000.0f;
-        }
-        else
-        {
-            return Convert.ToSingle(value.Value) * (float)Math.Pow(10, value.UnitOfMeasure.Multiplier);
-        }
+        // Don't scale to KW - if the incoming sampled value is set to "wh" we'll end up with 0.xx wh :(
+        // if (value.UnitOfMeasure.Unit.ToLower() == "wh")
+        // {
+        //     return Convert.ToSingle(value.Value) / 1000.0f;
+        // }
+        // else
+        // {
+        //     return Convert.ToSingle(value.Value) * (float)Math.Pow(10, value.UnitOfMeasure.Multiplier);
+        // }
+
+        return Convert.ToSingle(value.Value);
     }
 
     private INode GetNodeForSampleValue(SampledValue sample)
@@ -92,13 +95,36 @@ public sealed class ConsumptionService
         return graph;
     }
 
+    private float?[] GetPhasesConsumption(Logic.TxGraph.TxGraph? tx)
+    {
+        float?[] phases =
+        [
+            tx?.ComputeL1(),
+            tx?.ComputeL2(),
+            tx?.ComputeL3()
+        ];
+        return phases;
+    }
+
     public TransactionConsumption GetTransactionConsumption(ConsumptionGraph graph)
     {
         if (graph.End is not null)
         {
+            var consumption = graph.End.Compute() - graph.Begin?.Compute() ?? 0;
+            var phasesEnd = GetPhasesConsumption(graph.End);
+            var phasesBegin = GetPhasesConsumption(graph.Begin);
+
+            float?[] phases =
+                [
+                    phasesEnd[0] - phasesBegin[0],
+                    phasesEnd[1] - phasesBegin[1],
+                    phasesEnd[2] - phasesBegin[2]
+                ];
+            
             return new TransactionConsumption()
             {
-                Consumption = graph.End.Compute() - graph.Begin?.Compute() ?? 0,
+                Consumption = consumption,
+                PhaseConsumption = phases,
                 ConsumptionType = ConsumptionType.Cumulative,
                 Timestamp = DateTime.UtcNow,
             };
@@ -109,6 +135,7 @@ public sealed class ConsumptionService
             return new TransactionConsumption()
             {
                 Consumption = graph.Sample.Compute(),
+                PhaseConsumption = GetPhasesConsumption(graph.Sample),
                 ConsumptionType = ConsumptionType.Cumulative,
                 Timestamp = DateTime.UtcNow,
             };

@@ -1,0 +1,11 @@
+syntax = "proto3";
+
+option csharp_namespace = "Medinilla.Core.gRPC.Contracts";
+
+package medinilla.core.grpc;
+
+enum ResetType {
+    RESET_TYPE_UNSPECIFIED = 0;
+    IMMEDIATE = 1;
+    ON_IDLE = 2;
+}

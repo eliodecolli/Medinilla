@@ -11,6 +11,7 @@
     <Protobuf Include="Contracts\UserSetVariablesRequest.proto" />
     <Protobuf Include="Contracts\UserGetVariablesRequest.proto" />
     <Protobuf Include="Contracts\CommandExecution.proto" />
+    <Protobuf Include="Contracts\ResetType.proto" />
     <Protobuf Include="Service\Types.proto" />
     <Protobuf Include="Service\OcppService.proto" />
   </ItemGroup>

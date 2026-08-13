@@ -7,6 +7,8 @@ public sealed class TransactionConsumption
     public ConsumptionType ConsumptionType { get; set; }
 
     public float Consumption { get; set; }
+    
+    public float?[] PhaseConsumption { get; set; }
 
     public DateTime Timestamp { get; set; }
 }
