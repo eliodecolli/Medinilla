@@ -20,9 +20,9 @@ The skill does **not** implement the rich `HandleResponse` / `HandleError` logic
 Every outbound OCPP call (CSMS -> charger) is audited end-to-end via `ICommandExecutionService`:
 
 - When the gRPC method submits the call to the router and the router successfully dispatches it, the router calls `executionService.RegisterExecution(clientIdentifier, messageId, action)` (see `src/Medillina.Core/v1/OcppCallRouter.cs:156`). This writes a `CommandExecution` row (`Completed = false`, `Error = false`) so callers can later correlate the audit by message id.
-- When the charger replies, the matching `IOcppChargerCommand.HandleResponse` / `HandleError` is invoked. That handler **must** call `executionService.SetExecutionResult(clientIdentifier, new ExecutionResult(messageId, error, errorMessage))` to close the row (`Completed = true`, `Error = error`, `EndTime = UtcNow`).
+- When the charger replies, the matching `IOcppChargerCommand.HandleResponse` / `HandleError` is invoked. That handler **must** call `executionService.SetExecutionResult(clientIdentifier, new ExecutionResult(messageId, actionName, error, errorMessage))` to close the row (`Completed = true`, `Error = error`, `EndTime = UtcNow`).
 
-`ExecutionResult` (`src/Medinilla.DataTypes/Core/ExecutionResult.cs`) is `record ExecutionResult(string MessageId, bool Error, string? ErrorMessage)`.
+`ExecutionResult` (`src/Medinilla.DataTypes/Core/ExecutionResult.cs`) is `record ExecutionResult(string MessageId, string ActionName, bool Error, string? ErrorMessage)`. The `ActionName` should be the command's own `Action` property (e.g. `OcppActionNames.<NewAction>`), not a string literal.
 
 If the handler doesn't call `SetExecutionResult` the audit row stays open forever — so treat it as required, not optional.
 
@@ -121,36 +121,38 @@ The csproj does **not** glob — add an explicit `<Protobuf Include="Contracts\<
 ## Step 2 — gRPC service method
 Add the override to `src/Medinilla.Core.Service/Communication/MedinillaGrpc.cs` (alongside the other `OcppServiceBase` overrides). The method:
 
-- Logs the request.
+- Logs the request with `an` / `mi` / `ci` (action / messageId / clientIdentifier).
 - Generates a fresh `messageId`.
 - Calls `MedinillaMapping.Map<NewAction>(request)`.
-- Serializes with `JsonNamingPolicy.CamelCase`, a `JsonStringEnumConverter`, and `DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull`.
-- Builds an `OcppCallRequest(messageId, OcppActionNames.<NewAction>, json)` and calls `router.SubmitAsync(request.ClientIdentifier, ocppRequest)`.
-- Catches exceptions, logs, and returns an `Error` (success/failure).
+- Serializes via `OcppPayloadSerializer.SerializePayload(payload)` (it already sets camelCase + enum-as-string + omit-null).
+- Builds an `OcppCallRequest(messageId, OcppActionNames.<NewAction>, payloadJson)` and hands it to the private `SubmitAsync` helper (see below).
+- Catches `ChargerNotConnectedException` separately — that's the only way to surface "charger is offline" as a real OCPP `CALLERROR` to the caller; the generic `catch (Exception)` is the fallback.
 
 ```csharp
 public override async Task<<NewAction>Response> <NewAction>(<NewAction>Request request, ServerCallContext context)
 {
-    log.LogInformation("{ci}: {an}", request.ClientIdentifier, OcppActionNames.<NewAction>);
-
     try
     {
         var messageId = Guid.NewGuid().ToString();
+        log.LogInformation("Request: {an} msgId={mi} ci={ci}",
+            OcppActionNames.<NewAction>,
+            messageId,
+            request.ClientIdentifier);
+
         var payload = MedinillaMapping.Map<NewAction>(request);
 
-        var ocppRequest = new OcppCallRequest(messageId, OcppActionNames.<NewAction>, JsonSerializer.Serialize(payload, new JsonSerializerOptions
-        {
-            PropertyNamingPolicy = JsonNamingPolicy.CamelCase,
-            Converters = { new JsonStringEnumConverter() },
-            DefaultIgnoreCondition = JsonIgnoreCondition.WhenWritingNull,
-        }));
-        using var scope = serviceProvider.CreateScope();
-        var router = scope.ServiceProvider.GetRequiredService<IOcppCallRouter>();
-
-        await router.SubmitAsync(request.ClientIdentifier, ocppRequest);
+        var ocppRequest = new OcppCallRequest(messageId, OcppActionNames.<NewAction>, OcppPayloadSerializer.SerializePayload(payload));
+        await SubmitAsync(request.ClientIdentifier, ocppRequest);
         return new <NewAction>Response()
         {
             Error = new Error() { HasError = false },
+        };
+    }
+    catch (ChargerNotConnectedException e)
+    {
+        return new <NewAction>Response()
+        {
+            Error = NotConnectedError(e, OcppActionNames.<NewAction>)
         };
     }
     catch (Exception e)
@@ -164,7 +166,18 @@ public override async Task<<NewAction>Response> <NewAction>(<NewAction>Request r
 }
 ```
 
-The required usings already in the file: `Grpc.Core`, `Medinilla.Core.gRPC.Service`, `Medinilla.Core.Interfaces`, `Medinilla.Core.Service.Communication.Mapping`, `Medinilla.Core.Service.Types`, `System.Text.Json`, `System.Text.Json.Serialization`. Don't add duplicates.
+**`SubmitAsync` helper** — already defined at the bottom of `MedinillaGrpc` from a previous refactor. It owns the scope/router lifetime so the per-method body stays focused on building the OCPP call. The helper **must be `async`/`await`** (not return the Task directly) — otherwise `using var scope` would dispose before the router's own awaits resolve.
+
+```csharp
+private async Task SubmitAsync(string clientIdentifier, OcppCallRequest request)
+{
+    using var scope = serviceProvider.CreateScope();
+    var router = scope.ServiceProvider.GetRequiredService<IOcppCallRouter>();
+    await router.SubmitAsync(clientIdentifier, request);
+}
+```
+
+The required usings already in the file: `Grpc.Core`, `Medinilla.Core.gRPC.Contracts` (only if the request uses shared sub-messages), `Medinilla.Core.gRPC.Service`, `Medinilla.Core.Interfaces`, `Medinilla.Core.Service.Communication.Mapping`, `Medinilla.Infrastructure`, `Medinilla.Infrastructure.WAMP`, `Microsoft.Extensions.DependencyInjection`, `Microsoft.Extensions.Logging`, `System.Text` (for `Encoding.UTF8`). Don't add duplicates — `System.Text.Json` and `System.Text.Json.Serialization` are **not** needed because the helper uses `OcppPayloadSerializer`.
 
 ---
 
@@ -250,7 +263,7 @@ internal sealed class <NewAction>Command(ILogger<<NewAction>Command> log) : IOcp
         log.LogError("(<NewAction>) {mi}: Errored: {err}, Error Details: {errd}, Error Code: {errc}",
             error.MessageId, error.ErrorDescription, error.ErrorDetails ?? "None", error.ErrorCode);
 
-        await executionService.SetExecutionResult(clientIdentifier, new ExecutionResult(error.MessageId, true, error.ErrorDescription));
+        await executionService.SetExecutionResult(clientIdentifier, new ExecutionResult(error.MessageId, Action, true, error.ErrorDescription));
     }
 
     public async Task HandleResponse(string clientIdentifier, OcppCallResult result, ICommandExecutionService executionService)
@@ -261,7 +274,7 @@ internal sealed class <NewAction>Command(ILogger<<NewAction>Command> log) : IOcp
             log.LogError("{mid} could not be deserialized.", result.MessageId);
 
             await executionService.SetExecutionResult(clientIdentifier,
-                new ExecutionResult(result.MessageId, true, "Incoming charger response could not be serialized."));
+                new ExecutionResult(result.MessageId, Action, true, "Incoming charger response could not be serialized."));
 
             return;
         }
@@ -269,7 +282,7 @@ internal sealed class <NewAction>Command(ILogger<<NewAction>Command> log) : IOcp
         // TODO: react to response (per-status logging, counters, etc.)
 
         await executionService.SetExecutionResult(clientIdentifier,
-            new ExecutionResult(result.MessageId, /* error: */ false, /* errorMessage: */ null));
+            new ExecutionResult(result.MessageId, Action, /* error: */ false, /* errorMessage: */ null));
     }
 }
 ```
