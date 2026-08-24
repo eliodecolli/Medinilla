@@ -6,6 +6,7 @@ import "Contracts/UserSetVariablesRequest.proto";
 import "Contracts/UserGetVariablesRequest.proto";
 import "Contracts/CommandExecution.proto";
 import "Contracts/ResetType.proto";
+import "Contracts/IdToken.proto";
 
 package medinilla.core.grpc;
 
@@ -48,6 +49,27 @@ message ResetRequest {
 }
 
 message ResetResponse {
+    Error error = 1;
+}
+
+message RequestStartTransactionRequest {
+    string client_identifier = 1;
+    optional int32 evse_id = 2;
+    IdToken id_token = 3;
+    optional IdToken group_id_token = 4;
+    int32 remote_start_id = 5;
+}
+
+message RequestStartTransactionResponse {
+    Error error = 1;
+}
+
+message RequestStopTransactionRequest {
+    string client_identifier = 1;
+    string transaction_id = 2;
+}
+
+message RequestStopTransactionResponse {
     Error error = 1;
 }
 

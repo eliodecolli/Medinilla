@@ -33,6 +33,8 @@ public static class ServiceExtensions
         services.AddScoped<IOcppChargerCommand, GetVariablesCommand>();
         services.AddScoped<IOcppChargerCommand, GetBaseReportCommand>();
         services.AddScoped<IOcppChargerCommand, ResetCommand>();
+        services.AddScoped<IOcppChargerCommand, RequestStartTransactionCommand>();
+        services.AddScoped<IOcppChargerCommand, RequestStopTransactionCommand>();
         //...add more
     }
 

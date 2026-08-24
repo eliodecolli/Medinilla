@@ -14,7 +14,8 @@ using IdTokenDb = Medinilla.DataAccess.Relational.Models.Authorization.IdToken;
 
 namespace Medinilla.Core.Actions.Ocpp201;
 
-public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logger,
+public sealed class TransactionEventAction(
+    ILogger<TransactionEventAction> _logger,
     ChargingStationUnitOfWork unitOfWork,
     AuthorizationAlgorithmFactory authFactory,
     ConsumptionService consumptionService,
@@ -46,7 +47,8 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
             _logger.LogError($"Invalid client identifier: {clientIdentifier}");
             return new RpcResult()
             {
-                Error = call.CreateErrorResult<TransactionEventResponse>(OcppCallError.ErrorCodes.GenericError, $"Invalid client identifier: {clientIdentifier} not found."),
+                Error = call.CreateErrorResult<TransactionEventResponse>(OcppCallError.ErrorCodes.GenericError,
+                    $"Invalid client identifier: {clientIdentifier} not found."),
                 ReturnToCS = true
             };
         }
@@ -57,134 +59,184 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
                 ? await idTokenService.TryGetForTransaction(request.TransactionInfo.TransactionId, requestIdToken)
                 : null;
             
+            var response = new TransactionEventResponse();
+            
             if (idToken is null)
             {
-                _logger.LogWarning($"IdToken for transaction {request.TransactionInfo.TransactionId}, event '{Enum.GetName(request.EventType)}' not found ('{request.IdToken?.Token}' was found in request)");
+                _logger.LogWarning(
+                    $"IdToken for transaction {request.TransactionInfo.TransactionId}, event '{Enum.GetName(request.EventType)}' not found ('{request.IdToken?.Token}' was found in request)");
+            }
+            
+            var context = AuthUtils.GenerateAuthContext(chargingStation, request.Evse?.Id, true);
+            var authStatus = await PerformAuthorization(chargingStation, request, context);
+            
+            // TODO: Update this. "request" might not contain an Id Token on "UPDATE" events;
+            // however we already know the related token to this transaction from the "START" event.
+            if (idToken is not null)
+            {
+                response.IdTokenInfo = new IdTokenInfo()
+                {
+                    Status = authStatus,
+                };
+            }
+
+            if (authStatus != AuthorizeStatus.Accepted)
+            {
+                _logger.LogError("[Transaction Event]: [{event}]: Authorization failed with status='{status}'",
+                    request.EventType.ToString(), authStatus);
+                return new RpcResult()
+                {
+                    Result = call.CreateResult(response)
+                };
             }
 
             var transaction = MapOcppTransaction(chargingStation, request, idToken);
-            
-            
-            var context = AuthUtils.GenerateAuthContext(chargingStation, request.Evse?.Id, true);
-                var authStatus = await PerformAuthorization(chargingStation, request, context);
 
-                var response = new TransactionEventResponse()
-                {
-                    IdTokenInfo = new IdTokenInfo()
-                    {
-                        Status = authStatus,
-                    }
-                };
-
-                if (authStatus != AuthorizeStatus.Accepted)
-                {
-                    return new RpcResult()
-                    {
-                        Result = call.CreateResult(response)
-                    };
-                }
-
-                var currentTransactions = chargingStation.TransactionEvents is not null ? chargingStation.TransactionEvents
+            var currentTransactions = chargingStation.TransactionEvents is not null
+                ? chargingStation.TransactionEvents
                     .Where(t => t.TransactionId == request.TransactionInfo.TransactionId)
-                    .OrderBy(t => t.SeqNo).ToArray() : [];
+                    .OrderBy(t => t.SeqNo).ToArray()
+                : [];
 
-                var validationFailure = ValidateTransactionEvent(request, currentTransactions, response, call, clientIdentifier);
-                if (validationFailure is not null)
+            var validationFailure =
+                ValidateTransactionEvent(request, currentTransactions, response, call, clientIdentifier);
+            if (validationFailure is not null)
+            {
+                return validationFailure;
+            }
+            else
+            {
+                var consumption = GetTransactionConsumption(request);
+
+                transaction.RegisterValue = Convert.ToDecimal(consumption?.Consumption ?? 0.0);
+                transaction.PhaseOneValue = GetPhaseConsumption(consumption?.PhaseConsumption, 0);
+                transaction.PhaseTwoValue = GetPhaseConsumption(consumption?.PhaseConsumption, 1);
+                transaction.PhaseThreeValue = GetPhaseConsumption(consumption?.PhaseConsumption, 2);
+
+                transaction.ConsumptionType = (ConsumptionTypeDb?)consumption?.ConsumptionType;
+
+                transaction = await unitOfWork.TransactionSubUnit.RegisterTransaction(transaction, context.IdToken);
+
+                if (request.EventType == TransactionEventEnum.Ended)
                 {
-                    return validationFailure;
-                }
-                else
-                {
-                    var consumption = GetTransactionConsumption(request);
-
-                    transaction.RegisterValue = Convert.ToDecimal(consumption?.Consumption ?? 0.0);
-                    transaction.PhaseOneValue = GetPhaseConsumption(consumption?.PhaseConsumption, 0);
-                    transaction.PhaseTwoValue = GetPhaseConsumption(consumption?.PhaseConsumption, 1);
-                    transaction.PhaseThreeValue = GetPhaseConsumption(consumption?.PhaseConsumption, 2);
-                    
-                    transaction.ConsumptionType = (ConsumptionTypeDb?)consumption?.ConsumptionType;
-
-                    transaction = await unitOfWork.TransactionSubUnit.RegisterTransaction(transaction, context.IdToken);
-
-                    if (request.EventType == TransactionEventEnum.Ended)
+                    // first check for sanity
+                    if (currentTransactions.LastOrDefault()?.SeqNo > request.SeqNo)
                     {
-                        // first check for sanity
-                        if (currentTransactions.LastOrDefault()?.SeqNo > request.SeqNo)
+                        // the END event cannot have a smaller SeqNo than the rest of them
+                        await unitOfWork.Discard();
+                        return new RpcResult()
                         {
-                            // the END event cannot have a smaller SeqNo than the rest of them
-                            await unitOfWork.Discard();
-                            return new RpcResult()
-                            {
-                                Error = call.CreateErrorResult<TransactionEventResponse>(OcppCallError.ErrorCodes.OccurrenceConstraintViolation, $"Transaction {request.TransactionInfo.TransactionId} with EventType='Ended' must have greatest SeqNo than its previous siblings.")
-                            };
+                            Error = call.CreateErrorResult<TransactionEventResponse>(
+                                OcppCallError.ErrorCodes.OccurrenceConstraintViolation,
+                                $"Transaction {request.TransactionInfo.TransactionId} with EventType='Ended' must have greatest SeqNo than its previous siblings.")
+                        };
+                    }
+
+                    // do we need to keep a coherent snapshot after each tx event?
+                    if (currentTransactions.Length > 0)
+                    {
+                        var firstTransaction = currentTransactions.FirstOrDefault(tx =>
+                            tx.EventType == TransactionEventEnum.Started.ToString());
+                        if (firstTransaction is null)
+                        {
+                            _logger.LogWarning(
+                                $"Partially finalizing tx snapshot for {request.TransactionInfo.TransactionId}: No 'Started' event was found.");
                         }
 
-                        // do we need to keep a coherent snapshot after each tx event?
-                        if (currentTransactions.Length > 0)
+                        await unitOfWork.TransactionSubUnit.FinalizeSnapshot(firstTransaction, transaction,
+                            consumption);
+                    }
+
+                    var unitName = await unitOfWork.TransactionSubUnit.GetTransactionUnit(transaction.TransactionId);
+
+                    response.TotalCost = tariffService.CalculateTotalCosts(consumption?.Consumption ?? 0.0f,
+                        chargingStation, unitName ?? "UNKNOWN");
+
+                    if (request.IdToken?.Type == IdTokenType.Central)
+                    {
+                        if (idTokenService.RemoveTemporaryToken(chargingStation, request.IdToken))
                         {
-                            var firstTransaction = currentTransactions.FirstOrDefault(tx => tx.EventType == TransactionEventEnum.Started.ToString());
-                            if (firstTransaction is null)
-                            {
-                                _logger.LogWarning($"Partially finalizing tx snapshot for {request.TransactionInfo.TransactionId}: No 'Started' event was found.");
-                            }
-                            await unitOfWork.TransactionSubUnit.FinalizeSnapshot(firstTransaction, transaction, consumption);
+                            _logger.LogInformation(
+                                $"{clientIdentifier}: Removed temporary token {request.IdToken.Token} because transaction is done.");
                         }
-
-                        var unitName = await unitOfWork.TransactionSubUnit.GetTransactionUnit(transaction.TransactionId);
-
-                        response.TotalCost = tariffService.CalculateTotalCosts(consumption?.Consumption ?? 0.0f, chargingStation, unitName ?? "UNKNOWN");
-
-                        if (request.IdToken?.Type == IdTokenType.Central)
+                        else
                         {
-                            if (idTokenService.RemoveTemporaryToken(chargingStation, request.IdToken))
+                            _logger.LogWarning(
+                                $"{clientIdentifier}: Temp token {request.IdToken.Token} couldn't be removed.");
+                        }
+                    }
+
+                    if (idToken is null)
+                    {
+                        // try to find the active id token for this session
+                        var tokenQuery = await unitOfWork.IdTokenRepository
+                            .Filter(t => t.ChargingStationId == chargingStation.Id)
+                            .ConfigureAwait(false);
+
+                        var token = tokenQuery.FirstOrDefault();
+                        if (token is not null)
+                        {
+                            if (token.IsUnderTx)
                             {
-                                _logger.LogInformation($"{clientIdentifier}: Removed temporary token {request.IdToken.Token} because transaction is done.");
+                                idToken = token;
                             }
                             else
                             {
-                                _logger.LogWarning($"{clientIdentifier}: Temp token {request.IdToken.Token} couldn't be removed.");
+                                _logger.LogError("Found token={token} for related to tx={tx} under ci={ci}, however it is not marked as under transaction.",
+                                    token.Token, transaction.Id, chargingStation.ClientIdentifier);
                             }
                         }
-
-                        if (idToken is not null)
+                        else
                         {
-                            await unitOfWork.ReleaseToken(idToken);
-                            _logger.LogInformation($"Released token {idToken.Token}");
+                            _logger.LogWarning("Cannot find active token for ci={ci} under tx={tx}",
+                                chargingStation.ClientIdentifier, transaction.Id);
                         }
                     }
-
-                    switch (request.EventType)
+                    
+                    // TODO: ew refactor maybe?
+                    if (idToken is not null)
                     {
-                        case TransactionEventEnum.Started:
-                            _logger.LogInformation($"{clientIdentifier} started a new transaction. Reason: {request.TriggerReason}");
-                            break;
-                        case TransactionEventEnum.Ended:
-                            _logger.LogInformation($"{clientIdentifier} ended transaction with id {request.TransactionInfo.TransactionId}");
-                            break;
+                        await unitOfWork.ReleaseToken(idToken);
+                        _logger.LogInformation("Released token for tx={tx} ci={ci}",
+                            transaction.Id, chargingStation.ClientIdentifier);
                     }
-
-                    await unitOfWork.Save();
-
-                    return new RpcResult()
-                    {
-                        Result = call.CreateResult(response),
-                        ReturnToCS = true
-                    };
                 }
+
+                switch (request.EventType)
+                {
+                    case TransactionEventEnum.Started:
+                        _logger.LogInformation(
+                            $"{clientIdentifier} started a new transaction. Reason: {request.TriggerReason}");
+                        break;
+                    case TransactionEventEnum.Ended:
+                        _logger.LogInformation(
+                            $"{clientIdentifier} ended transaction with id {request.TransactionInfo.TransactionId} Total Cost: {response.TotalCost}");
+                        break;
+                }
+
+                await unitOfWork.Save();
+
+                return new RpcResult()
+                {
+                    Result = call.CreateResult(response),
+                    ReturnToCS = true
+                };
+            }
         }
     }
 
-    private async Task<string> PerformAuthorization(DbChargingStation cs, TransactionEventRequest request, AuthorizationContext context)
+    private async Task<string> PerformAuthorization(DbChargingStation cs, TransactionEventRequest request,
+        AuthorizationContext context)
     {
         var status = await authFactory.RunAuthorization(request.IdToken, context);
 
         if (status == AuthorizeStatus.Accepted)
         {
             status = request.EventType == TransactionEventEnum.Started &&
-                context.IdToken is not null &&
-                context.IdToken.IsUnderTx ?
-                AuthorizeStatus.ConcurrentTx :
-                AuthorizeStatus.Accepted;
+                     context.IdToken is not null &&
+                     context.IdToken.IsUnderTx
+                ? AuthorizeStatus.ConcurrentTx
+                : AuthorizeStatus.Accepted;
         }
 
         return status;
@@ -192,8 +244,9 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
 
     private DbTransaction MapOcppTransaction(DbChargingStation cs, TransactionEventRequest request, IdTokenDb? idToken)
     {
-        var unitName = request.MeterValue?.SelectMany(c => c.SampledValue).FirstOrDefault(s => s.Measurand == MeasurandEnum.EnergyActiveImportRegister ||
-                                                                                                s.Measurand == MeasurandEnum.EnergyActiveImportInterval)?.UnitOfMeasure?.Unit ?? "UNKNOWN";
+        var unitName = request.MeterValue?.SelectMany(c => c.SampledValue).FirstOrDefault(s =>
+            s.Measurand == MeasurandEnum.EnergyActiveImportRegister ||
+            s.Measurand == MeasurandEnum.EnergyActiveImportInterval)?.UnitOfMeasure?.Unit ?? "UNKNOWN";
 
         return new DbTransaction()
         {
@@ -219,7 +272,8 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
     {
         if (currentTransactions.Any(c => c.SeqNo == request.SeqNo))
         {
-            _logger.LogWarning($"{clientIdentifier}: Transaction {request.TransactionInfo.TransactionId} trying to send a duplicate of an old SeqNo={request.SeqNo}");
+            _logger.LogWarning(
+                $"{clientIdentifier}: Transaction {request.TransactionInfo.TransactionId} trying to send a duplicate of an old SeqNo={request.SeqNo}");
 
             return new RpcResult()
             {
@@ -227,12 +281,16 @@ public sealed class TransactionEventAction(ILogger<TransactionEventAction> _logg
             };
         }
 
-        if (currentTransactions.Any(c => c.EventType != nameof(TransactionEventEnum.Updated) && c.EventType == Enum.GetName(request.EventType)))
+        if (currentTransactions.Any(c =>
+                c.EventType != nameof(TransactionEventEnum.Updated) && c.EventType == Enum.GetName(request.EventType)))
         {
-            _logger.LogWarning($"{clientIdentifier}: Transaction {request.TransactionInfo.TransactionId} is trying to send a duplicate event of type EventType='{Enum.GetName(request.EventType) ?? "<UNKNOWN>"}'.");
+            _logger.LogWarning(
+                $"{clientIdentifier}: Transaction {request.TransactionInfo.TransactionId} is trying to send a duplicate event of type EventType='{Enum.GetName(request.EventType) ?? "<UNKNOWN>"}'.");
             return new RpcResult()
             {
-                Error = call.CreateErrorResult<TransactionEventResponse>(OcppCallError.ErrorCodes.OccurrenceConstraintViolation, $"Duplicate EventType='{Enum.GetName(request.EventType) ?? "<UNKNOWN>"}' is not allowed.")
+                Error = call.CreateErrorResult<TransactionEventResponse>(
+                    OcppCallError.ErrorCodes.OccurrenceConstraintViolation,
+                    $"Duplicate EventType='{Enum.GetName(request.EventType) ?? "<UNKNOWN>"}' is not allowed.")
             };
         }
 

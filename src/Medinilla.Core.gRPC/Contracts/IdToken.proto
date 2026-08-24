@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+option csharp_namespace = "Medinilla.Core.gRPC.Contracts";
+
+package medinilla.core.grpc;
+
+message AdditionalTokenInfo {
+    string additional_id_token = 1;
+    string type = 2;
+}
+
+message IdToken {
+    string token = 1;
+    string type = 2;
+    AdditionalTokenInfo additional_info = 3;
+}
