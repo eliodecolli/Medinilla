@@ -19,6 +19,8 @@ Currently implemented OCPP messages:
 - Set Variables
 - Get Variables
 - Get Base Report
+- Request Start Transaction
+- Request Stop Transaction
 
 For the full per-message and per-use-case coverage breakdown see [`docs/ocpp-coverage.md`](docs/ocpp-coverage.md).
 
