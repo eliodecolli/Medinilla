@@ -251,7 +251,8 @@ BEGIN
 
                 INSERT INTO public.core_transactions_event (
                     "Id", "ChargingStationId", "IdTokenId", "TransactionId", "SeqNo",
-                    "EVSEId", "Timestamp", "Offline", "TotalConsuption",
+                    "EVSEId", "Timestamp", "Offline", "RegisterValue",
+                    "PhaseOneValue", "PhaseTwoValue", "PhaseThreeValue",
                     "ConsumptionType", "UnitName", "TriggerReason", "EventType"
                 )
                 VALUES (
@@ -264,6 +265,9 @@ BEGIN
                     started_at + (random() * (ended_at - started_at)),
                     random() > 0.8,
                     (random() * metered_value)::numeric(10,3),
+                    (random() * metered_value / 3)::numeric(10,3),
+                    (random() * metered_value / 3)::numeric(10,3),
+                    (random() * metered_value / 3)::numeric(10,3),
                     consumption_pick,
                     'kWh',
                     trigger_pick,
@@ -440,7 +444,8 @@ BEGIN
 
                     INSERT INTO public.core_transactions_event (
                         "Id", "ChargingStationId", "IdTokenId", "TransactionId", "SeqNo",
-                        "EVSEId", "Timestamp", "Offline", "TotalConsuption",
+                        "EVSEId", "Timestamp", "Offline", "RegisterValue",
+                        "PhaseOneValue", "PhaseTwoValue", "PhaseThreeValue",
                         "ConsumptionType", "UnitName", "TriggerReason", "EventType"
                     )
                     VALUES (
@@ -453,6 +458,9 @@ BEGIN
                         started_at + (random() * (ended_at - started_at)),
                         random() > 0.85,
                         (random() * metered_value)::numeric(10,3),
+                        (random() * metered_value / 3)::numeric(10,3),
+                        (random() * metered_value / 3)::numeric(10,3),
+                        (random() * metered_value / 3)::numeric(10,3),
                         consumption_pick,
                         'kWh',
                         trigger_pick,

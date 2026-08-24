@@ -23,4 +23,8 @@ public static class OcppActionNames
     public const string Reset = "Reset";
 
     public const string NotifyReport = "NotifyReport";
+
+    public const string RequestStartTransaction = "RequestStartTransaction";
+
+    public const string RequestStopTransaction = "RequestStopTransaction";
 }

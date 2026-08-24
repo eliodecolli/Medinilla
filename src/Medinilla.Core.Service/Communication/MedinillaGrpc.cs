@@ -48,10 +48,7 @@ internal sealed class MedinillaGrpc(ILogger<MedinillaGrpc> log, IServiceProvider
             var payload = MedinillaMapping.MapSetVariables(request);
 
             var ocppRequest = new OcppCallRequest(messageId, OcppActionNames.SetVariables, OcppPayloadSerializer.SerializePayload(payload));
-            using var scope = serviceProvider.CreateScope();
-            var router = scope.ServiceProvider.GetRequiredService<IOcppCallRouter>();
-
-            await router.SubmitAsync(request.ClientIdentifier, ocppRequest);
+            await SubmitAsync(request.ClientIdentifier, ocppRequest);
             return new SetVariablesResponse()
             {
                 Error = new Error()
@@ -94,10 +91,7 @@ internal sealed class MedinillaGrpc(ILogger<MedinillaGrpc> log, IServiceProvider
             var payload = MedinillaMapping.MapGetVariables(request);
 
             var ocppRequest = new OcppCallRequest(messageId, OcppActionNames.GetVariables, OcppPayloadSerializer.SerializePayload(payload));
-            using var scope = serviceProvider.CreateScope();
-            var router = scope.ServiceProvider.GetRequiredService<IOcppCallRouter>();
-
-            await router.SubmitAsync(request.ClientIdentifier, ocppRequest);
+            await SubmitAsync(request.ClientIdentifier, ocppRequest);
             return new GetVariablesResponse()
             {
                 Error = new Error()
@@ -140,10 +134,7 @@ internal sealed class MedinillaGrpc(ILogger<MedinillaGrpc> log, IServiceProvider
             var payload = MedinillaMapping.MapGetBaseReport(request);
 
             var ocppRequest = new OcppCallRequest(messageId, OcppActionNames.GetBaseReport, OcppPayloadSerializer.SerializePayload(payload));
-            using var scope = serviceProvider.CreateScope();
-            var router = scope.ServiceProvider.GetRequiredService<IOcppCallRouter>();
-
-            await router.SubmitAsync(request.ClientIdentifier, ocppRequest);
+            await SubmitAsync(request.ClientIdentifier, ocppRequest);
             return new GetBaseReportResponse()
             {
                 Error = new Error()
@@ -186,10 +177,7 @@ internal sealed class MedinillaGrpc(ILogger<MedinillaGrpc> log, IServiceProvider
             var payload = MedinillaMapping.MapReset(request);
 
             var ocppRequest = new OcppCallRequest(messageId, OcppActionNames.Reset, OcppPayloadSerializer.SerializePayload(payload));
-            using var scope = serviceProvider.CreateScope();
-            var router = scope.ServiceProvider.GetRequiredService<IOcppCallRouter>();
-
-            await router.SubmitAsync(request.ClientIdentifier, ocppRequest);
+            await SubmitAsync(request.ClientIdentifier, ocppRequest);
             return new ResetResponse()
             {
                 Error = new Error()
@@ -219,6 +207,92 @@ internal sealed class MedinillaGrpc(ILogger<MedinillaGrpc> log, IServiceProvider
         }
     }
 
+    public override async Task<RequestStartTransactionResponse> RequestStartTransaction(RequestStartTransactionRequest request, ServerCallContext context)
+    {
+        try
+        {
+            var messageId = Guid.NewGuid().ToString();
+            log.LogInformation("Request: {an} msgId={mi} ci={ci}",
+                OcppActionNames.RequestStartTransaction,
+                messageId,
+                request.ClientIdentifier);
+
+            var payload = MedinillaMapping.MapRequestStartTransaction(request);
+
+            var ocppRequest = new OcppCallRequest(messageId, OcppActionNames.RequestStartTransaction, OcppPayloadSerializer.SerializePayload(payload));
+            await SubmitAsync(request.ClientIdentifier, ocppRequest);
+            return new RequestStartTransactionResponse()
+            {
+                Error = new Error()
+                {
+                    HasError = false,
+                }
+            };
+        }
+        catch (ChargerNotConnectedException e)
+        {
+            return new RequestStartTransactionResponse()
+            {
+                Error = NotConnectedError(e, OcppActionNames.RequestStartTransaction)
+            };
+        }
+        catch (Exception e)
+        {
+            log.LogError("{ci}: {an}: Error: {msg}", request.ClientIdentifier, OcppActionNames.RequestStartTransaction, e.Message);
+            return new RequestStartTransactionResponse()
+            {
+                Error = new Error()
+                {
+                    HasError = true,
+                    Message = e.Message,
+                }
+            };
+        }
+    }
+
+    public override async Task<RequestStopTransactionResponse> RequestStopTransaction(RequestStopTransactionRequest request, ServerCallContext context)
+    {
+        try
+        {
+            var messageId = Guid.NewGuid().ToString();
+            log.LogInformation("Request: {an} msgId={mi} ci={ci}",
+                OcppActionNames.RequestStopTransaction,
+                messageId,
+                request.ClientIdentifier);
+
+            var payload = MedinillaMapping.MapRequestStopTransaction(request);
+
+            var ocppRequest = new OcppCallRequest(messageId, OcppActionNames.RequestStopTransaction, OcppPayloadSerializer.SerializePayload(payload));
+            await SubmitAsync(request.ClientIdentifier, ocppRequest);
+            return new RequestStopTransactionResponse()
+            {
+                Error = new Error()
+                {
+                    HasError = false,
+                }
+            };
+        }
+        catch (ChargerNotConnectedException e)
+        {
+            return new RequestStopTransactionResponse()
+            {
+                Error = NotConnectedError(e, OcppActionNames.RequestStopTransaction)
+            };
+        }
+        catch (Exception e)
+        {
+            log.LogError("{ci}: {an}: Error: {msg}", request.ClientIdentifier, OcppActionNames.RequestStopTransaction, e.Message);
+            return new RequestStopTransactionResponse()
+            {
+                Error = new Error()
+                {
+                    HasError = true,
+                    Message = e.Message,
+                }
+            };
+        }
+    }
+
     public override async Task<FetchExecutedCommandsResponse> FetchExecutedCommands(FetchExecutedCommandsRequest request, ServerCallContext context)
     {
         using var scope = serviceProvider.CreateScope();
@@ -235,5 +309,12 @@ internal sealed class MedinillaGrpc(ILogger<MedinillaGrpc> log, IServiceProvider
         }));
 
         return retval;
+    }
+
+    private async Task SubmitAsync(string clientIdentifier, OcppCallRequest request)
+    {
+        using var scope = serviceProvider.CreateScope();
+        var router = scope.ServiceProvider.GetRequiredService<IOcppCallRouter>();
+        await router.SubmitAsync(clientIdentifier, request);
     }
 }

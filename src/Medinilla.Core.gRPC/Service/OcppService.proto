@@ -11,6 +11,8 @@ service OcppService {
     rpc GetVariables (GetVariablesRequest) returns (GetVariablesResponse) {}
     rpc GetBaseReport (GetBaseReportRequest) returns (GetBaseReportResponse) {}
     rpc Reset (ResetRequest) returns (ResetResponse) {}
+    rpc RequestStartTransaction (RequestStartTransactionRequest) returns (RequestStartTransactionResponse) {}
+    rpc RequestStopTransaction (RequestStopTransactionRequest) returns (RequestStopTransactionResponse) {}
 
     rpc FetchExecutedCommands (FetchExecutedCommandsRequest) returns (FetchExecutedCommandsResponse) {}
 }
