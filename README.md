@@ -22,7 +22,7 @@ Currently implemented OCPP messages:
 - Request Start Transaction
 - Request Stop Transaction
 
-For the full per-message and per-use-case coverage breakdown see [`docs/ocpp-coverage.md`](docs/ocpp-coverage.md).
+For a rough per-message and per-use-case coverage breakdown see [`docs/ocpp-coverage.md`](docs/ocpp-coverage.md).
 
 ## Medinilla - Architecture
 The most fundamental idea behind the architectural decisions on this project was scalability, and fault tolerance.
