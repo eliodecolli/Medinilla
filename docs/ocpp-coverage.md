@@ -1,5 +1,9 @@
 # OCPP 2.0.1 Coverage
 
+**NOTE**: This document is AI-generated based on a cross-reference between the actual source code and the official OCPP 2.0.1 documentation. While it aims to be as precise as possible, the main purpose of this is to keep track of currently touched features.
+
+---
+
 Medinilla is a CSMS. **Actions** are messages received from the charger
 (`src/Medillina.Core/Actions/Ocpp201/`); **Commands** are messages sent to the
 charger (`src/Medillina.Core/Commands/Ocpp201/`).
