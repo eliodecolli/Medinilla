@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+option csharp_namespace = "Medinilla.Core.gRPC.Service";
+
+import "Contracts/ocpp/CommandExecution.proto";
+
+package medinilla.core.grpc;
+
+message FetchExecutedCommandsRequest {
+    string client_identifier = 1;
+}
+
+message FetchExecutedCommandsResponse {
+    repeated CommandExecution executions = 1;
+}

@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+option csharp_namespace = "Medinilla.Core.gRPC.Service";
+
+import "Service/ocpp/Error.proto";
+
+package medinilla.core.grpc;
+
+message RequestStopTransactionRequest {
+    string client_identifier = 1;
+    string transaction_id = 2;
+}
+
+message RequestStopTransactionResponse {
+    Error error = 1;
+}

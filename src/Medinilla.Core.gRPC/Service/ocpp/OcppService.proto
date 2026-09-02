@@ -2,7 +2,13 @@ syntax = "proto3";
 
 option csharp_namespace = "Medinilla.Core.gRPC.Service";
 
-import "Service/Types.proto";
+import "Service/ocpp/SetVariablesAPI.proto";
+import "Service/ocpp/GetVariablesAPI.proto";
+import "Service/ocpp/GetBaseReportAPI.proto";
+import "Service/ocpp/ResetAPI.proto";
+import "Service/ocpp/RequestStartTransactionAPI.proto";
+import "Service/ocpp/RequestStopTransactionAPI.proto";
+import "Service/ocpp/FetchExecutedCommandsAPI.proto";
 
 package medinilla.core.grpc;
 

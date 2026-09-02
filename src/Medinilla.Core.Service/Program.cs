@@ -36,6 +36,7 @@ builder.Services.AddWebSocketRoutingTable();
 builder.Services.AddSingleton(CommunicationSettings.FromSettingsFile("settings.json"));
 builder.Services.AddScoped<IOcppRequestDispatcher, OcppRequestDispatcher>();
 builder.Services.AddSingleton<MedinillaGrpc>();
+builder.Services.AddSingleton<MedinillaQueryGrpc>();
 builder.Services.AddScoped<BaseOcppRoutingTable, RedisRoutingTable>();
 builder.Services.AddSingleton<IInterfaceCommunication, CoreInterfaceCommunication>();
 
@@ -46,5 +47,6 @@ builder.Services.AddGrpc();
 var app = builder.Build();
 
 app.MapGrpcService<MedinillaGrpc>();
+app.MapGrpcService<MedinillaQueryGrpc>();
 
 await app.RunAsync();

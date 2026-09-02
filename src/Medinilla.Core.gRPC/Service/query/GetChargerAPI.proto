@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+option csharp_namespace = "Medinilla.Core.gRPC.Query";
+
+import "Contracts/query/Charger.proto";
+
+package medinilla.core.grpc.query;
+
+message GetChargerRequest {
+    string client_identifier = 1;
+}
+
+message GetChargerResponse {
+    Charger charger = 1;
+}

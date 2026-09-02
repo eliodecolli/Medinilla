@@ -38,14 +38,21 @@ the messages they need.
 
 | Use case | Message(s) | Status |
 |---|---|---|
-| B11 - Reset - Without Ongoing Transaction | Reset | **Missing** |
-| B12 - Reset - With Ongoing Transaction | Reset | **Missing** |
+| B11 - Reset - Without Ongoing Transaction | Reset | Implemented |
+| B12 - Reset - With Ongoing Transaction | Reset | Implemented |
 
 ### Authorization Options (one of C01, C02, C04)
 
 | Use case | Message(s) | Status |
 |---|---|---|
 | C01 - EV Driver Authorization using RFID | Authorize | Implemented |
+
+### Remote Control
+
+| Use case | Message(s) | Status |
+|---|---|---|
+| F01 - Request Start Transaction | RequestStartTransaction | Implemented |
+| F02 - Request Stop Transaction | RequestStopTransaction | Implemented |
 
 ### Transaction Mechanism
 
@@ -88,11 +95,13 @@ the messages they need.
 | P01 - Data Transfer to the Charging Station | DataTransfer | **Missing** |
 | P02 - Data Transfer to the CSMS | DataTransfer | **Missing** |
 
-**Base compliance result: 15 of 17 use case groups covered.** The missing
-ones are B11/B12 (Reset), G03/G04 (ChangeAvailability), N07 (Alert Event), and
-P01/P02 (Data Transfer).
+**Base compliance result: 16 of 17 use case groups covered.** The missing
+ones are G03/G04 (ChangeAvailability), N07 (Alert Event), and P01/P02
+(Data Transfer).
 
-Extra messages implemented beyond the base: Heartbeat (G02), SecurityEventNotification (A04).
+Extra messages implemented beyond the base: Heartbeat (G02),
+SecurityEventNotification (A04), RequestStartTransaction (F01),
+RequestStopTransaction (F02).
 
 ## Functional blocks
 
@@ -103,7 +112,7 @@ Extra messages implemented beyond the base: Heartbeat (G02), SecurityEventNotifi
 | C. Authorization | C01–C16 | **Partial** — Authorize (C01) only |
 | D. LocalAuthorizationList Management | D01–D02 | **None** |
 | E. Transactions | E01–E15 | **Partial** — TransactionEvent (E01–E13) |
-| F. RemoteControl | F01–F06 | **None** |
+| F. RemoteControl | F01–F06 | **Partial** — RequestStartTransaction (F01), RequestStopTransaction (F02) |
 | G. Availability | G01–G05 | **Partial** — Heartbeat (G02), StatusNotification (G01, G05) |
 | H. Reservation | H01–H04 | **None** |
 | I. TariffAndCost | I01–I06 | **None** |
@@ -115,7 +124,7 @@ Extra messages implemented beyond the base: Heartbeat (G02), SecurityEventNotifi
 | O. DisplayMessage | O01–O06 | **None** |
 | P. DataTransfer | P01–P02 | **None** |
 
-**5 of 16 blocks are partial. 11 of 16 are not started.** None are complete.
+**6 of 16 blocks are partial. 10 of 16 are not started.** None are complete.
 
 ## Charger → CSMS (Actions)
 
@@ -173,10 +182,10 @@ Extra messages implemented beyond the base: Heartbeat (G02), SecurityEventNotifi
 | 25 | GetVariables | B. Provisioning | p. 366 | Implemented |
 | 26 | InstallCertificate | M. ISO 15118 CertMgmt | p. 366 | Missing |
 | 27 | PublishFirmware | L. FirmwareManagement | p. 371 | Missing |
-| 28 | RequestStartTransaction | F. RemoteControl | p. 373 | Missing |
-| 29 | RequestStopTransaction | F. RemoteControl | p. 373 | Missing |
+| 28 | RequestStartTransaction | F. RemoteControl | p. 373 | Implemented |
+| 29 | RequestStopTransaction | F. RemoteControl | p. 373 | Implemented |
 | 30 | ReserveNow | H. Reservation | p. 374 | Missing |
-| 31 | Reset | B. Provisioning | p. 375 | Missing |
+| 31 | Reset | B. Provisioning | p. 375 | Implemented |
 | 32 | SendLocalList | D. LocalAuthList Mgmt | p. 375 | Missing |
 | 33 | SetChargingProfile | K. SmartCharging | p. 376 | Missing |
 | 34 | SetDisplayMessage | O. DisplayMessage | p. 377 | Missing |
@@ -196,5 +205,5 @@ Extra messages implemented beyond the base: Heartbeat (G02), SecurityEventNotifi
 | Bucket | Total | Implemented | Missing |
 |---|---|---|---|
 | Charger → CSMS (Actions) | 20 | 7 | 13 |
-| CSMS → Charger (Commands) | 44 | 3 | 41 |
-| **Overall** | **64** | **10** | **54** |
+| CSMS → Charger (Commands) | 44 | 6 | 38 |
+| **Overall** | **64** | **13** | **51** |

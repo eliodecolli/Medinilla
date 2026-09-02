@@ -2,6 +2,7 @@
 using Medinilla.DataAccess.Interfaces;
 using Medinilla.DataAccess.Relational.Models;
 using Medinilla.DataAccess.Relational.Models.Authorization;
+using Microsoft.EntityFrameworkCore;
 
 namespace Medinilla.DataAccess.Relational.UnitOfWork;
 
@@ -37,6 +38,29 @@ public sealed class ChargingStationUnitOfWork(MedinillaOcppDbContext context) : 
     {
         var result = await repository.Filter(c => c.ClientIdentifier == id);
         return result.FirstOrDefault();
+    }
+
+    public async Task<ChargingStation?> GetByClientIdentifierWithConnectors(string clientIdentifier)
+    {
+        return await context.Set<ChargingStation>()
+            .Include(c => c.EvseConnectors)
+            .FirstOrDefaultAsync(c => c.ClientIdentifier == clientIdentifier);
+    }
+
+    public async Task<IReadOnlyList<ChargingStation>> ListPaged(int offset, int limit)
+    {
+        const int defaultLimit = 50;
+        const int maxLimit = 200;
+
+        var safeOffset = Math.Max(offset, 0);
+        var safeLimit = limit <= 0 ? defaultLimit : Math.Min(limit, maxLimit);
+
+        return await context.Set<ChargingStation>()
+            .Include(c => c.EvseConnectors)
+            .OrderBy(c => c.ClientIdentifier)
+            .Skip(safeOffset)
+            .Take(safeLimit)
+            .ToListAsync();
     }
 
     public async Task<IEnumerable<ChargingStation>> GetChargingStations(string accountId)

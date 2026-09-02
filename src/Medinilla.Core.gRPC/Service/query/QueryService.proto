@@ -1,0 +1,15 @@
+syntax = "proto3";
+
+option csharp_namespace = "Medinilla.Core.gRPC.Query";
+
+import "Service/query/GetChargerAPI.proto";
+import "Service/query/ListChargersAPI.proto";
+import "Service/query/ListTransactionSnapshotsAPI.proto";
+
+package medinilla.core.grpc.query;
+
+service QueryService {
+    rpc GetCharger (GetChargerRequest) returns (GetChargerResponse) {}
+    rpc ListChargers (ListChargersRequest) returns (ListChargersResponse) {}
+    rpc ListTransactionSnapshots (ListTransactionSnapshotsRequest) returns (ListTransactionSnapshotsResponse) {}
+}

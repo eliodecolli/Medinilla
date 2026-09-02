@@ -7,14 +7,28 @@
   </PropertyGroup>
 
   <ItemGroup>
-    <Protobuf Include="Contracts\ChargingStation.proto" />
-    <Protobuf Include="Contracts\UserSetVariablesRequest.proto" />
-    <Protobuf Include="Contracts\UserGetVariablesRequest.proto" />
-    <Protobuf Include="Contracts\CommandExecution.proto" />
-    <Protobuf Include="Contracts\ResetType.proto" />
-    <Protobuf Include="Contracts\IdToken.proto" />
-    <Protobuf Include="Service\Types.proto" />
-    <Protobuf Include="Service\OcppService.proto" />
+    <Protobuf Include="Contracts\ocpp\ChargingStation.proto" />
+    <Protobuf Include="Contracts\ocpp\CommandExecution.proto" />
+    <Protobuf Include="Contracts\ocpp\IdToken.proto" />
+    <Protobuf Include="Contracts\ocpp\ResetType.proto" />
+    <Protobuf Include="Contracts\ocpp\UserSetVariablesRequest.proto" />
+    <Protobuf Include="Contracts\ocpp\UserGetVariablesRequest.proto" />
+    <Protobuf Include="Contracts\query\Charger.proto" />
+    <Protobuf Include="Contracts\query\Connector.proto" />
+    <Protobuf Include="Contracts\query\TransactionSnapshot.proto" />
+    <Protobuf Include="Service\ocpp\Error.proto" />
+    <Protobuf Include="Service\ocpp\SetVariablesAPI.proto" />
+    <Protobuf Include="Service\ocpp\GetVariablesAPI.proto" />
+    <Protobuf Include="Service\ocpp\GetBaseReportAPI.proto" />
+    <Protobuf Include="Service\ocpp\ResetAPI.proto" />
+    <Protobuf Include="Service\ocpp\RequestStartTransactionAPI.proto" />
+    <Protobuf Include="Service\ocpp\RequestStopTransactionAPI.proto" />
+    <Protobuf Include="Service\ocpp\FetchExecutedCommandsAPI.proto" />
+    <Protobuf Include="Service\ocpp\OcppService.proto" />
+    <Protobuf Include="Service\query\GetChargerAPI.proto" />
+    <Protobuf Include="Service\query\ListChargersAPI.proto" />
+    <Protobuf Include="Service\query\ListTransactionSnapshotsAPI.proto" />
+    <Protobuf Include="Service\query\QueryService.proto" />
   </ItemGroup>
 
   <ItemGroup>

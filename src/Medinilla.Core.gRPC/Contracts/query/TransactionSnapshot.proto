@@ -1,0 +1,21 @@
+syntax = "proto3";
+
+option csharp_namespace = "Medinilla.Core.gRPC.Query";
+
+import "google/protobuf/timestamp.proto";
+
+package medinilla.core.grpc.query;
+
+message TransactionSnapshot {
+    string transaction_id = 1;
+    string client_identifier = 2;
+    int32 evse_id = 3;
+    int32 connector_id = 4;
+    string id_token = 5;
+    string start_reason = 6;
+    string end_reason = 7;
+    double total_metered_value = 8;
+    double total_cost = 9;
+    google.protobuf.Timestamp started_at = 10;
+    google.protobuf.Timestamp ended_at = 11;
+}

@@ -1,0 +1,22 @@
+syntax = "proto3";
+
+option csharp_namespace = "Medinilla.Core.gRPC.Query";
+
+import "Contracts/query/Connector.proto";
+import "google/protobuf/timestamp.proto";
+
+package medinilla.core.grpc.query;
+
+message Charger {
+    string client_identifier = 1;
+    string vendor = 2;
+    string model = 3;
+    bool booted = 4;
+    string latest_boot_notification_reason = 5;
+    google.protobuf.Timestamp created_at = 6;
+    google.protobuf.Timestamp modified_at = 7;
+    string account_id = 8;
+    string alias = 9;
+    string location = 10;
+    repeated Connector connectors = 11;
+}

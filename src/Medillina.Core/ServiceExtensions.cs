@@ -62,6 +62,8 @@ public static class ServiceExtensions
         serviceCollection.AddScoped<ITariffService, TariffService>();
         serviceCollection.AddScoped<ICommandExecutionService, CommandExecutionService>();
         serviceCollection.AddScoped<IChargerConfigService, ChargerConfigService>();
+        serviceCollection.AddScoped<IChargerQueryService, ChargerQueryService>();
+        serviceCollection.AddScoped<ITransactionQueryService, TransactionQueryService>();
 
         serviceCollection.AddScoped<IOcppActionsFactory, OcppActionsFactory>();
         serviceCollection.AddScoped<IOcppChargerCommandFactory, OcppChargerCommandsFactory>();
