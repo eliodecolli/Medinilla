@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+option csharp_namespace = "Medinilla.Core.gRPC.Service";
+
+import "Service/ocpp/Error.proto";
+
+package medinilla.core.grpc;
+
+message GetBaseReportRequest {
+    string client_identifier = 1;
+    string report_base = 2;
+}
+
+message GetBaseReportResponse {
+    Error error = 1;
+}

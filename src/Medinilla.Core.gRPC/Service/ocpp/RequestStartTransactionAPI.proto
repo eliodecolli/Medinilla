@@ -1,0 +1,20 @@
+syntax = "proto3";
+
+option csharp_namespace = "Medinilla.Core.gRPC.Service";
+
+import "Contracts/ocpp/IdToken.proto";
+import "Service/ocpp/Error.proto";
+
+package medinilla.core.grpc;
+
+message RequestStartTransactionRequest {
+    string client_identifier = 1;
+    optional int32 evse_id = 2;
+    IdToken id_token = 3;
+    optional IdToken group_id_token = 4;
+    int32 remote_start_id = 5;
+}
+
+message RequestStartTransactionResponse {
+    Error error = 1;
+}

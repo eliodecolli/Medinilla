@@ -1,0 +1,18 @@
+syntax = "proto3";
+
+option csharp_namespace = "Medinilla.Core.gRPC.Service";
+
+import "Contracts/ocpp/ResetType.proto";
+import "Service/ocpp/Error.proto";
+
+package medinilla.core.grpc;
+
+message ResetRequest {
+    string client_identifier = 1;
+    ResetType type = 2;
+    optional int32 evse_id = 3;
+}
+
+message ResetResponse {
+    Error error = 1;
+}

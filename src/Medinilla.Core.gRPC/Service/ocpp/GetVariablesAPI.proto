@@ -1,0 +1,17 @@
+syntax = "proto3";
+
+option csharp_namespace = "Medinilla.Core.gRPC.Service";
+
+import "Contracts/ocpp/UserGetVariablesRequest.proto";
+import "Service/ocpp/Error.proto";
+
+package medinilla.core.grpc;
+
+message GetVariablesRequest {
+    string client_identifier = 1;
+    repeated UserGetVariablesRequest get_variable_data = 2;
+}
+
+message GetVariablesResponse {
+    Error error = 1;
+}

@@ -1,0 +1,16 @@
+syntax = "proto3";
+
+option csharp_namespace = "Medinilla.Core.gRPC.Query";
+
+import "Contracts/query/Charger.proto";
+
+package medinilla.core.grpc.query;
+
+message ListChargersRequest {
+    int32 offset = 1;
+    int32 limit = 2;
+}
+
+message ListChargersResponse {
+    repeated Charger chargers = 1;
+}

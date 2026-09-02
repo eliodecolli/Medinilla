@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+option csharp_namespace = "Medinilla.Core.gRPC.Query";
+
+import "google/protobuf/timestamp.proto";
+
+package medinilla.core.grpc.query;
+
+message Connector {
+    int32 evse_id = 1;
+    int32 connector_id = 2;
+    string connector_status = 3;
+    google.protobuf.Timestamp modified_at = 4;
+}

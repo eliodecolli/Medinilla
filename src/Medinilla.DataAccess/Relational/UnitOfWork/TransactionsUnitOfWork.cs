@@ -3,6 +3,7 @@ using Medinilla.DataAccess.Relational.Models;
 using Medinilla.DataTypes.Contracts.Common;
 using Medinilla.DataTypes.Core;
 using IdToken = Medinilla.DataAccess.Relational.Models.Authorization.IdToken;
+using Microsoft.EntityFrameworkCore;
 
 namespace Medinilla.DataAccess.Relational.UnitOfWork;
 
@@ -53,5 +54,23 @@ public sealed class TransactionsUnitOfWork(MedinillaOcppDbContext context)
         snapshot.TotalCost = Convert.ToDecimal(consumption?.Consumption ?? 0);
 
         await _snapshotRepository.Update(snapshot);
+    }
+
+    public async Task<IReadOnlyList<TransactionSnapshot>> ListSnapshotsPaged(int offset, int limit)
+    {
+        const int defaultLimit = 50;
+        const int maxLimit = 200;
+
+        var safeOffset = Math.Max(offset, 0);
+        var safeLimit = limit <= 0 ? defaultLimit : Math.Min(limit, maxLimit);
+
+        return await context.Set<TransactionSnapshot>()
+            .Include(s => s.ChargingStation)
+            .Include(s => s.EvseConnector)
+            .Include(s => s.IdToken)
+            .OrderBy(s => s.Id)
+            .Skip(safeOffset)
+            .Take(safeLimit)
+            .ToListAsync();
     }
 }

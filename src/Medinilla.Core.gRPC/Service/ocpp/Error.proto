@@ -1,0 +1,10 @@
+syntax = "proto3";
+
+option csharp_namespace = "Medinilla.Core.gRPC.Service";
+
+package medinilla.core.grpc;
+
+message Error {
+    bool has_error = 1;
+    optional string message = 2;
+}
