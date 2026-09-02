@@ -1,5 +1,9 @@
 # OCPP 2.0.1 — Transactions & Energy Consumption
 
+**NOTE**: This document is AI-generated to keep track of possible transaction-related features. Don't pay much attention to it.
+
+---
+
 Reference notes compiled from research into the OCPP 2.0.1 Part 2 specification
 (Edition 2, 2022-12-15). Intended to give a future agent enough domain context
 to help refactor transactions / energy-consumption logic in the Medinilla CSMS
