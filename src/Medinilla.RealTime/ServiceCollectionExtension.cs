@@ -24,4 +24,10 @@ public static class ServiceCollectionExtensions
         services.AddMedinillaSubscriptionReceiver();
         return services;
     }
+    
+    public static IServiceCollection AddPubSub(this IServiceCollection services)
+    {
+        services.AddMedinillaPubSub();
+        return services;
+    }
 }

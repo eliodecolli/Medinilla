@@ -75,4 +75,13 @@ internal static class ServiceCollectionExtensions
 
         return services;
     }
+
+    internal static IServiceCollection AddMedinillaPubSub(this IServiceCollection services)
+    {
+        services.AddSingleton<IPubSub>(sp => new RedisPubSub(
+            sp.GetRequiredKeyedService<ConnectionMultiplexer>(RedisUtils.SubscriptionConnectionMultiplexer),
+            sp.GetRequiredService<ILogger<RedisPubSub>>()));
+
+        return services;
+    }
 }
