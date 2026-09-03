@@ -1,7 +1,9 @@
 using Medinilla.DataAccess.Relational.Models;
+using Medinilla.DataAccess.Exceptions;
 using Medinilla.DataAccess.Relational.UnitOfWork;
 using Medinilla.DataTypes.Contracts;
 using Medinilla.Infrastructure.WAMP;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace Medinilla.Core.Actions.Ocpp201;
@@ -11,11 +13,11 @@ public sealed class StatusNotificationAction(ChargingStationUnitOfWork unitOfWor
 {
     public string ActionName => OcppActionNames.StatusNotification;
 
-    private EvseConnector GetEvseConnector(ChargingStation cs, StatusNotificationRequest request)
+    private EvseConnector GetEvseConnector(StatusNotificationRequest request)
     {
         return new EvseConnector()
         {
-            ChargingStationId = cs.Id,
+            ChargingStationId = unitOfWork.AggregateRoot.Id,
 
             // we assume that if the connector is not specified, then the EVSE probably has only one connector
             ConnectorId = request.ConnectorId ?? 1,
@@ -28,14 +30,13 @@ public sealed class StatusNotificationAction(ChargingStationUnitOfWork unitOfWor
 
     private async Task ProcessStatusNotification(EvseConnector evseConnector)
     {
-        var result = await unitOfWork.EvseConnectorSubUnit.EvseConnectorRepository.Filter(c => c.ChargingStationId == evseConnector.ChargingStationId &&
-            c.EvseId == evseConnector.EvseId && c.ConnectorId == evseConnector.ConnectorId);
-        var connector = result.FirstOrDefault();
+        var connector = await unitOfWork.EvseConnectors.FirstOrDefaultAsync(c => c.ChargingStationId == evseConnector.ChargingStationId &&
+            c.EvseId == evseConnector.EvseId && c.ConnectorId == evseConnector.ConnectorId).ConfigureAwait(false);
 
         if (connector == null)
         {
             // oopsies, create a new one
-            await unitOfWork.EvseConnectorSubUnit.EvseConnectorRepository.Create(evseConnector);
+            await unitOfWork.EvseConnectors.AddAsync(evseConnector);
         }
         else
         {
@@ -49,18 +50,22 @@ public sealed class StatusNotificationAction(ChargingStationUnitOfWork unitOfWor
         var request = call.As<StatusNotificationRequest>();
         logger.LogInformation("{ci}: Status Notification Event Received - Connector Id: {cii} - Status: {cs}", clientIdentifier, request.ConnectorId, request.ConnectorStatus.ToString());
 
-        var chargingStation = await unitOfWork.GetChargingStation(clientIdentifier);
-        if (chargingStation == null)
+        try
+        {
+            await unitOfWork.Start(c => c.ClientIdentifier == clientIdentifier);
+        }
+        catch (AggregateRootNotFoundException)
         {
             logger.LogError($"Something weird has happened: Charging Station with ID {clientIdentifier} does not exist on our end.");
             return new RpcResult()
             {
-                Error = call.CreateErrorResult<StatusNotificationResponse>(OcppCallError.ErrorCodes.GenericError, $"Client Identifier {clientIdentifier} not found."),
+                Error = call.CreateErrorResult<StatusNotificationResponse>(OcppCallError.ErrorCodes.GenericError,
+                    $"Client Identifier {clientIdentifier} not found."),
                 ReturnToCS = true
             };
         }
 
-        var evseConnector = GetEvseConnector(chargingStation, request);
+        var evseConnector = GetEvseConnector(request);
 
         await ProcessStatusNotification(evseConnector);
         await unitOfWork.Save();

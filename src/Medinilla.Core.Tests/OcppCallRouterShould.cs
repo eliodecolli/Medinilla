@@ -20,6 +20,7 @@ public class OcppCallRouterShould
     private readonly Mock<IOcppActionsFactory> _actionsFactoryMock = new();
     private readonly Mock<IOcppChargerCommandFactory> _commandsFactoryMock = new();
     private readonly Mock<IRouterServices> _routerServicesMock = new();
+    private readonly Mock<IChargingStationBootingService> _bootingServiceMock = new();
     private readonly Mock<IOcppRequestDispatcher> _dispatcherMock = new();
     private readonly Mock<ICommandExecutionService> _executionServiceMock = new();
 
@@ -35,7 +36,7 @@ public class OcppCallRouterShould
             .Setup(s => s.ValidateChargingStationAvailability(CLIENT_ID))
             .ReturnsAsync(true);
 
-        _routerServicesMock
+        _bootingServiceMock
             .Setup(s => s.DisconnectClient(It.IsAny<string>()))
             .Returns(Task.CompletedTask);
 
@@ -50,6 +51,7 @@ public class OcppCallRouterShould
         var router = new OcppCallRouter(
             _loggerMock.Object,
             _routerServicesMock.Object,
+            _bootingServiceMock.Object,
             _actionsFactoryMock.Object,
             _commandsFactoryMock.Object,
             _dispatcherMock.Object,
@@ -461,11 +463,11 @@ public class OcppCallRouterShould
     // ----------------------------------------------------------------
 
     [Fact]
-    public async Task DisconnectClient_ForwardsToRouterServices()
+    public async Task DisconnectClient_ForwardsToBootingService()
     {
         var (sut, _) = CreateSut();
         await sut.DisconnectClient(CLIENT_ID);
-        _routerServicesMock.Verify(s => s.DisconnectClient(CLIENT_ID), Times.Once);
+        _bootingServiceMock.Verify(s => s.DisconnectClient(CLIENT_ID), Times.Once);
     }
 
     // ----------------------------------------------------------------

@@ -53,7 +53,7 @@ internal sealed class MedinillaQueryGrpc(
     public override async Task<ListTransactionSnapshotsResponse> ListTransactionSnapshots(ListTransactionSnapshotsRequest request, ServerCallContext context)
     {
         using var scope = serviceProvider.CreateScope();
-        var service = scope.ServiceProvider.GetRequiredService<ITransactionQueryService>();
+        var service = scope.ServiceProvider.GetRequiredService<ITransactionService>();
 
         var snapshots = await service.ListPaged(request.Offset, request.Limit);
 

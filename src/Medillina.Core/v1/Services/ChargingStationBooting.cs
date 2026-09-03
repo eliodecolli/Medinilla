@@ -1,6 +1,7 @@
 using Medinilla.Core.Interfaces;
 using Medinilla.Core.Interfaces.Services;
 using Medinilla.Core.Logic.Configuration;
+using Medinilla.DataAccess.Exceptions;
 using Medinilla.DataAccess.Relational.Models;
 using Medinilla.DataAccess.Relational.Models.Authorization;
 using Medinilla.DataAccess.Relational.UnitOfWork;
@@ -10,6 +11,7 @@ using Medinilla.Infrastructure.WAMP;
 using Microsoft.Extensions.Logging;
 using System.Diagnostics.Metrics;
 using System.Text.Json;
+using Microsoft.EntityFrameworkCore;
 
 namespace Medinilla.Core.v1.Services;
 
@@ -31,47 +33,47 @@ public class ChargingStationBooting(ChargingStationUnitOfWork unitOfWork, ILogge
         };
     }
 
-    private async Task TryBootstrapChargingStatation(ChargingStation entity)
+    private async Task TryBootstrapChargingStatation()
     {
         var medinillaSettings = CentralConfig.GetMedinillaConfiguration();
 
-        if (entity.Tariffs is null || entity.Tariffs.Count == 0)
+        if (unitOfWork.AggregateRoot.Tariffs.Count == 0)
         {
             // get default unit price
             var defaultUnit = medinillaSettings.DefaultUnit;
 
-            await unitOfWork.TariffsRepository.Create(new Tariff()
+            await unitOfWork.Tariffs.AddAsync(new Tariff()
             {
                 Id = Guid.NewGuid(),
-                ChargingStationId = entity.Id,
+                ChargingStationId = unitOfWork.AggregateRoot.Id,
                 UnitName = defaultUnit.Name,
                 UnitPrice = (decimal)defaultUnit.Price,
             });
         }
 
-        if (entity.AuthorizationDetails is null)
+        if (unitOfWork.AggregateRoot.AuthorizationDetails is null)
         {
-            await unitOfWork.AuthDetailsRepository.Create(new AuthorizationDetails()
+            await unitOfWork.AuthorizationDetails.AddAsync(new AuthorizationDetails()
             {
                 AuthBlob = JsonDocument.Parse(medinillaSettings.DefaultAuthDetails ?? "{}"),
-                ChargingStationId = entity.Id,
+                ChargingStationId = unitOfWork.AggregateRoot.Id,
             });
         }
 
-        if ((entity.IdTokens is null || entity.IdTokens.Count == 0) && medinillaSettings.UseDefaultUser)
+        if (unitOfWork.AggregateRoot.IdTokens.Count == 0 && medinillaSettings.UseDefaultUser)
         {
             var defaultUser = medinillaSettings.DefaultUser;
-            var entityUser = await unitOfWork.AuthorizationUserRepository.Create(new AuthorizationUser()
+            var entityUser = (await unitOfWork.AuthorizationUser.AddAsync(new AuthorizationUser()
             {
-                ChargingStationId = entity.Id,
+                ChargingStationId = unitOfWork.AggregateRoot.Id,
                 ActiveCredit = (decimal)defaultUser.ActiveCredit,
                 DisplayName = defaultUser.DisplayName,
                 IsActive = true
-            });
+            })).Entity;
 
-            await unitOfWork.IdTokenRepository.Create(new IdToken()
+            await unitOfWork.IdTokens.AddAsync(new IdToken()
             {
-                ChargingStationId = entity.Id,
+                ChargingStationId = unitOfWork.AggregateRoot.Id,
                 AuthorizationUserId = entityUser.Id,
                 Token = defaultUser.Token,
                 CreatedDate = DateTime.UtcNow,
@@ -79,63 +81,55 @@ public class ChargingStationBooting(ChargingStationUnitOfWork unitOfWork, ILogge
                 IdType = "ISO14443"
             });
         }
-
-        await unitOfWork.ChargingStationRepository.Update(entity);
     }
 
     public async Task<BootupResult> ProcessBootup(string clientIdentifier, BootNotificationRequest request)
     {
-        var result = await unitOfWork.ChargingStationRepository.Filter(c => c.ClientIdentifier == clientIdentifier);
-        var entity = result.FirstOrDefault();
-
         var bootStatus = BootupResult.Ok;
-
-        if (entity == null)
+        try
         {
-            entity = GetChargingStation(clientIdentifier, request);
-            var accountQuery = await unitOfWork.AccountRepository.Filter(c => c.Name == "MedinillaTest-Core").ConfigureAwait(false);
-            var account = accountQuery.First();
-            entity.AccountId = account.Id;
+            await unitOfWork.Start(c => c.ClientIdentifier == clientIdentifier);
+        }
+        catch (AggregateRootNotFoundException)
+        {
+            var entity = GetChargingStation(clientIdentifier, request);
+            await unitOfWork.Start(entity);
+            
+            var account = await unitOfWork.Accounts
+                .Where(c => c.Name == "MedinillaTest-Core")
+                .FirstOrDefaultAsync()
+                .ConfigureAwait(false);
+            
+            // let account throw here agin if it's not found
+            // this logic will be replaced in https://github.com/eliodecolli/Medinilla/issues/24
+            entity.AccountId = account!.Id;
             entity.CreatedAt = DateTime.UtcNow;
             entity.LatestBootNotificationReason = GetBootupReason(request);
             entity.Booted = true;
 
-            entity = await unitOfWork.ChargingStationRepository.Create(entity);
-
             await unitOfWork.Save();  // gotta trigger a save so the next thing proceeds
-            await TryBootstrapChargingStatation(entity);
+            await TryBootstrapChargingStatation();
 
             bootStatus = BootupResult.FirstBoot;
         }
-        else
+
+        unitOfWork.AggregateRoot.LatestBootNotificationReason = GetBootupReason(request);
+        unitOfWork.AggregateRoot.Booted = true;
+
+        if (unitOfWork.AggregateRoot.ModifiedAt is null)
         {
-            entity.LatestBootNotificationReason = GetBootupReason(request);
-            entity.Booted = true;
-
-            if (entity.ModifiedAt is null)
-            {
-                bootStatus = BootupResult.FirstBoot;
-            }
-
-            entity.ModifiedAt = DateTime.UtcNow;
-            await unitOfWork.ChargingStationRepository.Update(entity);
+            bootStatus = BootupResult.FirstBoot;
         }
 
+        unitOfWork.AggregateRoot.ModifiedAt = DateTime.UtcNow;
         await unitOfWork.Save();
         return bootStatus;
     }
 
     public async Task DisconnectClient(string clientIdentifier)
     {
-        var chargingStation =
-            (await unitOfWork.ChargingStationRepository.Filter(cs => cs.ClientIdentifier == clientIdentifier)
-                .ConfigureAwait(false)).FirstOrDefault();
-        
-        if (chargingStation is not null)
-        {
-            chargingStation.Booted = false;
-            await unitOfWork.ChargingStationRepository.Update(chargingStation);
-            await unitOfWork.Save();
-        }
+        await unitOfWork.Start(cs => cs.ClientIdentifier == clientIdentifier).ConfigureAwait(false);
+        unitOfWork.AggregateRoot.Booted = false;
+        await unitOfWork.Save();
     }
 }

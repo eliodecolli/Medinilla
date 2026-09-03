@@ -6,7 +6,9 @@ namespace Medinilla.Core.Interfaces.Services;
 
 public interface IIdTokenService
 {
-    Task<IdTokenDb?> TryGetForTransaction(string transactionId, string token);
+    Task<IdTokenDb?> TryGetForTransaction(string clientIdentifier, string transactionId);
 
     bool RemoveTemporaryToken(DbChargingStation cs, IdToken token);
+    
+    
 }

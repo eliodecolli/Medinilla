@@ -14,6 +14,7 @@ namespace Medinilla.Core.v1;
 public class OcppCallRouter(
     ILogger<OcppCallRouter> _logger,
     IRouterServices services,
+    IChargingStationBootingService chargingStationBootingService,
     IOcppActionsFactory actionsFactory,
     IOcppChargerCommandFactory commandFactory,
     IOcppRequestDispatcher dispatcher,
@@ -169,7 +170,7 @@ public class OcppCallRouter(
 
     public async Task DisconnectClient(string clientIdentifier)
     {
-        await services.DisconnectClient(clientIdentifier);
+        await chargingStationBootingService.DisconnectClient(clientIdentifier);
     }
 
     private async Task<bool> ValidateRouting(string clientIdentifier, string actionName)

@@ -31,11 +31,11 @@ public class ChargingStation
 
     public virtual Account Account { get; set; }
 
-    public virtual AuthorizationDetails AuthorizationDetails { get; set; }
+    public virtual AuthorizationDetails? AuthorizationDetails { get; set; }
 
     public virtual ICollection<EvseConnector> EvseConnectors { get; set; }
 
-    public virtual ICollection<TransactionEvent> TransactionEvents { get; set; }
+    public virtual ICollection<TransactionEvent>? TransactionEvents { get; set; }
 
     public virtual ICollection<TransactionSnapshot> TransactionSnapshots { get; set; }
 

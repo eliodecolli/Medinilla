@@ -1,4 +1,5 @@
 ﻿using Medinilla.Core.Logic.Authorization;
+using Medinilla.DataAccess.Exceptions;
 using Medinilla.DataAccess.Relational.UnitOfWork;
 using Medinilla.DataTypes.Contracts;
 using Medinilla.DataTypes.Contracts.Common;
@@ -42,20 +43,23 @@ public sealed class AuthorizeAction(ChargingStationUnitOfWork unitOfWork,
             };
         }
 
-        var chargingStaiton = await unitOfWork.GetChargingStation(clientIdentifier);
-        if (chargingStaiton is null)
+        try
+        {
+            await unitOfWork.Start(c => c.ClientIdentifier == clientIdentifier);
+        }
+        catch (AggregateRootNotFoundException)
         {
             return new RpcResult()
             {
                 Error = call.CreateErrorResult<AuthorizeResponse>(OcppCallError.ErrorCodes.InternalError,
-                        $"Specified client identifier {clientIdentifier} was not found.")
+                    $"Specified client identifier {clientIdentifier} was not found.")
             };
         }
 
         try
         {
             status = await authorizationAlgorithmFactory.RunAuthorization(request.IdToken,
-                AuthUtils.GenerateAuthContext(chargingStaiton, null, false));
+                AuthUtils.GenerateAuthContext(unitOfWork.AggregateRoot, null, false));
             if (status != AuthorizeStatus.Accepted)
             {
                 logger.LogInformation($"{clientIdentifier}: Failed Authorization for token {request.IdToken.Token}: {status}.");

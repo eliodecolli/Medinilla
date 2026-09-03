@@ -1,16 +1,30 @@
 using Medinilla.Core.Interfaces.Services;
+using Medinilla.DataAccess.Exceptions;
 using Medinilla.DataAccess.Relational.Enums;
 using Medinilla.DataAccess.Relational.Models;
 using Medinilla.DataAccess.Relational.Models.ChargerConfig;
 using Medinilla.DataAccess.Relational.UnitOfWork;
 using Medinilla.DataTypes.Contracts.Common;
 using Medinilla.DataTypes.Core.Enums;
+using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging;
 
 namespace Medinilla.Core.v1.Services;
 
-public sealed class ChargerConfigService(ILogger<ChargerConfigService> log, ChargerConfigUnitOfWork unitOfWork, ChargingStationUnitOfWork cUnitOfWork) : IChargerConfigService
+public sealed class ChargerConfigService : IChargerConfigService
 {
+    private ILogger<ChargerConfigService> log;
+    private ChargerConfigUnitOfWork unitOfWork;
+    private ChargingStationUnitOfWork cUnitOfWork;
+    
+    ChargerConfigService(ILogger<ChargerConfigService> log, ChargerConfigUnitOfWork unitOfWork,
+        ChargingStationUnitOfWork cUnitOfWork)
+    {
+        this.cUnitOfWork =  cUnitOfWork;
+        this.log = log;
+        this.unitOfWork = unitOfWork;
+    }
+    
     public async Task<ReportNotificationIngestionResult> IngestReport(string clientIdentifier, int requestId, int seqNumber, bool tbc, IEnumerable<ReportData> data)
     {
         log.LogInformation("[{ci}]: Ingesting charger report id={ri} notify seqNo={sn}", clientIdentifier, requestId, seqNumber);
@@ -29,8 +43,11 @@ public sealed class ChargerConfigService(ILogger<ChargerConfigService> log, Char
         }
         
         // alright we have our statuses registered - now update the fucking components
-        var chargingStation = await cUnitOfWork.GetChargingStation(clientIdentifier);
-        if (chargingStation is null)
+        try
+        {
+            await cUnitOfWork.Start(c => c.ClientIdentifier == clientIdentifier);
+        }
+        catch (AggregateRootNotFoundException)
         {
             log.LogError("[{ci}]: Request id={ri} was trying to update component info but no registered charging station was found",
                 clientIdentifier, requestId);
@@ -48,7 +65,7 @@ public sealed class ChargerConfigService(ILogger<ChargerConfigService> log, Char
             {
                 component = new ChargerComponent()
                 {
-                    ChargingStation = chargingStation,
+                    ChargingStation = cUnitOfWork.AggregateRoot,
                     ClientIdentifier = clientIdentifier,
                     ComponentName = rd.Component.Name,
                     ComponentInstance = rd.Component.Instance,
@@ -62,21 +79,22 @@ public sealed class ChargerConfigService(ILogger<ChargerConfigService> log, Char
             if (rd.Component.Evse is not null)
             {
                 var targetEvse = rd.Component.Evse;
-                var evseQuery = await cUnitOfWork.EvseConnectorSubUnit.EvseConnectorRepository.Filter(e =>
-                    e.EvseId == targetEvse.Id
-                    && (!targetEvse.ConnectorId.HasValue || e.ConnectorId == targetEvse.ConnectorId.Value));
-                var evse = evseQuery.FirstOrDefault();
+                var evse = await cUnitOfWork.EvseConnectors
+                    .Where(e => 
+                        e.EvseId == targetEvse.Id && 
+                        (!targetEvse.ConnectorId.HasValue || e.ConnectorId == targetEvse.ConnectorId.Value))
+                    .FirstOrDefaultAsync();
 
                 // if we dont have this evse right now then just add it ? - let's go with yes for now
                 if (evse is null)
                 {
                     EvseConnector evseConnector = new EvseConnector()
                     {
-                        ChargingStationId = chargingStation.Id,
+                        ChargingStationId = cUnitOfWork.AggregateRoot.Id,
                         EvseId = rd.Component.Evse.Id,
                         ConnectorId = rd.Component.Evse.ConnectorId ?? 0
                     };
-                    evse = await cUnitOfWork.EvseConnectorSubUnit.EvseConnectorRepository.Create(evseConnector);
+                    evse = (await cUnitOfWork.EvseConnectors.AddAsync(evseConnector)).Entity;
                 }
 
                 component.Connector = evse;
