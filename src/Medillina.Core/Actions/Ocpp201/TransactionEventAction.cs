@@ -1,5 +1,6 @@
 ﻿using Medinilla.Core.Interfaces.Services;
 using Medinilla.Core.Logic.Authorization;
+using Medinilla.Core.Logic.Exceptions;
 using Medinilla.Core.v1.Transactions;
 using Medinilla.DataAccess.Exceptions;
 using Medinilla.DataAccess.Relational.Models;
@@ -38,9 +39,6 @@ public sealed class TransactionEventAction(
 
     public async Task<RpcResult> Execute(OcppCallRequest call, string clientIdentifier)
     {
-#if DEBUG
-        SaveTxLocally(call);
-#endif
         logger.LogInformation($"Received Transaction event from {clientIdentifier}");
         var request = call.As<TransactionEventRequest>();
 
@@ -97,6 +95,16 @@ public sealed class TransactionEventAction(
             else
             {
                 var consumption = GetTransactionConsumption(request);
+                
+                #if DEBUG
+                if (consumption.Consumption < 0)
+                {
+                    logger.LogDebug("Transaction {TransactionId} consumption is negative", request.TransactionInfo.TransactionId);
+                    
+                    // dump the event payload
+                    SaveTxLocally(call);
+                }
+                #endif
 
                 transaction.RegisterValue = Convert.ToDecimal(consumption.Consumption);
                 transaction.PhaseOneValue = GetPhaseConsumption(consumption.PhaseConsumption, 0);
@@ -136,10 +144,19 @@ public sealed class TransactionEventAction(
                             tx.EventType == nameof(TransactionEventEnum.Started));
                         if (firstTransaction is null)
                         {
-                            logger.LogWarning(
+                            logger.LogError(
                                 "Partially finalizing tx snapshot for {TransactionInfoTransactionId}: No 'Started' event was found.",
                                 request.TransactionInfo.TransactionId);
                         }
+                        
+                        var unitName =
+                            await transactionService.GetTransactionUnit(chargingStation, transaction.TransactionId);
+
+                        var totalCost = tariffService.CalculateTotalCosts(consumption.Consumption,
+                            chargingStation, unitName ?? "UNKNOWN");
+                        
+                        // send the final response cost to the charger
+                        response.TotalCost = totalCost;
 
                         var snapshot = new TransactionSnapshot
                         {
@@ -149,17 +166,20 @@ public sealed class TransactionEventAction(
                                           Enum.GetName(TriggerReasonEnum.AbnormalCondition)!,
                             EndedAt = transaction.Timestamp,
                             EndReason = transaction.TriggerReason,
-                            TotalCost = Convert.ToDecimal(consumption.Consumption)
+                            TotalCost = totalCost,
                         };
 
-                        chargingStation.TransactionSnapshots.Add(snapshot);
+                        try
+                        {
+                            transactionService.FinalizeTransaction(chargingStation, snapshot);
+                        }
+                        catch (TransactionException e)
+                        {
+                            logger.LogError(
+                                "Cannot finalize transaction for ci='{ci}': Transaction with id='{tx}' has already been finalized.",
+                                clientIdentifier, snapshot.TransactionId);
+                        }
                     }
-
-                    var unitName =
-                        await transactionService.GetTransactionUnit(chargingStation, transaction.TransactionId);
-
-                    response.TotalCost = tariffService.CalculateTotalCosts(consumption.Consumption,
-                        chargingStation, unitName ?? "UNKNOWN");
 
                     idToken.IsUnderTx = false;
                     logger.LogInformation("Released token for tx={tx} ci={ci}",

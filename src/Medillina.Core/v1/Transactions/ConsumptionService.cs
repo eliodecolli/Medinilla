@@ -110,7 +110,7 @@ public sealed class ConsumptionService
     {
         if (graph.End is not null)
         {
-            var consumption = graph.End.Compute() - graph.Begin?.Compute() ?? 0;
+            var consumption = graph.End.Compute() - (graph.Begin?.Compute() ?? 0);
             var phasesEnd = GetPhasesConsumption(graph.End);
             var phasesBegin = GetPhasesConsumption(graph.Begin);
 

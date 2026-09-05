@@ -10,4 +10,6 @@ public interface ITransactionService
     void RegisterTransaction(ChargingStation cs, TransactionEvent transaction, IdToken idToken);
 
     Task<string?> GetTransactionUnit(ChargingStation cs, string transactionId);
+
+    void FinalizeTransaction(ChargingStation cs, TransactionSnapshot snapshot);
 }
