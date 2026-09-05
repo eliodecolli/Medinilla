@@ -11,7 +11,7 @@ public class CreditCheckAlgo : IAuthAlgorithm
 
     public AuthorizationAlgorithm Algorithm => AuthorizationAlgorithm.CreditCheck;
 
-    public Task<string> Authorize(IdToken? idToken, AuthorizationContext context)
+    public Task<string> Authorize(AuthorizationContext context)
     {
         var status = AuthorizeStatus.Accepted;
         var details = context.AuthorizationDetails.AuthBlob.Deserialize<AuthDetailsBlob>();

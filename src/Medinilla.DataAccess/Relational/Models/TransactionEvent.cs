@@ -9,7 +9,7 @@ public class TransactionEvent
 
     public Guid ChargingStationId { get; set; }
 
-    public Guid? IdTokenId { get; set; }
+    public Guid IdTokenId { get; set; }
 
     public string TransactionId { get; set; }
 
@@ -39,5 +39,5 @@ public class TransactionEvent
 
     public virtual ChargingStation ChargingStation { get; set; }
 
-    public virtual IdToken? IdToken { get; set; }
+    public virtual IdToken IdToken { get; set; }
 }

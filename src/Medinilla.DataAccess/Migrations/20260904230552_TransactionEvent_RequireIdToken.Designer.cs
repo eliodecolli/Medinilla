@@ -4,6 +4,7 @@ using System.Text.Json;
 using Medinilla.DataAccess.Relational;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Medinilla.DataAccess.Migrations
 {
     [DbContext(typeof(MedinillaOcppDbContext))]
-    partial class MedinillaOcppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260904230552_TransactionEvent_RequireIdToken")]
+    partial class TransactionEvent_RequireIdToken
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -306,7 +309,7 @@ namespace Medinilla.DataAccess.Migrations
                     b.Property<string>("Alias")
                         .HasColumnType("text");
 
-                    b.Property<Guid>("AuthorizationDetailsId")
+                    b.Property<Guid>("AuthDetailsId")
                         .HasColumnType("uuid");
 
                     b.Property<bool>("Booted")

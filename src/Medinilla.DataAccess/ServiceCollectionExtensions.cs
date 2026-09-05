@@ -18,7 +18,6 @@ public static class ServiceCollectionExtensions
         });
 
         services.AddTransient<TransactionsUnitOfWork>();
-        services.AddTransient<ChargingStationUnitOfWork>();
         services.AddTransient<CommandExecutionUnitOfWork>();
         services.AddTransient<ChargerConfigUnitOfWork>();
     }

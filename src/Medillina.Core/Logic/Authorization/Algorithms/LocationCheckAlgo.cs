@@ -11,7 +11,7 @@ public class LocationCheckAlgo : IAuthAlgorithm
 
     public AuthorizationAlgorithm Algorithm => AuthorizationAlgorithm.LocationCheck;
 
-    public Task<string> Authorize(IdToken? idToken, AuthorizationContext context)
+    public Task<string> Authorize(AuthorizationContext context)
     {
         var status = AuthorizeStatus.Accepted;
 

@@ -14,7 +14,8 @@ public class AuthorizationContext
 
     public AuthorizationDetails AuthorizationDetails { get; set; }
 
+    /// <summary>
+    /// Configures how the auth pipeline should treat a null <see cref="IdToken"/>.
+    /// </summary>
     public bool SkipIfNullToken { get; set; }
-
-    public IQueryable<IdToken> Tokens { get; set; }
 }

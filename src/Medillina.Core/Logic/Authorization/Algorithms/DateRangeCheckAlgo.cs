@@ -11,7 +11,7 @@ public class DateRangeCheckAlgo : IAuthAlgorithm
 
     public AuthorizationAlgorithm Algorithm => AuthorizationAlgorithm.DateRangeCheck;
 
-    public Task<string> Authorize(IdToken? idToken, AuthorizationContext context)
+    public Task<string> Authorize(AuthorizationContext context)
     {
         var status = AuthorizeStatus.Accepted;
 

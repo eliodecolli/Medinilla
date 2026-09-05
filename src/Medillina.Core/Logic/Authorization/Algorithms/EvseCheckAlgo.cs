@@ -11,8 +11,7 @@ public sealed class EvseCheckAlgo : IAuthAlgorithm
 
     public int Priority => 1;
 
-    public Task<string> Authorize(IdToken? idToken,
-        AuthorizationContext context)
+    public Task<string> Authorize(AuthorizationContext context)
     {
         var status = AuthorizeStatus.Accepted;
 

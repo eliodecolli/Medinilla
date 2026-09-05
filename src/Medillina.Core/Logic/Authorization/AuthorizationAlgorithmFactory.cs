@@ -25,16 +25,16 @@ public sealed class AuthorizationAlgorithmFactory
 
     public IAuthAlgorithm[] All() => [.. _store.Values.OrderBy(a => a.Priority)];
 
-    public async Task<string> RunAuthorization(IdToken? token, AuthorizationContext context)
+    public async Task<string> RunAuthorization(AuthorizationContext context)
     {
         var status = AuthorizeStatus.Accepted;
 
         foreach (var algorithm in All())
         {
-            status = await algorithm.Authorize(token, context);
+            status = await algorithm.Authorize(context);
             if (status != AuthorizeStatus.Accepted)
             {
-                logger.LogError($"Running Authorization: {Enum.GetName(algorithm.Algorithm)}...FAIL");
+                logger.LogError($"Running Authorization: {Enum.GetName(algorithm.Algorithm)}: FAIL");
                 break;
             }
         }

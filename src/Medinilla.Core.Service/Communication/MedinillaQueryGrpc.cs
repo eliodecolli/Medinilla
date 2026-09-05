@@ -19,7 +19,7 @@ internal sealed class MedinillaQueryGrpc(
         }
 
         using var scope = serviceProvider.CreateScope();
-        var service = scope.ServiceProvider.GetRequiredService<IChargerQueryService>();
+        var service = scope.ServiceProvider.GetRequiredService<IChargerService>();
 
         var cs = await service.GetByClientIdentifier(request.ClientIdentifier);
         if (cs is null)
@@ -38,7 +38,7 @@ internal sealed class MedinillaQueryGrpc(
     public override async Task<ListChargersResponse> ListChargers(ListChargersRequest request, ServerCallContext context)
     {
         using var scope = serviceProvider.CreateScope();
-        var service = scope.ServiceProvider.GetRequiredService<IChargerQueryService>();
+        var service = scope.ServiceProvider.GetRequiredService<IChargerService>();
 
         var chargers = await service.ListPaged(request.Offset, request.Limit);
 
@@ -53,7 +53,7 @@ internal sealed class MedinillaQueryGrpc(
     public override async Task<ListTransactionSnapshotsResponse> ListTransactionSnapshots(ListTransactionSnapshotsRequest request, ServerCallContext context)
     {
         using var scope = serviceProvider.CreateScope();
-        var service = scope.ServiceProvider.GetRequiredService<ITransactionQueryService>();
+        var service = scope.ServiceProvider.GetRequiredService<ITransactionService>();
 
         var snapshots = await service.ListPaged(request.Offset, request.Limit);
 
