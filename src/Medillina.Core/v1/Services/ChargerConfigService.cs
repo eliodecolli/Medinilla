@@ -1,5 +1,6 @@
 using Medinilla.Core.Interfaces.Services;
 using Medinilla.DataAccess.Exceptions;
+using Medinilla.DataAccess.Relational;
 using Medinilla.DataAccess.Relational.Enums;
 using Medinilla.DataAccess.Relational.Models;
 using Medinilla.DataAccess.Relational.Models.ChargerConfig;
@@ -11,20 +12,9 @@ using Microsoft.Extensions.Logging;
 
 namespace Medinilla.Core.v1.Services;
 
-public sealed class ChargerConfigService : IChargerConfigService
+public sealed class ChargerConfigService(ILogger<ChargerConfigService> log, ChargerConfigUnitOfWork unitOfWork,
+    MedinillaOcppDbContext context) : IChargerConfigService
 {
-    private ILogger<ChargerConfigService> log;
-    private ChargerConfigUnitOfWork unitOfWork;
-    private ChargingStationUnitOfWork cUnitOfWork;
-    
-    ChargerConfigService(ILogger<ChargerConfigService> log, ChargerConfigUnitOfWork unitOfWork,
-        ChargingStationUnitOfWork cUnitOfWork)
-    {
-        this.cUnitOfWork =  cUnitOfWork;
-        this.log = log;
-        this.unitOfWork = unitOfWork;
-    }
-    
     public async Task<ReportNotificationIngestionResult> IngestReport(string clientIdentifier, int requestId, int seqNumber, bool tbc, IEnumerable<ReportData> data)
     {
         log.LogInformation("[{ci}]: Ingesting charger report id={ri} notify seqNo={sn}", clientIdentifier, requestId, seqNumber);
@@ -45,17 +35,8 @@ public sealed class ChargerConfigService : IChargerConfigService
         // alright we have our statuses registered - now update the fucking components
         try
         {
-            await cUnitOfWork.Start(c => c.ClientIdentifier == clientIdentifier);
-        }
-        catch (AggregateRootNotFoundException)
-        {
-            log.LogError("[{ci}]: Request id={ri} was trying to update component info but no registered charging station was found",
-                clientIdentifier, requestId);
-            return ReportNotificationIngestionResult.InternalError;
-        }
-        
-        // turn of lazy loading so we're not skyrocketing queries
-        unitOfWork.DisableLazyLoading();
+            var chargingStation = await context.GetChargingStation(clientIdentifier);
+               unitOfWork.DisableLazyLoading();
         
         foreach (var rd in data)
         {
@@ -65,7 +46,7 @@ public sealed class ChargerConfigService : IChargerConfigService
             {
                 component = new ChargerComponent()
                 {
-                    ChargingStation = cUnitOfWork.AggregateRoot,
+                    ChargingStation = chargingStation,
                     ClientIdentifier = clientIdentifier,
                     ComponentName = rd.Component.Name,
                     ComponentInstance = rd.Component.Instance,
@@ -79,22 +60,22 @@ public sealed class ChargerConfigService : IChargerConfigService
             if (rd.Component.Evse is not null)
             {
                 var targetEvse = rd.Component.Evse;
-                var evse = await cUnitOfWork.EvseConnectors
-                    .Where(e => 
+                var evse = chargingStation.EvseConnectors
+                    .AsQueryable()
+                    .FirstOrDefault(e => 
                         e.EvseId == targetEvse.Id && 
-                        (!targetEvse.ConnectorId.HasValue || e.ConnectorId == targetEvse.ConnectorId.Value))
-                    .FirstOrDefaultAsync();
+                        (!targetEvse.ConnectorId.HasValue || e.ConnectorId == targetEvse.ConnectorId.Value));
 
                 // if we dont have this evse right now then just add it ? - let's go with yes for now
                 if (evse is null)
                 {
-                    EvseConnector evseConnector = new EvseConnector()
+                    evse = new EvseConnector()
                     {
-                        ChargingStationId = cUnitOfWork.AggregateRoot.Id,
+                        ChargingStationId = chargingStation.Id,
                         EvseId = rd.Component.Evse.Id,
                         ConnectorId = rd.Component.Evse.ConnectorId ?? 0
                     };
-                    evse = (await cUnitOfWork.EvseConnectors.AddAsync(evseConnector)).Entity;
+                    chargingStation.EvseConnectors.Add(evse);
                 }
 
                 component.Connector = evse;
@@ -154,5 +135,12 @@ public sealed class ChargerConfigService : IChargerConfigService
         }
 
         return ReportNotificationIngestionResult.Ok;
+        }
+        catch (AggregateRootNotFoundException)
+        {
+            log.LogError("[{ci}]: Request id={ri} was trying to update component info but no registered charging station was found",
+                clientIdentifier, requestId);
+            return ReportNotificationIngestionResult.InternalError;
+        }
     }
 }

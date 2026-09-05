@@ -1,20 +1,19 @@
 using Medinilla.Core.Interfaces.Services;
 using Medinilla.DataAccess.Exceptions;
-using Medinilla.DataAccess.Relational.UnitOfWork;
+using Medinilla.DataAccess.Relational;
 using Microsoft.Extensions.Logging;
 
 namespace Medinilla.Core.v1.Services;
 
 public class RouterServices(ILogger<RouterServices> logger,
-    IChargingStationBootingService chargingStationBootingService,
-    ChargingStationUnitOfWork unitOfWork) : IRouterServices
+    MedinillaOcppDbContext context) : IRouterServices
 {
     public async Task<bool> ValidateChargingStationAvailability(string clientIdentifier)
     {
         try
         {
-            await unitOfWork.Start(cs => cs.ClientIdentifier == clientIdentifier).ConfigureAwait(false);
-            return unitOfWork.AggregateRoot.Booted;
+            var chargingStation = await context.GetChargingStation(clientIdentifier).ConfigureAwait(false);
+            return chargingStation.Booted;
         }
         catch (AggregateRootNotFoundException)
         {

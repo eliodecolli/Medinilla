@@ -1,9 +1,6 @@
 using Medinilla.Core.Interfaces.Services;
 using Medinilla.DataAccess.Relational.Models;
 using Medinilla.DataAccess.Relational.UnitOfWork;
-using Medinilla.DataTypes.Contracts.Common;
-using Medinilla.DataTypes.Core;
-using Microsoft.EntityFrameworkCore;
 using ChargingStation = Medinilla.DataAccess.Relational.Models.ChargingStation;
 using IdToken = Medinilla.DataAccess.Relational.Models.Authorization.IdToken;
 
@@ -14,20 +11,16 @@ public sealed class TransactionService(TransactionsUnitOfWork unitOfWork) : ITra
     public Task<IReadOnlyList<TransactionSnapshot>> ListPaged(int offset, int limit) =>
         unitOfWork.ListSnapshotsPaged(offset, limit);
     
-    public void RegisterTransaction(ChargingStation cs, TransactionEvent transaction, IdToken? idToken)
+    public void RegisterTransaction(ChargingStation cs, TransactionEvent transaction, IdToken idToken)
     {
-        if (idToken is null)
-        {
-            cs.TransactionEvents?.Add(transaction);
-            return;
-        }
-        
-        transaction.IdTokenId = idToken.Id;
+        transaction.IdToken = idToken;
 
         if (!idToken.IsUnderTx)
         {
             idToken.IsUnderTx = true;
         }
+
+        cs.TransactionEvents.Add(transaction);
     }
     
     public Task<string?> GetTransactionUnit(ChargingStation cs, string transactionId)

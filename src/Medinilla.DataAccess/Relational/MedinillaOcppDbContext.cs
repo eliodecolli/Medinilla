@@ -1,4 +1,5 @@
-﻿using Medinilla.DataAccess.Relational.Models;
+﻿using Medinilla.DataAccess.Exceptions;
+using Medinilla.DataAccess.Relational.Models;
 using Medinilla.DataAccess.Relational.Models.Audit;
 using Medinilla.DataAccess.Relational.Models.Authorization;
 using Medinilla.DataAccess.Relational.Models.ChargerConfig;
@@ -69,7 +70,8 @@ public class MedinillaOcppDbContext(DbContextOptions<MedinillaOcppDbContext> opt
 
         modelBuilder.Entity<TransactionEvent>().HasOne(c => c.IdToken)
             .WithMany(i => i.TransactionEvents)
-            .HasForeignKey(c => c.IdTokenId);
+            .HasForeignKey(c => c.IdTokenId)
+            .IsRequired();
 
         // configure transaction snapshots
         modelBuilder.Entity<TransactionSnapshot>().HasOne(c => c.EvseConnector)
@@ -91,6 +93,10 @@ public class MedinillaOcppDbContext(DbContextOptions<MedinillaOcppDbContext> opt
         modelBuilder.Entity<IdToken>().HasMany(c => c.TransactionSnapshots)
             .WithOne(c => c.IdToken)
             .HasForeignKey(c => c.IdTokenId);
+
+        modelBuilder.Entity<AuthorizationUser>().HasOne(c => c.ChargingStation)
+            .WithMany(c => c.AuthorizationUsers)
+            .HasForeignKey(c => c.ChargingStationId);
 
         // configure command execution auditing
         modelBuilder.Entity<CommandExecution>().ToTable("core_command_executions");
@@ -126,5 +132,17 @@ public class MedinillaOcppDbContext(DbContextOptions<MedinillaOcppDbContext> opt
         modelBuilder.Entity<ComponentVariable>().HasOne(cv => cv.Component)
             .WithMany(cc => cc.ComponentVariables)
             .HasForeignKey(cv => cv.ChargerComponentId);
+    }
+
+    public async Task<ChargingStation> GetChargingStation(string clientIdentifier)
+    {
+        var result = await Set<ChargingStation>()
+            .FirstOrDefaultAsync(c => c.ClientIdentifier == clientIdentifier)
+            .ConfigureAwait(false);
+
+        if (result is null)
+            throw new AggregateRootNotFoundException($"Cannot find charging station for client {clientIdentifier}");
+        
+        return result;
     }
 }

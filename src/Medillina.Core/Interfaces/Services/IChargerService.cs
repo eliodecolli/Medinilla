@@ -2,7 +2,7 @@ using Medinilla.DataAccess.Relational.Models;
 
 namespace Medinilla.Core.Interfaces.Services;
 
-public interface IChargerQueryService
+public interface IChargerService
 {
     Task<ChargingStation> GetByClientIdentifier(string clientIdentifier);
 

@@ -4,6 +4,7 @@ using System.Text.Json;
 using Medinilla.DataAccess.Relational;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.EntityFrameworkCore.Infrastructure;
+using Microsoft.EntityFrameworkCore.Migrations;
 using Microsoft.EntityFrameworkCore.Storage.ValueConversion;
 using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 
@@ -12,9 +13,11 @@ using Npgsql.EntityFrameworkCore.PostgreSQL.Metadata;
 namespace Medinilla.DataAccess.Migrations
 {
     [DbContext(typeof(MedinillaOcppDbContext))]
-    partial class MedinillaOcppDbContextModelSnapshot : ModelSnapshot
+    [Migration("20260904214137_AuthorizationUser_AddChargingStationRelationship")]
+    partial class AuthorizationUser_AddChargingStationRelationship
     {
-        protected override void BuildModel(ModelBuilder modelBuilder)
+        /// <inheritdoc />
+        protected override void BuildTargetModel(ModelBuilder modelBuilder)
         {
 #pragma warning disable 612, 618
             modelBuilder
@@ -306,7 +309,7 @@ namespace Medinilla.DataAccess.Migrations
                     b.Property<string>("Alias")
                         .HasColumnType("text");
 
-                    b.Property<Guid>("AuthorizationDetailsId")
+                    b.Property<Guid>("AuthDetailsId")
                         .HasColumnType("uuid");
 
                     b.Property<bool>("Booted")
@@ -417,7 +420,7 @@ namespace Medinilla.DataAccess.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<Guid>("IdTokenId")
+                    b.Property<Guid?>("IdTokenId")
                         .HasColumnType("uuid");
 
                     b.Property<bool?>("Offline")
@@ -639,9 +642,7 @@ namespace Medinilla.DataAccess.Migrations
 
                     b.HasOne("Medinilla.DataAccess.Relational.Models.Authorization.IdToken", "IdToken")
                         .WithMany("TransactionEvents")
-                        .HasForeignKey("IdTokenId")
-                        .OnDelete(DeleteBehavior.Cascade)
-                        .IsRequired();
+                        .HasForeignKey("IdTokenId");
 
                     b.Navigation("ChargingStation");
 

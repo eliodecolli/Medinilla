@@ -7,7 +7,7 @@ public interface ITransactionService
 {
     Task<IReadOnlyList<TransactionSnapshot>> ListPaged(int offset, int limit);
 
-    void RegisterTransaction(ChargingStation cs, TransactionEvent transaction, IdToken? idToken);
+    void RegisterTransaction(ChargingStation cs, TransactionEvent transaction, IdToken idToken);
 
     Task<string?> GetTransactionUnit(ChargingStation cs, string transactionId);
 }

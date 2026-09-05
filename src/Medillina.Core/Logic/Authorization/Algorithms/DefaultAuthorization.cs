@@ -10,34 +10,25 @@ public class DefaultAuthorization : IAuthAlgorithm
 
     public int Priority => 0;
 
-    public Task<string> Authorize(IdToken? idToken, AuthorizationContext context)
+    public Task<string> Authorize(AuthorizationContext context)
     {
-        var status = AuthorizeStatus.Accepted;
+        // The action layer is responsible for resolving the IdToken (DB lookup
+        // for a request-supplied token, or recovery from a previous event) and
+        // placing it on the context before invoking the pipeline. We don't
+        // query the DB here.
+        var idToken = context.IdToken;
+
         if (idToken is null)
         {
-            status = context.SkipIfNullToken ? AuthorizeStatus.Accepted : AuthorizeStatus.Unknown;
-        }
-        else
-        {
-            var token = context.Tokens.FirstOrDefault(t => t.Token == idToken.Token);
-            if (token is null)
-            {
-                status = AuthorizeStatus.Unknown;
-            }
-            else
-            {
-                if (token.Blocked)
-                {
-                    status = AuthorizeStatus.Blocked;
-                }
-                else
-                {
-                    // pass it over to the next authorizers
-                    context.IdToken = token;
-                }
-            }
+            return Task.FromResult(
+                context.SkipIfNullToken ? AuthorizeStatus.Accepted : AuthorizeStatus.Invalid);
         }
 
-        return Task.FromResult(status);
+        if (idToken.Blocked)
+        {
+            return Task.FromResult(AuthorizeStatus.Blocked);
+        }
+
+        return Task.FromResult(AuthorizeStatus.Accepted);
     }
 }

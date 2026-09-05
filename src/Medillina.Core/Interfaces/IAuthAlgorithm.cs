@@ -1,5 +1,4 @@
 ﻿using Medinilla.Core.Logic.Authorization;
-using Medinilla.DataTypes.Contracts.Common;
 using Medinilla.Infrastructure.Core.Authorization;
 
 namespace Medinilla.Core.Interfaces;
@@ -10,6 +9,5 @@ public interface IAuthAlgorithm
 
     AuthorizationAlgorithm Algorithm { get; }
 
-    Task<string> Authorize(IdToken? idToken,
-        AuthorizationContext context);
+    Task<string> Authorize(AuthorizationContext context);
 }

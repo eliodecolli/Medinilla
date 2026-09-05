@@ -10,8 +10,9 @@
 --      station boots (see Medillina.Core/v1/Services/ChargingStationBooting.cs).
 --   3. Inserts a handful of secondary 'noise' accounts, each with several
 --      stations, EVSE connectors, tariffs, auth users, id tokens, transactions
---      and transaction events, so the rest of the system has realistic data
---      to chew on.
+--      and transaction events, plus command-execution audit rows, charger
+--      components/variables and base-report statuses, so the rest of the
+--      system has realistic data to chew on.
 --
 -- All noise is generated inside the procedure with random()/gen_random_uuid()
 -- so the same procedure is reusable for different seed sizes.
@@ -49,6 +50,18 @@ DECLARE
     token_id uuid;
     token_count int;
 
+    -- Per command execution
+    action_pick text;
+
+    -- Per charger component / variable
+    component_id bigint;
+    variable_count int;
+    attribute_pick text;
+    mutability_pick text;
+
+    -- Per base report status
+    report_request_id bigint;
+
     -- Per transaction
     transaction_id text;
     transaction_count int;
@@ -80,6 +93,10 @@ BEGIN
     ----------------------------------------------------------------------------
     -- 1. Clear existing data
     ----------------------------------------------------------------------------
+    DELETE FROM public.core_command_executions;
+    DELETE FROM public.core_component_variables;
+    DELETE FROM public.core_charger_components;
+    DELETE FROM public.core_report_base_statuses;
     DELETE FROM public.core_transactions_event;
     DELETE FROM public.core_transactions_snapshot;
     DELETE FROM public.core_id_token;
@@ -108,7 +125,7 @@ BEGIN
         reason_pick   := (ARRAY['PowerUp', 'Reboot', 'LocalReset', 'FirmwareUpdate', 'RemoteReset'])[floor(random() * 5 + 1)];
 
         INSERT INTO public.core_charging_station (
-            "Id", "AccountId", "AuthDetailsId", "Booted", "ClientIdentifier", "Model", "Vendor",
+            "Id", "AccountId", "AuthorizationDetailsId", "Booted", "ClientIdentifier", "Model", "Vendor",
             "LatestBootNotificationReason", "Location", "Alias",
             "CreatedAt", "ModifiedAt"
         )
@@ -143,7 +160,7 @@ BEGIN
             );
 
             UPDATE public.core_charging_station
-            SET "AuthDetailsId" = auth_details_id
+            SET "AuthorizationDetailsId" = auth_details_id
             WHERE "Id" = station_id;
         END;
 
@@ -201,6 +218,104 @@ BEGIN
                 false,
                 false
             );
+        END LOOP;
+
+        -- Command execution audit trail.
+        FOR ev IN 1..(floor(random() * 3 + 1)::int) LOOP  -- 1..4 recent commands
+            action_pick := (ARRAY['RequestStartTransaction', 'RequestStopTransaction', 'Reset', 'GetVariables', 'SetVariables', 'GetBaseReport', 'UnlockConnector', 'GetTransactionStatus'])[floor(random() * 8 + 1)];
+
+            INSERT INTO public.core_command_executions (
+                "ChargingStationClientIdentifier", "ActionName", "MessageId",
+                "StartTime", "EndTime", "Completed", "Error", "ErrorMessage",
+                "ChargingStationId"
+            )
+            VALUES (
+                'MT_' || lpad(i::text, 3, '0'),
+                action_pick,
+                gen_random_uuid()::text,
+                NOW() - (random() * interval '30 days'),
+                NOW() - (random() * interval '29 days' + interval '2 seconds'),
+                random() > 0.1,
+                random() > 0.92,
+                CASE WHEN random() > 0.92 THEN 'Timeout waiting for response' ELSE NULL END,
+                station_id
+            );
+        END LOOP;
+
+        -- Charger config: station-level components with a few variables each.
+        --   OCPPCommCtrlr
+        INSERT INTO public.core_charger_components (
+            "ChargingStationId", "EvseConnectorId", "ClientIdentifier", "ComponentName", "ComponentInstance"
+        )
+        VALUES (station_id, NULL, 'MT_' || lpad(i::text, 3, '0'), 'OCPPCommCtrlr', NULL)
+        RETURNING "Id" INTO component_id;
+
+        INSERT INTO public.core_component_variables (
+            "Id", "ChargerComponentId", "Name", "Instance", "Value", "Constant",
+            "AttributeType", "Mutability", "Unit", "DataType", "MinLimit", "MaxLimit", "ValuesList"
+        ) VALUES
+        (gen_random_uuid(), component_id, 'HeartbeatInterval', NULL, '60',   true,  'Actual', 'ReadWrite', 's',    'integer', 1,   3600, NULL),
+        (gen_random_uuid(), component_id, 'MessageTimeout',    NULL, '30',   false, 'Actual', 'ReadOnly',  's',    'integer', 1,   3600, NULL),
+        (gen_random_uuid(), component_id, 'MessageAttempts',   NULL, '3',    NULL,  'Actual', 'ReadWrite', NULL,  'integer', 0,   10,   NULL);
+
+        --   SecurityCtrlr
+        INSERT INTO public.core_charger_components (
+            "ChargingStationId", "EvseConnectorId", "ClientIdentifier", "ComponentName", "ComponentInstance"
+        )
+        VALUES (station_id, NULL, 'MT_' || lpad(i::text, 3, '0'), 'SecurityCtrlr', NULL)
+        RETURNING "Id" INTO component_id;
+
+        INSERT INTO public.core_component_variables (
+            "Id", "ChargerComponentId", "Name", "Instance", "Value", "Constant",
+            "AttributeType", "Mutability", "Unit", "DataType", "MinLimit", "MaxLimit", "ValuesList"
+        ) VALUES
+        (gen_random_uuid(), component_id, 'BasicAuthPassword', NULL, replace(gen_random_uuid()::text, '-', '') || replace(gen_random_uuid()::text, '-', ''), NULL, 'Actual', 'ReadWrite', NULL, 'string', NULL, NULL, NULL),
+        (gen_random_uuid(), component_id, 'CertificateType',   NULL, 'ChargingStationCertificate', NULL, 'Actual', 'ReadWrite', NULL, 'string', NULL, NULL, 'ChargingStationCertificate,V2GCertificate,V2GRootCertificate,MOCertificate,MORootCertificate');
+
+        --   SmartChargingCtrlr
+        INSERT INTO public.core_charger_components (
+            "ChargingStationId", "EvseConnectorId", "ClientIdentifier", "ComponentName", "ComponentInstance"
+        )
+        VALUES (station_id, NULL, 'MT_' || lpad(i::text, 3, '0'), 'SmartChargingCtrlr', NULL)
+        RETURNING "Id" INTO component_id;
+
+        INSERT INTO public.core_component_variables (
+            "Id", "ChargerComponentId", "Name", "Instance", "Value", "Constant",
+            "AttributeType", "Mutability", "Unit", "DataType", "MinLimit", "MaxLimit", "ValuesList"
+        ) VALUES
+        (gen_random_uuid(), component_id, 'EnableSmartCharging', NULL, 'true',  NULL, 'Actual', 'ReadWrite', NULL, 'boolean', NULL, NULL, NULL),
+        (gen_random_uuid(), component_id, 'StopTxOnInvalidId',   NULL, 'false', NULL, 'Actual', 'ReadWrite', NULL, 'boolean', NULL, NULL, NULL);
+
+        --   One Connector component per EVSE connector, variables tracked against it.
+        FOR ev IN 1..connector_count LOOP
+            SELECT "Id" INTO connector_id
+            FROM public.core_evse_connector
+            WHERE "ChargingStationId" = station_id
+              AND "EvseId" = ev;
+
+            INSERT INTO public.core_charger_components (
+                "ChargingStationId", "EvseConnectorId", "ClientIdentifier", "ComponentName", "ComponentInstance"
+            )
+            VALUES (station_id, connector_id, 'MT_' || lpad(i::text, 3, '0'), 'Connector', lpad(ev::text, 2, '0'))
+            RETURNING "Id" INTO component_id;
+
+            INSERT INTO public.core_component_variables (
+                "Id", "ChargerComponentId", "Name", "Instance", "Value", "Constant",
+                "AttributeType", "Mutability", "Unit", "DataType", "MinLimit", "MaxLimit", "ValuesList"
+            ) VALUES
+            (gen_random_uuid(), component_id, 'Enabled',       NULL, 'true', NULL,  'Actual', 'ReadWrite', NULL, 'boolean', NULL, NULL, NULL),
+            (gen_random_uuid(), component_id, 'MaxCurrent',    NULL, (CASE WHEN random() > 0.5 THEN '32' ELSE '16' END), NULL, 'Target', 'ReadWrite', 'A', 'decimal', 6, 128, NULL),
+            (gen_random_uuid(), component_id, 'ConnectorType', NULL, (ARRAY['cCCS1', 'cCCS2', 'cType1', 'cType2', 'cCHAdeMO'])[floor(random() * 5 + 1)], NULL, 'Actual', 'ReadOnly', NULL, 'string', NULL, NULL, 'cCCS1,cCCS2,cType1,cType2,cCHAdeMO,cTesla');
+        END LOOP;
+
+        -- Base report progress markers (GetBaseReport / NotifyReport bookkeeping).
+        FOR ev IN 1..2 LOOP
+            -- stable pseudo-random request id per station + request index
+            report_request_id := ('x' || substr(replace(station_id::text, '-', ''), 1, 16))::bit(64)::bigint + ev;
+            FOR k IN 0..floor(random() * 3)::int LOOP  -- seqno 0..2
+                INSERT INTO public.core_report_base_statuses ("Id", "RequestId", "SeqNo")
+                VALUES (gen_random_uuid(), report_request_id, k);
+            END LOOP;
         END LOOP;
 
         -- A handful of completed transactions with events.
@@ -302,7 +417,7 @@ BEGIN
             reason_pick   := (ARRAY['PowerUp', 'Reboot', 'LocalReset', 'FirmwareUpdate', 'RemoteReset', 'Unknown'])[floor(random() * 6 + 1)];
 
             INSERT INTO public.core_charging_station (
-                "Id", "AccountId", "AuthDetailsId", "Booted", "ClientIdentifier", "Model", "Vendor",
+                "Id", "AccountId", "AuthorizationDetailsId", "Booted", "ClientIdentifier", "Model", "Vendor",
                 "LatestBootNotificationReason", "Location", "Alias",
                 "CreatedAt", "ModifiedAt"
             )
@@ -337,7 +452,7 @@ BEGIN
                 );
 
                 UPDATE public.core_charging_station
-                SET "AuthDetailsId" = noise_auth_details_id
+                SET "AuthorizationDetailsId" = noise_auth_details_id
                 WHERE "Id" = station_id;
             END;
 
@@ -397,6 +512,74 @@ BEGIN
                         random() > 0.85
                     );
                 END LOOP;
+            END LOOP;
+
+            -- Command execution audit trail.
+            FOR k IN 1..(floor(random() * 2 + 1)::int) LOOP  -- 1..3 recent commands
+                action_pick := (ARRAY['RequestStartTransaction', 'RequestStopTransaction', 'Reset', 'GetVariables', 'SetVariables', 'GetBaseReport', 'UnlockConnector'])[floor(random() * 7 + 1)];
+
+                INSERT INTO public.core_command_executions (
+                    "ChargingStationClientIdentifier", "ActionName", "MessageId",
+                    "StartTime", "EndTime", "Completed", "Error", "ErrorMessage",
+                    "ChargingStationId"
+                )
+                VALUES (
+                    'NS_' || lpad(i::text, 2, '0') || '_' || lpad(j::text, 2, '0'),
+                    action_pick,
+                    gen_random_uuid()::text,
+                    NOW() - (random() * interval '60 days'),
+                    NOW() - (random() * interval '59 days' + interval '2 seconds'),
+                    random() > 0.15,
+                    random() > 0.9,
+                    CASE WHEN random() > 0.9 THEN 'Station rejected the command' ELSE NULL END,
+                    station_id
+                );
+            END LOOP;
+
+            -- Charger config: a couple of station-level components.
+            FOR k IN 1..2 LOOP
+                INSERT INTO public.core_charger_components (
+                    "ChargingStationId", "EvseConnectorId", "ClientIdentifier", "ComponentName", "ComponentInstance"
+                )
+                VALUES (
+                    station_id, NULL,
+                    'NS_' || lpad(i::text, 2, '0') || '_' || lpad(j::text, 2, '0'),
+                    (ARRAY['OCPPCommCtrlr', 'SecurityCtrlr'])[k],
+                    NULL
+                )
+                RETURNING "Id" INTO component_id;
+
+                variable_count := floor(random() * 3 + 2)::int;  -- 2..4
+                FOR m IN 1..variable_count LOOP
+                    attribute_pick  := (ARRAY['Actual', 'Actual', 'Target'])[floor(random() * 3 + 1)];
+                    mutability_pick := (ARRAY['ReadOnly', 'ReadWrite', 'ReadWrite'])[floor(random() * 3 + 1)];
+
+                    INSERT INTO public.core_component_variables (
+                        "Id", "ChargerComponentId", "Name", "Instance", "Value", "Constant",
+                        "AttributeType", "Mutability", "Unit", "DataType", "MinLimit", "MaxLimit", "ValuesList"
+                    )
+                    VALUES (
+                        gen_random_uuid(), component_id,
+                        (ARRAY['HeartbeatInterval', 'MessageTimeout', 'MessageAttempts', 'BasicAuthPassword', 'LocalPreAuthorize', 'Enabled'])[floor(random() * 6 + 1)],
+                        NULL,
+                        (CASE WHEN random() > 0.3 THEN floor(random() * 600 + 1)::text ELSE NULL END),
+                        random() > 0.5,
+                        attribute_pick,
+                        mutability_pick,
+                        (ARRAY['s', 'A', 'V', 'W', NULL])[floor(random() * 5 + 1)],
+                        (ARRAY['boolean', 'integer', 'decimal', 'string'])[floor(random() * 4 + 1)],
+                        (random() * 10)::numeric(10,2),
+                        (random() * 1000 + 10)::numeric(10,2),
+                        NULL
+                    );
+                END LOOP;
+            END LOOP;
+
+            -- Base report progress marker (GetBaseReport / NotifyReport bookkeeping).
+            report_request_id := ('x' || substr(replace(station_id::text, '-', ''), 1, 16))::bit(64)::bigint;
+            FOR k IN 0..floor(random() * 4)::int LOOP  -- seqno 0..3
+                INSERT INTO public.core_report_base_statuses ("Id", "RequestId", "SeqNo")
+                VALUES (gen_random_uuid(), report_request_id, k);
             END LOOP;
 
             -- transactions
@@ -493,6 +676,10 @@ UNION ALL SELECT 'tariffs',                 COUNT(*)::text FROM public.core_tari
 UNION ALL SELECT 'auth_details',            COUNT(*)::text FROM public.core_auth_details
 UNION ALL SELECT 'auth_users',              COUNT(*)::text FROM public.core_auth_user
 UNION ALL SELECT 'id_tokens',               COUNT(*)::text FROM public.core_id_token
+UNION ALL SELECT 'command_executions',      COUNT(*)::text FROM public.core_command_executions
+UNION ALL SELECT 'charger_components',      COUNT(*)::text FROM public.core_charger_components
+UNION ALL SELECT 'component_variables',     COUNT(*)::text FROM public.core_component_variables
+UNION ALL SELECT 'report_base_statuses',    COUNT(*)::text FROM public.core_report_base_statuses
 UNION ALL SELECT 'transactions_snapshot',   COUNT(*)::text FROM public.core_transactions_snapshot
 UNION ALL SELECT 'transactions_event',      COUNT(*)::text FROM public.core_transactions_event
 ORDER BY entity;
