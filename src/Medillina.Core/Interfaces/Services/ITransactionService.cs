@@ -11,5 +11,7 @@ public interface ITransactionService
 
     Task<string?> GetTransactionUnit(ChargingStation cs, string transactionId);
 
-    void FinalizeTransaction(ChargingStation cs, TransactionSnapshot snapshot);
+    void FinalizeTransaction(ChargingStation cs, TransactionEvent transaction, TransactionSnapshot snapshot);
+
+    Task<TransactionSnapshot> GetOrCreateTransactionSnapshot(ChargingStation cs, string transactionId);
 }

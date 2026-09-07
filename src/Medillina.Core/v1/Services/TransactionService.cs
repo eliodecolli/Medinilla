@@ -15,11 +15,7 @@ public sealed class TransactionService(TransactionsUnitOfWork unitOfWork) : ITra
     public void RegisterTransaction(ChargingStation cs, TransactionEvent transaction, IdToken idToken)
     {
         transaction.IdToken = idToken;
-
-        if (!idToken.IsUnderTx)
-        {
-            idToken.IsUnderTx = true;
-        }
+        idToken.IsUnderTx = true;
 
         cs.TransactionEvents.Add(transaction);
     }
@@ -32,15 +28,29 @@ public sealed class TransactionService(TransactionsUnitOfWork unitOfWork) : ITra
         return Task.FromResult(unit);
     }
 
-    public void FinalizeTransaction(ChargingStation cs, TransactionSnapshot snapshot)
+    public void FinalizeTransaction(ChargingStation cs, TransactionEvent transaction, TransactionSnapshot snapshot)
     {
         // first check whether there's a current already persisted snapshot for this transaction
-        if (cs.TransactionSnapshots.Any(ts => ts.TransactionId == snapshot.TransactionId))
+        if (cs.TransactionSnapshots.Any(ts => ts.TransactionId == snapshot.TransactionId &&
+                                              ts.LatestSeqNo == transaction.SeqNo))
         {
             // yeah, another request won this race
             throw new TransactionException($"Transaction {snapshot.TransactionId} has already been finalized.");
         }
 
+        snapshot.LatestSeqNo = transaction.SeqNo;
         cs.TransactionSnapshots.Add(snapshot);
+    }
+
+    public Task<TransactionSnapshot> GetOrCreateTransactionSnapshot(ChargingStation cs, string transactionId)
+    {
+        var snapshot = cs.TransactionSnapshots.FirstOrDefault(ts => ts.TransactionId == transactionId) ??
+                       new TransactionSnapshot
+                       {
+                           ChargingStation = cs,
+                           TransactionId = transactionId,
+                       };
+
+        return Task.FromResult(snapshot);
     }
 }

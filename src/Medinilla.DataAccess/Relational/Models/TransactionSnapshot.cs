@@ -14,11 +14,19 @@ public class TransactionSnapshot
 
     public string StartReason { get; set; }
 
-    public string EndReason { get; set; }
+    public string? EndReason { get; set; }
+    
+    public int LatestSeqNo { get; set; }
 
     public decimal TotalMeteredValue { get; set; }
 
     public decimal TotalCost { get; set; }
+
+    public decimal? BeginConsumption { get; set; }
+    
+    public decimal? EndConsumption { get; set; }
+
+    public decimal TotalConsumption { get; set; }
 
     public DateTime StartedAt { get; set; }
 

@@ -94,8 +94,11 @@ public sealed class TransactionEventAction(
             }
             else
             {
-                var consumption = GetTransactionConsumption(request);
+                var snapshot =
+                    await transactionService.GetOrCreateTransactionSnapshot(chargingStation,
+                        transaction.TransactionId);
                 
+                var consumption = GetTransactionConsumption(request);
                 #if DEBUG
                 if (consumption.Consumption < 0)
                 {
@@ -113,40 +116,46 @@ public sealed class TransactionEventAction(
 
                 transaction.ConsumptionType = (ConsumptionTypeDb?)consumption.ConsumptionType;
 
-                transactionService.RegisterTransaction(chargingStation, transaction, idToken);
+                transactionService.RegisterTransaction(chargingStation, transaction, idToken!);
 
-                if (request.EventType == TransactionEventEnum.Ended)
+                switch (request.EventType)
                 {
-                    var lastSeqNo = currentTransactions.LastOrDefault()?.SeqNo;
-                    // first check for sanity
-                    if (lastSeqNo > request.SeqNo)
-                    {
-                        // the END event cannot have a smaller SeqNo than the rest of them :(
-                        logger.LogError("Transaction for clientIdentifier='{clientIdentifier}' seqNo={seqNo} is smaller than last seqNo={seqNoLast} ",
-                            clientIdentifier, request.SeqNo, lastSeqNo);
-                        
-                        // cleanup db context just in case
-                        // returning here will discard the changes automatically,
-                        // but this still feels like good practice
-                        unitOfWorkWrapper.DiscardChanges();
-                        return new RpcResult()
-                        {
-                            Error = call.CreateErrorResult<TransactionEventResponse>(
-                                OcppCallError.ErrorCodes.OccurrenceConstraintViolation,
-                                $"Transaction {request.TransactionInfo.TransactionId} with EventType='Ended' must have greatest SeqNo than its previous siblings.")
-                        };
-                    }
+                    case TransactionEventEnum.Started:
+                        logger.LogInformation(
+                            $"{clientIdentifier} started a new transaction tx='{transaction.TransactionId}'. Reason: {request.TriggerReason}");
 
-                    // do we need to keep a coherent snapshot after each tx event?
-                    if (currentTransactions.Count > 0)
+                        snapshot.StartReason = transaction.TriggerReason;
+                        snapshot.StartedAt = DateTime.UtcNow;
+                        break;
+                    case TransactionEventEnum.Updated:
+                        // this will set the initial Begin consumption - hopefully
+                        // it's not really bullet-proof tho;
+                        // we should probably extend the Consumption Service to return the context as well
+                        snapshot.BeginConsumption ??= transaction.RegisterValue;
+                        break;
+                    case TransactionEventEnum.Ended:
                     {
-                        var firstTransaction = currentTransactions.FirstOrDefault(tx =>
-                            tx.EventType == nameof(TransactionEventEnum.Started));
-                        if (firstTransaction is null)
+                        logger.LogInformation(
+                            $"{clientIdentifier} ended transaction with id {request.TransactionInfo.TransactionId} Total Cost: {response.TotalCost}");
+
+                        var lastSeqNo = currentTransactions.LastOrDefault()?.SeqNo;
+                        // first check for sanity
+                        if (lastSeqNo > request.SeqNo)
                         {
-                            logger.LogError(
-                                "Partially finalizing tx snapshot for {TransactionInfoTransactionId}: No 'Started' event was found.",
-                                request.TransactionInfo.TransactionId);
+                            // the END event cannot have a smaller SeqNo than the rest of them :(
+                            logger.LogError("Transaction for clientIdentifier='{clientIdentifier}' seqNo={seqNo} is smaller than last seqNo={seqNoLast} ",
+                                clientIdentifier, request.SeqNo, lastSeqNo);
+                        
+                            // cleanup db context just in case
+                            // returning here will discard the changes automatically,
+                            // but this still feels like good practice
+                            unitOfWorkWrapper.DiscardChanges();
+                            return new RpcResult()
+                            {
+                                Error = call.CreateErrorResult<TransactionEventResponse>(
+                                    OcppCallError.ErrorCodes.OccurrenceConstraintViolation,
+                                    $"Transaction {request.TransactionInfo.TransactionId} with EventType='Ended' must have greatest SeqNo than its previous siblings.")
+                            };
                         }
                         
                         var unitName =
@@ -157,63 +166,47 @@ public sealed class TransactionEventAction(
                         
                         // send the final response cost to the charger
                         response.TotalCost = totalCost;
+                    
+                        snapshot.EndedAt = transaction.Timestamp;
+                        snapshot.EndReason = transaction.TriggerReason;
+                        snapshot.TotalCost = totalCost;
 
-                        var snapshot = new TransactionSnapshot
-                        {
-                            ChargingStationId = transaction.ChargingStationId,
-                            TransactionId = transaction.TransactionId,
-                            StartReason = firstTransaction?.TriggerReason ??
-                                          Enum.GetName(TriggerReasonEnum.AbnormalCondition)!,
-                            EndedAt = transaction.Timestamp,
-                            EndReason = transaction.TriggerReason,
-                            TotalCost = totalCost,
-                        };
-
-                        try
-                        {
-                            transactionService.FinalizeTransaction(chargingStation, snapshot);
-                        }
-                        catch (TransactionException e)
-                        {
-                            logger.LogError(
-                                "Cannot finalize transaction for ci='{ci}': Transaction with id='{tx}' has already been finalized.",
-                                clientIdentifier, snapshot.TransactionId);
-                        }
-                    }
-
-                    idToken.IsUnderTx = false;
-                    logger.LogInformation("Released token for tx={tx} ci={ci}",
-                        transaction.Id, clientIdentifier);
+                        idToken.IsUnderTx = false;
+                        logger.LogInformation("Released token for tx={tx} ci={ci}",
+                            transaction.Id, clientIdentifier);
                         
-                    if (request.IdToken?.Type == IdTokenType.Central)
-                    {
-                        if (idTokenService.RemoveTemporaryToken(chargingStation, idToken))
+                        if (request.IdToken?.Type == IdTokenType.Central)
                         {
-                            logger.LogInformation(
-                                "{ClientIdentifier}: Removed temporary token {IdTokenToken} because transaction is done.", clientIdentifier, request.IdToken.Token);
+                            if (idTokenService.RemoveTemporaryToken(chargingStation, idToken))
+                            {
+                                logger.LogInformation(
+                                    "{ClientIdentifier}: Removed temporary token {IdTokenToken} because transaction is done.", clientIdentifier, request.IdToken.Token);
+                            }
+                            else
+                            {
+                                logger.LogWarning(
+                                    "{ClientIdentifier}: Temp token {IdTokenToken} couldn't be removed.", clientIdentifier, request.IdToken.Token);
+                            }
                         }
-                        else
-                        {
-                            logger.LogWarning(
-                                "{ClientIdentifier}: Temp token {IdTokenToken} couldn't be removed.", clientIdentifier, request.IdToken.Token);
-                        }
+
+                        break;
                     }
                 }
 
-                switch (request.EventType)
+                try
                 {
-                    case TransactionEventEnum.Started:
-                        logger.LogInformation(
-                            $"{clientIdentifier} started a new transaction. Reason: {request.TriggerReason}");
-                        break;
-                    case TransactionEventEnum.Ended:
-                        logger.LogInformation(
-                            $"{clientIdentifier} ended transaction with id {request.TransactionInfo.TransactionId} Total Cost: {response.TotalCost}");
-                        break;
+                    transactionService.FinalizeTransaction(chargingStation, transaction, snapshot);
                 }
-
+                catch (TransactionException)
+                {
+                    logger.LogError("Error finalizing tx snapshot: Transaction id='{tx}' seqNo='{seqNo}' for client ci='{ci}' has already been finalized.",
+                        transaction.TransactionId, transaction.SeqNo, clientIdentifier);
+                    
+                    // eh drop it.
+                    unitOfWorkWrapper.DiscardChanges();
+                }
+                
                 await unitOfWorkWrapper.SaveChanges();
-
                 return new RpcResult()
                 {
                     Result = call.CreateResult(response),

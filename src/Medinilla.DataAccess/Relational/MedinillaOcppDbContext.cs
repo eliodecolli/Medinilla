@@ -27,7 +27,7 @@ public class MedinillaOcppDbContext(DbContextOptions<MedinillaOcppDbContext> opt
 
         // configure indecies
         modelBuilder.Entity<TransactionSnapshot>().HasIndex(c => new { c.ChargingStationId, c.TransactionId });
-        modelBuilder.Entity<TransactionSnapshot>().HasIndex(c => c.TransactionId);
+        modelBuilder.Entity<TransactionSnapshot>().HasIndex(c => c.TransactionId).IsUnique();
 
         modelBuilder.Entity<TransactionEvent>().HasIndex(c => new { c.ChargingStationId, c.TransactionId });
         modelBuilder.Entity<TransactionEvent>().HasIndex(c => c.TransactionId);

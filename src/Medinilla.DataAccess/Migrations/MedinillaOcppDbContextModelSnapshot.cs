@@ -474,11 +474,16 @@ namespace Medinilla.DataAccess.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<decimal?>("BeginConsumption")
+                        .HasColumnType("numeric");
+
                     b.Property<Guid>("ChargingStationId")
                         .HasColumnType("uuid");
 
+                    b.Property<decimal?>("EndConsumption")
+                        .HasColumnType("numeric");
+
                     b.Property<string>("EndReason")
-                        .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<DateTime>("EndedAt")
@@ -490,12 +495,18 @@ namespace Medinilla.DataAccess.Migrations
                     b.Property<Guid?>("IdTokenId")
                         .HasColumnType("uuid");
 
+                    b.Property<int>("LatestSeqNo")
+                        .HasColumnType("integer");
+
                     b.Property<string>("StartReason")
                         .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<DateTime>("StartedAt")
                         .HasColumnType("timestamp with time zone");
+
+                    b.Property<decimal>("TotalConsumption")
+                        .HasColumnType("numeric");
 
                     b.Property<decimal>("TotalCost")
                         .HasColumnType("numeric");
@@ -513,7 +524,8 @@ namespace Medinilla.DataAccess.Migrations
 
                     b.HasIndex("IdTokenId");
 
-                    b.HasIndex("TransactionId");
+                    b.HasIndex("TransactionId")
+                        .IsUnique();
 
                     b.HasIndex("ChargingStationId", "TransactionId");
 
