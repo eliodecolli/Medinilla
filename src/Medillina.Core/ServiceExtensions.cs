@@ -8,7 +8,6 @@ using Medinilla.Core.Logic.Authorization;
 using Medinilla.Core.Logic.Authorization.Algorithms;
 using Medinilla.Core.v1;
 using Medinilla.Core.v1.Services;
-using Medinilla.Core.v1.Transactions;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Medinilla.Core;
@@ -21,7 +20,7 @@ public static class ServiceExtensions
         services.AddScoped<IOcppAction, HeartbeatAction>();
         services.AddScoped<IOcppAction, SecurityEventNotificationAction>();
         services.AddScoped<IOcppAction, AuthorizeAction>();
-        services.AddScoped<IOcppAction, TransactionEventAction>();
+        // TransactionEventAction removed in the transaction-handling rewrite.
         services.AddScoped<IOcppAction, StatusNotificationAction>();
         services.AddScoped<IOcppAction, NotifyReportAction>();
         //...add more
@@ -58,18 +57,17 @@ public static class ServiceExtensions
         // add services
         serviceCollection.AddScoped<IChargingStationBootingService, ChargingStationBooting>();
         serviceCollection.AddScoped<IRouterServices, RouterServices>();
-        serviceCollection.AddScoped<IIdTokenService, IdTokenService>();
+        // IIdTokenService / ITransactionService / ConsumptionService removed in the
+        // transaction-handling rewrite. Re-add as the new implementation lands.
         serviceCollection.AddScoped<ITariffService, TariffService>();
         serviceCollection.AddScoped<ICommandExecutionService, CommandExecutionService>();
         serviceCollection.AddScoped<IChargerConfigService, ChargerConfigService>();
         serviceCollection.AddScoped<IChargerService, ChargerService>();
-        serviceCollection.AddScoped<ITransactionService, TransactionService>();
         serviceCollection.AddScoped<IUnitOfWorkWrapper,  UnitOfWorkWrapper>();
 
         serviceCollection.AddScoped<IOcppActionsFactory, OcppActionsFactory>();
         serviceCollection.AddScoped<IOcppChargerCommandFactory, OcppChargerCommandsFactory>();
         serviceCollection.AddScoped<IOcppCallRouter, OcppCallRouter>();
         serviceCollection.AddScoped<AuthorizationAlgorithmFactory>();
-        serviceCollection.AddScoped<ConsumptionService>();
     }
 }

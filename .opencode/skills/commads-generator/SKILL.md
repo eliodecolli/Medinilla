@@ -6,9 +6,9 @@ description: Scaffold a new OCPP 2.0.1 charger command end-to-end (command, OCPP
 ## What this skill produces
 Everything needed to add a new outbound OCPP action (CSMS -> charger):
 
-1. The gRPC contract message(s) and `rpc` declaration in `Medinilla.Core.gRPC`.
+1. A per-action gRPC API proto and the `rpc` declaration in the OCPP service in `Medinilla.Core.gRPC`.
 2. The gRPC service method implementation in `Medinilla.Core.Service/Communication/MedinillaGrpc.cs`.
-3. The `gRPC -> OCPP payload` mapping as a partial `MedinillaMapping` class in `Medinilla.Core.Service/Communication/Mapping/<CommandName>Mapping.cs`.
+3. The `gRPC -> OCPP payload` mapping as a partial `MedinillaMapping` class in `Medinilla.Core.Service/Communication/Mapping/ocpp/<CommandName>Mapping.cs`.
 4. The OCPP payload `Request`/`Response` DTOs in `Medinilla.DataTypes/Contracts/` (plus any common types under `Contracts/Common/`).
 5. The command class in `Medillina.Core/Commands/Ocpp201/` (response handlers only — no mapping, no call-building).
 6. Registration in `AddOcppChargerCommands` and the action constant in `OcppActionNames`.
@@ -33,11 +33,12 @@ Use `<NewAction>` as the placeholder for the new OCPP action's PascalCase name (
 
 | Step | File |
 | --- | --- |
-| 1. gRPC `rpc` | `src/Medinilla.Core.gRPC/Service/OcppService.proto` |
-| 1. gRPC request/response messages | `src/Medinilla.Core.gRPC/Service/Types.proto` |
-| 1. (optional) shared sub-message | `src/Medinilla.Core.gRPC/Contracts/<Name>.proto` + register in `src/Medinilla.Core.gRPC/Medinilla.Core.gRPC.csproj` |
+| 1. gRPC request/response API | `src/Medinilla.Core.gRPC/Service/ocpp/<NewAction>API.proto` |
+| 1. gRPC `rpc` and API import | `src/Medinilla.Core.gRPC/Service/ocpp/OcppService.proto` |
+| 1. (optional) shared OCPP sub-message | `src/Medinilla.Core.gRPC/Contracts/ocpp/<Name>.proto` |
+| 1. proto registration | `src/Medinilla.Core.gRPC/Medinilla.Core.gRPC.csproj` (every new proto must be explicit) |
 | 2. Service method | `src/Medinilla.Core.Service/Communication/MedinillaGrpc.cs` |
-| 3. Mapping | `src/Medinilla.Core.Service/Communication/Mapping/<NewAction>Mapping.cs` |
+| 3. Mapping | `src/Medinilla.Core.Service/Communication/Mapping/ocpp/<NewAction>Mapping.cs` |
 | 4. OCPP payload DTOs | `src/Medinilla.DataTypes/Contracts/<NewAction>Request.cs`, `.../<NewAction>Response.cs` |
 | 4. (optional) common type | `src/Medinilla.DataTypes/Contracts/Common/<Name>.cs` |
 | 5. Command class | `src/Medillina.Core/Commands/Ocpp201/<NewAction>Command.cs` |
@@ -69,37 +70,21 @@ There is **no `BuildCall`** and **no payload mapping** on the command. Commands 
 
 ## Step 1 — gRPC contract
 
-### 1a. `OcppService.proto` (`src/Medinilla.Core.gRPC/Service/OcppService.proto`)
-Add a new `rpc` to the existing `OcppService` service block:
+The gRPC project is split by service. Outbound charger commands belong to the **OCPP** tree (`Service/ocpp`, `Contracts/ocpp`) and the existing `OcppService`; do not add them to `Service/query`, `Contracts/query`, or `QueryService`.
+
+There is no shared `Types.proto` anymore. Each operation owns a `<NewAction>API.proto` containing its request and response messages. `Error` remains shared in `Service/ocpp/Error.proto`.
+
+### 1a. Create `<NewAction>API.proto`
+Create `src/Medinilla.Core.gRPC/Service/ocpp/<NewAction>API.proto`:
 
 ```proto
 syntax = "proto3";
 
 option csharp_namespace = "Medinilla.Core.gRPC.Service";
 
-import "Service/Types.proto";
+import "Service/ocpp/Error.proto";
 
 package medinilla.core.grpc;
-
-service OcppService {
-    rpc <NewAction> (<NewAction>Request) returns (<NewAction>Response) {}
-}
-```
-
-### 1b. `Types.proto` (`src/Medinilla.Core.gRPC/Service/Types.proto`)
-Add the request and response messages. The response always wraps `Error`:
-
-```proto
-syntax = "proto3";
-
-option csharp_namespace = "Medinilla.Core.gRPC.Service";
-
-package medinilla.core.grpc;
-
-message Error {
-    bool has_error = 1;
-    optional string message = 2;
-}
 
 message <NewAction>Request {
     string client_identifier = 1;
@@ -111,10 +96,43 @@ message <NewAction>Response {
 }
 ```
 
-If the request needs a shared sub-message (a single item reused across the message), put it in `src/Medinilla.Core.gRPC/Contracts/<Name>.proto`, then add an `import "<Name>.proto";` to `Types.proto` and reference it.
+If the API needs a reusable OCPP-facing sub-message, put it in `src/Medinilla.Core.gRPC/Contracts/ocpp/<Name>.proto`. Give it `csharp_namespace = "Medinilla.Core.gRPC.Contracts"` and `package medinilla.core.grpc`, then import it from the API file with its repository-root-relative path:
 
-### 1c. `Medinilla.Core.gRPC.csproj` (only if you added a new proto under `Contracts/`)
-The csproj does **not** glob — add an explicit `<Protobuf Include="Contracts\<Name>.proto" />` line under `<ItemGroup>`.
+```proto
+import "Contracts/ocpp/<Name>.proto";
+```
+
+Do not duplicate `Error`; always import `Service/ocpp/Error.proto`.
+
+### 1b. Register every new proto in `Medinilla.Core.gRPC.csproj`
+`src/Medinilla.Core.gRPC/Medinilla.Core.gRPC.csproj` does **not** glob proto files. Add the action API explicitly to its existing protobuf item group:
+
+```xml
+<Protobuf Include="Service\ocpp\<NewAction>API.proto" />
+```
+
+If a contract proto was created, register that too:
+
+```xml
+<Protobuf Include="Contracts\ocpp\<Name>.proto" />
+```
+
+### 1c. Import the API and declare the RPC in `OcppService.proto`
+Update `src/Medinilla.Core.gRPC/Service/ocpp/OcppService.proto`. Add the API import alongside the existing OCPP API imports:
+
+```proto
+import "Service/ocpp/<NewAction>API.proto";
+```
+
+Then add the RPC to the existing service block:
+
+```proto
+service OcppService {
+    rpc <NewAction> (<NewAction>Request) returns (<NewAction>Response) {}
+}
+```
+
+Keep `option csharp_namespace = "Medinilla.Core.gRPC.Service"` and `package medinilla.core.grpc`; these intentionally match the other OCPP API files.
 
 ---
 
@@ -182,7 +200,7 @@ The required usings already in the file: `Grpc.Core`, `Medinilla.Core.gRPC.Contr
 ---
 
 ## Step 3 — Mapping (gRPC -> OCPP payload)
-Create `src/Medinilla.Core.Service/Communication/Mapping/<NewAction>Mapping.cs`. One static method per command, named `Map<NewAction>`:
+Create `src/Medinilla.Core.Service/Communication/Mapping/ocpp/<NewAction>Mapping.cs`. OCPP mappings live under `Mapping/ocpp`; `Mapping/query` is reserved for the separate query service. One static method per command, named `Map<NewAction>`:
 
 ```csharp
 using Medinilla.DataTypes.Contracts;
