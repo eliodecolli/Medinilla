@@ -14,11 +14,6 @@ public class MedinillaOcppDbContext(DbContextOptions<MedinillaOcppDbContext> opt
     {
         base.OnModelCreating(modelBuilder);
 
-        // Transaction event/snapshot tables removed in the transaction-handling
-        // rewrite. The drop is captured by the EF migration
-        // "DropCoreTransactionsEventAndSnapshot"; this DbContext no longer references
-        // either entity.
-
         // configure table
         modelBuilder.Entity<Account>().ToTable("core_account");
         modelBuilder.Entity<ChargingStation>().ToTable("core_charging_station");
@@ -66,6 +61,31 @@ public class MedinillaOcppDbContext(DbContextOptions<MedinillaOcppDbContext> opt
         modelBuilder.Entity<AuthorizationUser>().HasOne(c => c.ChargingStation)
             .WithMany(c => c.AuthorizationUsers)
             .HasForeignKey(c => c.ChargingStationId);
+
+        modelBuilder.Entity<TransactionEvent>().ToTable("core_transactions_event");
+        modelBuilder.Entity<TransactionEvent>().HasIndex(te => new
+        {
+            te.ChargingStationId,
+            te.TransactionId,
+            te.SeqNo
+        }).IsUnique();
+
+        modelBuilder.Entity<TransactionEvent>().Property(te => te.EventType)
+            .HasConversion<string>();
+        modelBuilder.Entity<TransactionEvent>().Property(te => te.TriggerReason)
+            .HasConversion<string>();
+        modelBuilder.Entity<TransactionEvent>().Property(te => te.ChargingState)
+            .HasConversion<string>();
+        modelBuilder.Entity<TransactionEvent>().Property(te => te.StoppedReason)
+            .HasConversion<string>();
+
+        modelBuilder.Entity<TransactionEvent>().HasOne(te => te.ChargingStation)
+            .WithMany()
+            .HasForeignKey(te => te.ChargingStationId);
+        modelBuilder.Entity<TransactionEvent>().HasOne(te => te.IdToken)
+            .WithMany()
+            .HasForeignKey(te => te.IdTokenId)
+            .OnDelete(DeleteBehavior.SetNull);
 
         // configure command execution auditing
         modelBuilder.Entity<CommandExecution>().ToTable("core_command_executions");
