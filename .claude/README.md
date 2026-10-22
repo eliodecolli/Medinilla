@@ -1,0 +1,3 @@
+# .claude
+
+Skills: `../.agents/skills`

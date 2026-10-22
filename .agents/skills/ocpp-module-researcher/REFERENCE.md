@@ -15,7 +15,7 @@ The script auto-installs `pypdf` on first run if it's missing.
 ## Usage
 
 ```powershell
-python .opencode/skills/ocpp-module-researcher/scripts/search_ocpp_pdf.py <term> [<term> ...] [options]
+python .agents/skills/ocpp-module-researcher/scripts/search_ocpp_pdf.py <term> [<term> ...] [options]
 ```
 
 ### Positional arguments
@@ -40,7 +40,7 @@ python .opencode/skills/ocpp-module-researcher/scripts/search_ocpp_pdf.py <term>
 Search for the SetVariables flow:
 
 ```powershell
-python .opencode/skills/ocpp-module-researcher/scripts/search_ocpp_pdf.py `
+python .agents/skills/ocpp-module-researcher/scripts/search_ocpp_pdf.py `
     "SetVariablesRequest" "SetVariablesResponse" "Set Variables" `
     -o "C:\Users\elio_\AppData\Local\Temp\opencode\ocpp_setvariables.txt"
 ```
@@ -48,13 +48,13 @@ python .opencode/skills/ocpp-module-researcher/scripts/search_ocpp_pdf.py `
 Search only the use-case section for a specific use case id:
 
 ```powershell
-python .opencode/skills/ocpp-module-researcher/scripts/search_ocpp_pdf.py "B05" --pages 50-70
+python .agents/skills/ocpp-module-researcher/scripts/search_ocpp_pdf.py "B05" --pages 50-70
 ```
 
 Get the full text of every page that mentions a message:
 
 ```powershell
-python .opencode/skills/ocpp-module-researcher/scripts/search_ocpp_pdf.py "TriggerMessage" --full
+python .agents/skills/ocpp-module-researcher/scripts/search_ocpp_pdf.py "TriggerMessage" --full
 ```
 
 ## Exit codes
