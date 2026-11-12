@@ -43,5 +43,7 @@ public class TransactionEvent
 
     public virtual IdToken? IdToken { get; set; }
 
-    public virtual required ChargingStation ChargingStation { get; set; }
+    public virtual ChargingStation ChargingStation { get; set; }
+
+    public virtual ICollection<TransactionSample> Samples { get; set; } = new List<TransactionSample>();
 }

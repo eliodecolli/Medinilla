@@ -395,6 +395,106 @@ namespace Medinilla.DataAccess.Migrations
                     b.ToTable("core_tariff", (string)null);
                 });
 
+            modelBuilder.Entity("Medinilla.DataAccess.Relational.Models.TransactionEvent", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("CableMaxCurrent")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ChargingState")
+                        .HasColumnType("text");
+
+                    b.Property<Guid>("ChargingStationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("ConnectorId")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("EventType")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<int?>("EvseId")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("IdTokenId")
+                        .HasColumnType("uuid");
+
+                    b.Property<int?>("NumberOfPhasesUsed")
+                        .HasColumnType("integer");
+
+                    b.Property<bool?>("Offline")
+                        .HasColumnType("boolean");
+
+                    b.Property<int?>("RemoteStartId")
+                        .HasColumnType("integer");
+
+                    b.Property<int?>("ReservationId")
+                        .HasColumnType("integer");
+
+                    b.Property<int>("SeqNo")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("StoppedReason")
+                        .HasColumnType("text");
+
+                    b.Property<int?>("TimeSpentCharging")
+                        .HasColumnType("integer");
+
+                    b.Property<DateTime>("Timestamp")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<string>("TransactionId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("TriggerReason")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("IdTokenId");
+
+                    b.HasIndex("ChargingStationId", "TransactionId", "SeqNo")
+                        .IsUnique();
+
+                    b.ToTable("core_transactions_event", (string)null);
+                });
+
+            modelBuilder.Entity("Medinilla.DataAccess.Relational.Models.TransactionSample", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Location")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Measurand")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("Timestamp")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("TransactionEventId")
+                        .HasColumnType("uuid");
+
+                    b.Property<decimal>("Value")
+                        .HasColumnType("numeric");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TransactionEventId");
+
+                    b.ToTable("core_transaction_samples", (string)null);
+                });
+
             modelBuilder.Entity("Medinilla.DataAccess.Relational.Models.Audit.CommandExecution", b =>
                 {
                     b.HasOne("Medinilla.DataAccess.Relational.Models.ChargingStation", null)
@@ -504,6 +604,35 @@ namespace Medinilla.DataAccess.Migrations
                     b.Navigation("ChargingStation");
                 });
 
+            modelBuilder.Entity("Medinilla.DataAccess.Relational.Models.TransactionEvent", b =>
+                {
+                    b.HasOne("Medinilla.DataAccess.Relational.Models.ChargingStation", "ChargingStation")
+                        .WithMany("TransactionEvents")
+                        .HasForeignKey("ChargingStationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Medinilla.DataAccess.Relational.Models.Authorization.IdToken", "IdToken")
+                        .WithMany()
+                        .HasForeignKey("IdTokenId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("ChargingStation");
+
+                    b.Navigation("IdToken");
+                });
+
+            modelBuilder.Entity("Medinilla.DataAccess.Relational.Models.TransactionSample", b =>
+                {
+                    b.HasOne("Medinilla.DataAccess.Relational.Models.TransactionEvent", "TransactionEvent")
+                        .WithMany("Samples")
+                        .HasForeignKey("TransactionEventId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("TransactionEvent");
+                });
+
             modelBuilder.Entity("Medinilla.DataAccess.Relational.Models.Account", b =>
                 {
                     b.Navigation("ChargingStations");
@@ -532,11 +661,18 @@ namespace Medinilla.DataAccess.Migrations
                     b.Navigation("IdTokens");
 
                     b.Navigation("Tariffs");
+
+                    b.Navigation("TransactionEvents");
                 });
 
             modelBuilder.Entity("Medinilla.DataAccess.Relational.Models.EvseConnector", b =>
                 {
                     b.Navigation("Components");
+                });
+
+            modelBuilder.Entity("Medinilla.DataAccess.Relational.Models.TransactionEvent", b =>
+                {
+                    b.Navigation("Samples");
                 });
 #pragma warning restore 612, 618
         }

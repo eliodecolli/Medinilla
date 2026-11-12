@@ -57,8 +57,7 @@ public static class ServiceExtensions
         // add services
         serviceCollection.AddScoped<IChargingStationBootingService, ChargingStationBooting>();
         serviceCollection.AddScoped<IRouterServices, RouterServices>();
-        // IIdTokenService / ITransactionService / ConsumptionService removed in the
-        // transaction-handling rewrite. Re-add as the new implementation lands.
+        serviceCollection.AddScoped<ITransactionService, TransactionService>();
         serviceCollection.AddScoped<ITariffService, TariffService>();
         serviceCollection.AddScoped<ICommandExecutionService, CommandExecutionService>();
         serviceCollection.AddScoped<IChargerConfigService, ChargerConfigService>();

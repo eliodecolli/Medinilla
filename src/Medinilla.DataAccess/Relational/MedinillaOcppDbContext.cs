@@ -80,12 +80,22 @@ public class MedinillaOcppDbContext(DbContextOptions<MedinillaOcppDbContext> opt
             .HasConversion<string>();
 
         modelBuilder.Entity<TransactionEvent>().HasOne(te => te.ChargingStation)
-            .WithMany()
+            .WithMany(cs => cs.TransactionEvents)
             .HasForeignKey(te => te.ChargingStationId);
         modelBuilder.Entity<TransactionEvent>().HasOne(te => te.IdToken)
             .WithMany()
             .HasForeignKey(te => te.IdTokenId)
             .OnDelete(DeleteBehavior.SetNull);
+
+        // configure transaction samples
+        modelBuilder.Entity<TransactionSample>().ToTable("core_transaction_samples");
+        modelBuilder.Entity<TransactionSample>().Property(ts => ts.Measurand)
+            .HasConversion<string>();
+        modelBuilder.Entity<TransactionSample>().Property(ts => ts.Location)
+            .HasConversion<string>();
+        modelBuilder.Entity<TransactionSample>().HasOne(ts => ts.TransactionEvent)
+            .WithMany(te => te.Samples)
+            .HasForeignKey(ts => ts.TransactionEventId);
 
         // configure command execution auditing
         modelBuilder.Entity<CommandExecution>().ToTable("core_command_executions");

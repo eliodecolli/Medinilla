@@ -37,6 +37,8 @@ public class ChargingStation
 
     public virtual ICollection<Tariff> Tariffs { get; set; } = new List<Tariff>();
 
+    public virtual ICollection<TransactionEvent> TransactionEvents { get; set; } = new List<TransactionEvent>();
+
     public virtual ICollection<IdToken> IdTokens { get; set; } = new List<IdToken>();
 
     public virtual ICollection<CommandExecution> CommandExecutions { get; set; } = new List<CommandExecution>();
