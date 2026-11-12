@@ -247,11 +247,13 @@ public class TransactionServiceShould : IDisposable
                 {
                     Value = 230m, Measurand = MeasurandEnum.Voltage,
                     Location = LocationEnum.Inlet, UnitOfMeasure = new UnitOfMeasure { Unit = "V" },
+                    Context = ReadingContextEnum.SampleClock, Phase = PhaseEnum.L1N,
                 }),
             CreateMeter(secondTimestamp, new SampledValue
             {
                 Value = 200m, Measurand = MeasurandEnum.EnergyActiveExportRegister,
                 Location = LocationEnum.EV,
+                Context = ReadingContextEnum.TransactionEnd, Phase = PhaseEnum.L3,
             }),
         ];
 
@@ -266,6 +268,8 @@ public class TransactionServiceShould : IDisposable
                 Assert.Equal(100m, sample.Value);
                 Assert.Equal(Measurand.EnergyActiveImportRegister, sample.Measurand);
                 Assert.Equal(MeasurementLocation.Outlet, sample.Location);
+                Assert.Equal(ReadingContext.SamplePeriodic, sample.Context);
+                Assert.Null(sample.Phase);
             },
             sample =>
             {
@@ -273,6 +277,8 @@ public class TransactionServiceShould : IDisposable
                 Assert.Equal(230m, sample.Value);
                 Assert.Equal(Measurand.Voltage, sample.Measurand);
                 Assert.Equal(MeasurementLocation.Inlet, sample.Location);
+                Assert.Equal(ReadingContext.SampleClock, sample.Context);
+                Assert.Equal(MeasurementPhase.L1N, sample.Phase);
             },
             sample =>
             {
@@ -280,6 +286,8 @@ public class TransactionServiceShould : IDisposable
                 Assert.Equal(200m, sample.Value);
                 Assert.Equal(Measurand.EnergyActiveExportRegister, sample.Measurand);
                 Assert.Equal(MeasurementLocation.EV, sample.Location);
+                Assert.Equal(ReadingContext.TransactionEnd, sample.Context);
+                Assert.Equal(MeasurementPhase.L3, sample.Phase);
             });
         Assert.All(stored.Samples, sample =>
         {
@@ -288,6 +296,52 @@ public class TransactionServiceShould : IDisposable
             Assert.Same(stored, sample.TransactionEvent);
             Assert.Equal(stored.Id, sample.TransactionEventId);
         });
+    }
+
+    [Theory]
+    [InlineData(null, ReadingContext.SamplePeriodic)]
+    [InlineData(ReadingContextEnum.InterruptionBegin, ReadingContext.InterruptionBegin)]
+    [InlineData(ReadingContextEnum.InterruptionEnd, ReadingContext.InterruptionEnd)]
+    [InlineData(ReadingContextEnum.Other, ReadingContext.Other)]
+    [InlineData(ReadingContextEnum.SampleClock, ReadingContext.SampleClock)]
+    [InlineData(ReadingContextEnum.SamplePeriodic, ReadingContext.SamplePeriodic)]
+    [InlineData(ReadingContextEnum.TransactionBegin, ReadingContext.TransactionBegin)]
+    [InlineData(ReadingContextEnum.TransactionEnd, ReadingContext.TransactionEnd)]
+    [InlineData(ReadingContextEnum.Trigger, ReadingContext.Trigger)]
+    public async Task MapAndPersistReadingContext(ReadingContextEnum? context, ReadingContext expected)
+    {
+        await AddStation();
+        var request = CreateRequest();
+        request.MeterValue = [CreateMeter(EventTimestamp, new SampledValue { Value = 10m, Context = context })];
+
+        await _service.IngestEvent(ClientIdentifier, request);
+
+        var stored = await _context.Set<TransactionSample>().AsNoTracking().SingleAsync();
+        Assert.Equal(expected, stored.Context);
+    }
+
+    [Theory]
+    [InlineData(null, null)]
+    [InlineData(PhaseEnum.L1, MeasurementPhase.L1)]
+    [InlineData(PhaseEnum.L2, MeasurementPhase.L2)]
+    [InlineData(PhaseEnum.L3, MeasurementPhase.L3)]
+    [InlineData(PhaseEnum.N, MeasurementPhase.N)]
+    [InlineData(PhaseEnum.L1N, MeasurementPhase.L1N)]
+    [InlineData(PhaseEnum.L2N, MeasurementPhase.L2N)]
+    [InlineData(PhaseEnum.L3N, MeasurementPhase.L3N)]
+    [InlineData(PhaseEnum.L1L2, MeasurementPhase.L1L2)]
+    [InlineData(PhaseEnum.L2L3, MeasurementPhase.L2L3)]
+    [InlineData(PhaseEnum.L3L1, MeasurementPhase.L3L1)]
+    public async Task MapAndPersistPhase(PhaseEnum? phase, MeasurementPhase? expected)
+    {
+        await AddStation();
+        var request = CreateRequest();
+        request.MeterValue = [CreateMeter(EventTimestamp, new SampledValue { Value = 10m, Phase = phase })];
+
+        await _service.IngestEvent(ClientIdentifier, request);
+
+        var stored = await _context.Set<TransactionSample>().AsNoTracking().SingleAsync();
+        Assert.Equal(expected, stored.Phase);
     }
 
     [Theory]

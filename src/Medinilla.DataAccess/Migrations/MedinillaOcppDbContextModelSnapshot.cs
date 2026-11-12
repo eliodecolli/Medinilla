@@ -471,12 +471,19 @@ namespace Medinilla.DataAccess.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<string>("Context")
+                        .IsRequired()
+                        .HasColumnType("text");
+
                     b.Property<string>("Location")
                         .IsRequired()
                         .HasColumnType("text");
 
                     b.Property<string>("Measurand")
                         .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Phase")
                         .HasColumnType("text");
 
                     b.Property<DateTime>("Timestamp")

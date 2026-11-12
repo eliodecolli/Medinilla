@@ -62,6 +62,11 @@ public class TransactionService(
                 (sample.Measurand ?? MeasurandEnum.EnergyActiveImportRegister).ToString()),
             Location = Enum.Parse<MeasurementLocation>(
                 (sample.Location ?? LocationEnum.Outlet).ToString()),
+            Context = Enum.Parse<ReadingContext>(
+                (sample.Context ?? ReadingContextEnum.SamplePeriodic).ToString()),
+            Phase = sample.Phase.HasValue
+                ? Enum.Parse<MeasurementPhase>(sample.Phase.Value.ToString())
+                : null,
             Value = NormalizeSampleValue(sample),
         })).ToList() ?? [];
     }

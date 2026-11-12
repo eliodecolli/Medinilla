@@ -93,6 +93,10 @@ public class MedinillaOcppDbContext(DbContextOptions<MedinillaOcppDbContext> opt
             .HasConversion<string>();
         modelBuilder.Entity<TransactionSample>().Property(ts => ts.Location)
             .HasConversion<string>();
+        modelBuilder.Entity<TransactionSample>().Property(ts => ts.Context)
+            .HasConversion<string>();
+        modelBuilder.Entity<TransactionSample>().Property(ts => ts.Phase)
+            .HasConversion<string>();
         modelBuilder.Entity<TransactionSample>().HasOne(ts => ts.TransactionEvent)
             .WithMany(te => te.Samples)
             .HasForeignKey(ts => ts.TransactionEventId);

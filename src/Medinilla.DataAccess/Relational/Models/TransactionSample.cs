@@ -12,6 +12,10 @@ public class TransactionSample
 
     public MeasurementLocation Location { get; set; }
 
+    public ReadingContext Context { get; set; }
+
+    public MeasurementPhase? Phase { get; set; }
+
     // this is the final computed value
     public decimal Value { get; set; }
 
