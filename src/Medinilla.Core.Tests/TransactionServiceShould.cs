@@ -30,6 +30,7 @@ public class TransactionServiceShould : IDisposable
     private readonly TestDbContext _context;
     private readonly Mock<IAuthAlgorithm> _authorization = new(MockBehavior.Strict);
     private readonly Mock<IIdTokenService> _tokenService = new(MockBehavior.Strict);
+    private readonly Mock<IConsumptionService> _consumptionService = new();
     private readonly TransactionService _service;
 
     public TransactionServiceShould()
@@ -674,11 +675,48 @@ public class TransactionServiceShould : IDisposable
         _authorization.Verify(a => a.Authorize(It.IsAny<AuthorizationContext>()), Times.Once);
     }
 
+    [Fact]
+    public async Task ComputeConsumptionFromOnlyTheCurrentTransactionsSamplesIncludingTheIncomingEnd()
+    {
+        var station = await AddStation();
+        var begin = CreateRequest();
+        begin.MeterValue = [CreateMeter(EventTimestamp, new SampledValue
+        {
+            Value = 100m,
+            Context = ReadingContextEnum.TransactionBegin,
+        })];
+        await _service.IngestEvent(ClientIdentifier, begin);
+
+        var other = CreateRequest();
+        other.TransactionInfo.TransactionId = "another-transaction";
+        other.MeterValue = [CreateMeter(EventTimestamp, new SampledValue { Value = 900m })];
+        await _service.IngestEvent(ClientIdentifier, other);
+
+        List<TransactionSample>? consumedSamples = null;
+        _consumptionService.Setup(s => s.TryComputeConsumption(It.IsAny<IEnumerable<TransactionSample>>()))
+            .Callback<IEnumerable<TransactionSample>>(samples => consumedSamples = samples.ToList())
+            .ReturnsAsync(5m);
+
+        var end = CreateRequest(TransactionEventEnum.Ended, seqNo: 1);
+        end.MeterValue = [CreateMeter(EventTimestamp.AddMinutes(10), new SampledValue
+        {
+            Value = 105m,
+            Context = ReadingContextEnum.TransactionEnd,
+        })];
+        await _service.IngestEvent(ClientIdentifier, end);
+
+        Assert.NotNull(consumedSamples);
+        Assert.Equal(new[] { 100m, 105m }, consumedSamples.Select(s => s.Value).OrderBy(v => v));
+        Assert.All(consumedSamples, s => Assert.Equal("transaction-1", s.TransactionId));
+        Assert.Equal(5m, Assert.Single(station.TransactionSnapshots).Consumption);
+    }
+
     private TransactionService CreateService(params IAuthAlgorithm[] algorithms) => new(
         NullLogger<ITransactionService>.Instance,
         _context,
         new AuthorizationAlgorithmFactory(algorithms, NullLogger<AuthorizationAlgorithmFactory>.Instance),
-        _tokenService.Object);
+        _tokenService.Object,
+        _consumptionService.Object);
 
     private async Task<ChargingStation> AddStation(string? allowedMeasurands = null)
     {

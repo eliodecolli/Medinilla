@@ -8,7 +8,8 @@ Canonical location for this repository's agent skills.
 |---|---|
 | commands-generator | Scaffold a new `OcppChargerCommand` (class + DTOs from OCPP JSON schema). Handler logic left for the developer. |
 | actions-generator | Scaffold a new inbound `IOcppAction` (CS -> CSMS) — action class + DTOs from OCPP JSON schema. Handler logic left for the developer. |
-| test-alignment | Fix stale tests only. Never edit source code under test. |
+| tests | Required for test work: no DB-model/EF-metadata unit tests; assess each use case and edge case with concise benefits, costs, and an include/skip decision. Add only coverage with real value. |
+| test-alignment | Fix stale tests only. Never edit source code under test. Use alongside `tests`. |
 | ocpp-module-researcher | Research OCPP 2.0.1 protocol behaviour (message flows, PDUs, data types, configuration variables) from the local Part 2 spec PDF. Read-only — does not touch code. |
 | coverage-reporter | Reconcile the OCPP 2.0.1 implementation against `docs/ocpp-coverage.md` and update that doc in place to reflect what is actually wired up. Does not change the doc's structure. |
 | db-working-patterns | Safe patterns for ANY database work (inspect, query, migrate, seed, dump/restore). Enforces pre-flight state checks, backup-before-destructive, explicit user confirmation for wipes/reseeds, and transaction-safe experimentation. Load whenever touching a database in any way. |

@@ -17,6 +17,8 @@ This includes (but is not limited to):
 If a test fails because production code "looks wrong", assume the production code is correct and the test is stale — update the test to match the current intended behavior. If you believe production code is genuinely buggy, **stop and ask** before editing it.
 
 ## Workflow
+Before changing tests, load `../tests/SKILL.md`. Follow its scenario-by-scenario value assessment, prohibition on DB-model/EF-metadata unit tests, and minimal-coverage rules. Do not preserve low-value tests merely because they already exist.
+
 1. Run the failing test(s) and read the failure carefully.
 2. Identify the gap between the test's expectation and the current behavior.
 3. Update the test (assertions, setup, expected values) to reflect the intended behavior.

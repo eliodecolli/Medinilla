@@ -18,7 +18,8 @@ public class TransactionService(
     ILogger<ITransactionService> logger,
     MedinillaOcppDbContext context,
     AuthorizationAlgorithmFactory authFactory,
-    IIdTokenService tokenService)
+    IIdTokenService tokenService,
+    IConsumptionService consumptionService)
     : ITransactionService
 {
     private TransactionEvent MapEvent(TransactionEventRequest request)
@@ -82,7 +83,10 @@ public class TransactionService(
     }
 
     private ICollection<TransactionSample> MapSamples(
-        IEnumerable<MeterValue>? meterValues, AccountSettings? settings)
+        ChargingStation chargingStation,
+        string transactionId,
+        IEnumerable<MeterValue>? meterValues,
+        AccountSettings? settings)
     {
         var allowedMeasurands = ParseAllowedMeasurands(settings);
 
@@ -96,6 +100,7 @@ public class TransactionService(
             .Where(x => allowedMeasurands?.Contains(x.Measurand) ?? true )
             .Select(x => new TransactionSample
             {
+                TransactionId = transactionId,
                 Timestamp = x.Meter.Timestamp.ToUniversalTime(),
                 Measurand = x.Measurand,
                 Location = Enum.Parse<MeasurementLocation>(
@@ -106,6 +111,7 @@ public class TransactionService(
                     ? Enum.Parse<MeasurementPhase>(x.Sample.Phase.Value.ToString())
                     : null,
                 Value = NormalizeSampleValue(x.Sample),
+                ChargingStation = chargingStation
             }).ToList() ?? [];
     }
 
@@ -214,10 +220,33 @@ public class TransactionService(
         }
         
         // fill in the samples
-        @event.Samples = MapSamples(request.MeterValue, settings);
+        @event.Samples = MapSamples(chargingStation, request.TransactionInfo.TransactionId, request.MeterValue, settings);
         
         // finally append the event
         chargingStation.TransactionEvents.Add(@event);
+        
+        // first check whether this is an Ended event, if it is, create a snapshot
+        if (@event.EventType == TransactionEventType.Ended)
+        {
+            // Track the incoming samples before reading the station's inverse collection.
+            context.ChangeTracker.DetectChanges();
+            var samples = chargingStation.TransactionSamples
+                .Where(s => s.TransactionId == request.TransactionInfo.TransactionId);
+
+            var snapshot = new TransactionSnapshot()
+            {
+                TransactionId = request.TransactionInfo.TransactionId,
+                Consumption = await consumptionService.TryComputeConsumption(samples)
+            };
+            chargingStation.TransactionSnapshots.Add(snapshot);
+            
+            logger.LogInformation(
+                "{ci}: Transaction Event: Computed final consumption {cp} Wh for tx={tx}",
+                clientIdentifier,
+                snapshot.Consumption,
+                request.TransactionInfo.TransactionId);
+        }
+        
         
         // if this is the end then we should free the token now
         // one caveat: there's nothing guaranteeing us that the Ended event will come last

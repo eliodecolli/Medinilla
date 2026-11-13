@@ -6,6 +6,8 @@ public class TransactionSample
 {
     public Guid Id { get; set; }
 
+    public required string TransactionId { get; set; }
+
     public DateTime Timestamp { get; set; }
 
     public Measurand Measurand { get; set; }
@@ -22,4 +24,8 @@ public class TransactionSample
     public Guid TransactionEventId { get; set; }
 
     public virtual TransactionEvent TransactionEvent { get; set; }
+
+    public Guid ChargingStationId { get; set; }
+    
+    public virtual ChargingStation ChargingStation { get; set; }
 }

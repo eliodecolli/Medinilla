@@ -94,8 +94,24 @@ public class MedinillaOcppDbContext(DbContextOptions<MedinillaOcppDbContext> opt
             .HasForeignKey(te => te.IdTokenId)
             .OnDelete(DeleteBehavior.SetNull);
 
+        // configure transaction snapshots
+        modelBuilder.Entity<TransactionSnapshot>().ToTable("core_transaction_snapshots");
+        modelBuilder.Entity<TransactionSnapshot>().HasIndex(ts => new
+        {
+            ts.ChargingStationId,
+            ts.TransactionId
+        }).IsUnique();
+        modelBuilder.Entity<TransactionSnapshot>().HasOne(ts => ts.ChargingStation)
+            .WithMany(cs => cs.TransactionSnapshots)
+            .HasForeignKey(ts => ts.ChargingStationId);
+
         // configure transaction samples
         modelBuilder.Entity<TransactionSample>().ToTable("core_transaction_samples");
+        modelBuilder.Entity<TransactionSample>().HasIndex(ts => new
+        {
+            ts.ChargingStationId,
+            ts.TransactionId
+        });
         modelBuilder.Entity<TransactionSample>().Property(ts => ts.Measurand)
             .HasConversion<string>();
         modelBuilder.Entity<TransactionSample>().Property(ts => ts.Location)
@@ -104,6 +120,9 @@ public class MedinillaOcppDbContext(DbContextOptions<MedinillaOcppDbContext> opt
             .HasConversion<string>();
         modelBuilder.Entity<TransactionSample>().Property(ts => ts.Phase)
             .HasConversion<string>();
+        modelBuilder.Entity<TransactionSample>().HasOne(ts => ts.ChargingStation)
+            .WithMany(cs => cs.TransactionSamples)
+            .HasForeignKey(ts => ts.ChargingStationId);
         modelBuilder.Entity<TransactionSample>().HasOne(ts => ts.TransactionEvent)
             .WithMany(te => te.Samples)
             .HasForeignKey(ts => ts.TransactionEventId);

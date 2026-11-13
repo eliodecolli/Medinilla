@@ -39,9 +39,13 @@ public class ChargingStation
 
     public virtual ICollection<TransactionEvent> TransactionEvents { get; set; } = new List<TransactionEvent>();
 
+    public virtual ICollection<TransactionSnapshot> TransactionSnapshots { get; set; } = new List<TransactionSnapshot>();
+
     public virtual ICollection<IdToken> IdTokens { get; set; } = new List<IdToken>();
 
     public virtual ICollection<CommandExecution> CommandExecutions { get; set; } = new List<CommandExecution>();
     
     public virtual ICollection<AuthorizationUser> AuthorizationUsers { get; set; } = new List<AuthorizationUser>();
+    
+    public virtual ICollection<TransactionSample> TransactionSamples { get; set; } = new List<TransactionSample>();
 }
