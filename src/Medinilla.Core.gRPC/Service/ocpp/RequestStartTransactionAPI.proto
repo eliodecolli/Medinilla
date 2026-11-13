@@ -10,11 +10,14 @@ package medinilla.core.grpc;
 message RequestStartTransactionRequest {
     string client_identifier = 1;
     optional int32 evse_id = 2;
-    IdToken id_token = 3;
-    optional IdToken group_id_token = 4;
     int32 remote_start_id = 5;
+    
+    string authorization_user_id = 6;
+    int64 duration_seconds = 7;
 }
 
 message RequestStartTransactionResponse {
-    Error error = 1;
+    IdToken token = 1;
+    string correlation_id = 2;
+    Error error = 3;
 }

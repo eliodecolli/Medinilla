@@ -1,4 +1,4 @@
-﻿using Medinilla.DataAccess.Relational.Enums;
+using Medinilla.DataAccess.Relational.Enums;
 using Medinilla.DataAccess.Relational.Models.Authorization;
 
 namespace Medinilla.DataAccess.Relational.Models;
@@ -9,35 +9,41 @@ public class TransactionEvent
 
     public Guid ChargingStationId { get; set; }
 
-    public Guid IdTokenId { get; set; }
+    public required string TransactionId { get; set; }
 
-    public string TransactionId { get; set; }
-
-    public int SeqNo { get; set; }
-
-    public int? EVSEId { get; set; }
+    public TransactionEventType EventType { get; set; }
 
     public DateTime Timestamp { get; set; }
 
+    public TransactionTriggerReason TriggerReason { get; set; }
+
+    public int SeqNo { get; set; }
+
     public bool? Offline { get; set; }
 
-    public decimal RegisterValue { get; set; }
-    
-    public decimal? PhaseOneValue { get; set; }
-    
-    public decimal? PhaseTwoValue { get; set; }
-    
-    public decimal? PhaseThreeValue { get; set; }
+    public int? NumberOfPhasesUsed { get; set; }
 
-    public ConsumptionType? ConsumptionType { get; set; }
+    public int? CableMaxCurrent { get; set; }
 
-    public string UnitName { get; set; }
+    public int? ReservationId { get; set; }
 
-    public string TriggerReason { get; set; }
+    public ChargingState? ChargingState { get; set; }
 
-    public string EventType { get; set; }
+    public int? TimeSpentCharging { get; set; }
+
+    public TransactionStoppedReason? StoppedReason { get; set; }
+
+    public int? RemoteStartId { get; set; }
+
+    public int? EvseId { get; set; }
+
+    public int? ConnectorId { get; set; }
+
+    public Guid? IdTokenId { get; set; }
+
+    public virtual IdToken? IdToken { get; set; }
 
     public virtual ChargingStation ChargingStation { get; set; }
 
-    public virtual IdToken IdToken { get; set; }
+    public virtual ICollection<TransactionSample> Samples { get; set; } = new List<TransactionSample>();
 }

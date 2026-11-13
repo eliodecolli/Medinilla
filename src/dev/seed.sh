@@ -1,10 +1,11 @@
 #!/usr/bin/env bash
-# Wipes and reseeds the dev Postgres with realistic test data.
+# Wipes and reseeds the dev Postgres with the bootstrap test account.
 #
-# Replaces the old bootstrap-main-account.sh + Medinilla.DataAccess/Relational/Seed.sql.
-# Creates the 'MedinillaTest-Core' account (the one ChargingStationBooting looks
-# up on first boot) plus a handful of 'noise' accounts with stations, connectors,
-# tariffs, auth users, id tokens and transactions.
+# WARNING: This deletes all rows from the public core_* application tables
+# before creating the 'MedinillaTest-Core' account required by
+# ChargingStationBooting.
+# Stations, connectors, users, and transactions are then created by the
+# application at runtime.
 #
 # Usage:
 #   ./dev/seed.sh

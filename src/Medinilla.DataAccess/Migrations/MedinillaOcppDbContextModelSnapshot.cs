@@ -41,6 +41,20 @@ namespace Medinilla.DataAccess.Migrations
                     b.ToTable("core_account", (string)null);
                 });
 
+            modelBuilder.Entity("Medinilla.DataAccess.Relational.Models.AccountSettings", b =>
+                {
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AllowedMeasurands")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("AccountId");
+
+                    b.ToTable("core_account_settings", (string)null);
+                });
+
             modelBuilder.Entity("Medinilla.DataAccess.Relational.Models.Audit.CommandExecution", b =>
                 {
                     b.Property<long>("Id")
@@ -161,9 +175,6 @@ namespace Medinilla.DataAccess.Migrations
                     b.Property<string>("IdType")
                         .IsRequired()
                         .HasColumnType("text");
-
-                    b.Property<bool>("IsUnderTx")
-                        .HasColumnType("boolean");
 
                     b.Property<string>("Token")
                         .IsRequired()
@@ -404,38 +415,47 @@ namespace Medinilla.DataAccess.Migrations
                         .ValueGeneratedOnAdd()
                         .HasColumnType("uuid");
 
+                    b.Property<int?>("CableMaxCurrent")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("ChargingState")
+                        .HasColumnType("text");
+
                     b.Property<Guid>("ChargingStationId")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("ConsumptionType")
-                        .HasColumnType("text");
-
-                    b.Property<int?>("EVSEId")
+                    b.Property<int?>("ConnectorId")
                         .HasColumnType("integer");
 
                     b.Property<string>("EventType")
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<Guid>("IdTokenId")
+                    b.Property<int?>("EvseId")
+                        .HasColumnType("integer");
+
+                    b.Property<Guid?>("IdTokenId")
                         .HasColumnType("uuid");
+
+                    b.Property<int?>("NumberOfPhasesUsed")
+                        .HasColumnType("integer");
 
                     b.Property<bool?>("Offline")
                         .HasColumnType("boolean");
 
-                    b.Property<decimal?>("PhaseOneValue")
-                        .HasColumnType("numeric");
+                    b.Property<int?>("RemoteStartId")
+                        .HasColumnType("integer");
 
-                    b.Property<decimal?>("PhaseThreeValue")
-                        .HasColumnType("numeric");
-
-                    b.Property<decimal?>("PhaseTwoValue")
-                        .HasColumnType("numeric");
-
-                    b.Property<decimal>("RegisterValue")
-                        .HasColumnType("numeric");
+                    b.Property<int?>("ReservationId")
+                        .HasColumnType("integer");
 
                     b.Property<int>("SeqNo")
+                        .HasColumnType("integer");
+
+                    b.Property<string>("StoppedReason")
+                        .HasColumnType("text");
+
+                    b.Property<int?>("TimeSpentCharging")
                         .HasColumnType("integer");
 
                     b.Property<DateTime>("Timestamp")
@@ -449,23 +469,60 @@ namespace Medinilla.DataAccess.Migrations
                         .IsRequired()
                         .HasColumnType("text");
 
-                    b.Property<string>("UnitName")
-                        .IsRequired()
-                        .HasColumnType("text");
-
                     b.HasKey("Id");
-
-                    b.HasIndex("EventType");
 
                     b.HasIndex("IdTokenId");
 
-                    b.HasIndex("SeqNo");
+                    b.HasIndex("ChargingStationId", "TransactionId", "SeqNo")
+                        .IsUnique();
 
-                    b.HasIndex("TransactionId");
+                    b.ToTable("core_transactions_event", (string)null);
+                });
+
+            modelBuilder.Entity("Medinilla.DataAccess.Relational.Models.TransactionSample", b =>
+                {
+                    b.Property<Guid>("Id")
+                        .ValueGeneratedOnAdd()
+                        .HasColumnType("uuid");
+
+                    b.Property<Guid>("ChargingStationId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("Context")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Location")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Measurand")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<string>("Phase")
+                        .HasColumnType("text");
+
+                    b.Property<DateTime>("Timestamp")
+                        .HasColumnType("timestamp with time zone");
+
+                    b.Property<Guid>("TransactionEventId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("TransactionId")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.Property<decimal>("Value")
+                        .HasColumnType("numeric");
+
+                    b.HasKey("Id");
+
+                    b.HasIndex("TransactionEventId");
 
                     b.HasIndex("ChargingStationId", "TransactionId");
 
-                    b.ToTable("core_transactions_event", (string)null);
+                    b.ToTable("core_transaction_samples", (string)null);
                 });
 
             modelBuilder.Entity("Medinilla.DataAccess.Relational.Models.TransactionSnapshot", b =>
@@ -477,31 +534,14 @@ namespace Medinilla.DataAccess.Migrations
                     b.Property<Guid>("ChargingStationId")
                         .HasColumnType("uuid");
 
-                    b.Property<string>("EndReason")
-                        .IsRequired()
-                        .HasColumnType("text");
+                    b.Property<decimal?>("Consumption")
+                        .HasColumnType("numeric");
 
-                    b.Property<DateTime>("EndedAt")
+                    b.Property<DateTime?>("EndedAt")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<Guid?>("EvseConnectorId")
-                        .HasColumnType("uuid");
-
-                    b.Property<Guid?>("IdTokenId")
-                        .HasColumnType("uuid");
-
-                    b.Property<string>("StartReason")
-                        .IsRequired()
-                        .HasColumnType("text");
 
                     b.Property<DateTime>("StartedAt")
                         .HasColumnType("timestamp with time zone");
-
-                    b.Property<decimal>("TotalCost")
-                        .HasColumnType("numeric");
-
-                    b.Property<decimal>("TotalMeteredValue")
-                        .HasColumnType("numeric");
 
                     b.Property<string>("TransactionId")
                         .IsRequired()
@@ -509,15 +549,21 @@ namespace Medinilla.DataAccess.Migrations
 
                     b.HasKey("Id");
 
-                    b.HasIndex("EvseConnectorId");
+                    b.HasIndex("ChargingStationId", "TransactionId")
+                        .IsUnique();
 
-                    b.HasIndex("IdTokenId");
+                    b.ToTable("core_transaction_snapshots", (string)null);
+                });
 
-                    b.HasIndex("TransactionId");
+            modelBuilder.Entity("Medinilla.DataAccess.Relational.Models.AccountSettings", b =>
+                {
+                    b.HasOne("Medinilla.DataAccess.Relational.Models.Account", "Account")
+                        .WithOne("Settings")
+                        .HasForeignKey("Medinilla.DataAccess.Relational.Models.AccountSettings", "AccountId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
 
-                    b.HasIndex("ChargingStationId", "TransactionId");
-
-                    b.ToTable("core_transactions_snapshot", (string)null);
+                    b.Navigation("Account");
                 });
 
             modelBuilder.Entity("Medinilla.DataAccess.Relational.Models.Audit.CommandExecution", b =>
@@ -638,14 +684,32 @@ namespace Medinilla.DataAccess.Migrations
                         .IsRequired();
 
                     b.HasOne("Medinilla.DataAccess.Relational.Models.Authorization.IdToken", "IdToken")
-                        .WithMany("TransactionEvents")
+                        .WithMany()
                         .HasForeignKey("IdTokenId")
+                        .OnDelete(DeleteBehavior.SetNull);
+
+                    b.Navigation("ChargingStation");
+
+                    b.Navigation("IdToken");
+                });
+
+            modelBuilder.Entity("Medinilla.DataAccess.Relational.Models.TransactionSample", b =>
+                {
+                    b.HasOne("Medinilla.DataAccess.Relational.Models.ChargingStation", "ChargingStation")
+                        .WithMany("TransactionSamples")
+                        .HasForeignKey("ChargingStationId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.HasOne("Medinilla.DataAccess.Relational.Models.TransactionEvent", "TransactionEvent")
+                        .WithMany("Samples")
+                        .HasForeignKey("TransactionEventId")
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
                     b.Navigation("ChargingStation");
 
-                    b.Navigation("IdToken");
+                    b.Navigation("TransactionEvent");
                 });
 
             modelBuilder.Entity("Medinilla.DataAccess.Relational.Models.TransactionSnapshot", b =>
@@ -656,36 +720,20 @@ namespace Medinilla.DataAccess.Migrations
                         .OnDelete(DeleteBehavior.Cascade)
                         .IsRequired();
 
-                    b.HasOne("Medinilla.DataAccess.Relational.Models.EvseConnector", "EvseConnector")
-                        .WithMany()
-                        .HasForeignKey("EvseConnectorId");
-
-                    b.HasOne("Medinilla.DataAccess.Relational.Models.Authorization.IdToken", "IdToken")
-                        .WithMany("TransactionSnapshots")
-                        .HasForeignKey("IdTokenId");
-
                     b.Navigation("ChargingStation");
-
-                    b.Navigation("EvseConnector");
-
-                    b.Navigation("IdToken");
                 });
 
             modelBuilder.Entity("Medinilla.DataAccess.Relational.Models.Account", b =>
                 {
                     b.Navigation("ChargingStations");
+
+                    b.Navigation("Settings")
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Medinilla.DataAccess.Relational.Models.Authorization.AuthorizationUser", b =>
                 {
                     b.Navigation("Tokens");
-                });
-
-            modelBuilder.Entity("Medinilla.DataAccess.Relational.Models.Authorization.IdToken", b =>
-                {
-                    b.Navigation("TransactionEvents");
-
-                    b.Navigation("TransactionSnapshots");
                 });
 
             modelBuilder.Entity("Medinilla.DataAccess.Relational.Models.ChargerConfig.ChargerComponent", b =>
@@ -709,12 +757,19 @@ namespace Medinilla.DataAccess.Migrations
 
                     b.Navigation("TransactionEvents");
 
+                    b.Navigation("TransactionSamples");
+
                     b.Navigation("TransactionSnapshots");
                 });
 
             modelBuilder.Entity("Medinilla.DataAccess.Relational.Models.EvseConnector", b =>
                 {
                     b.Navigation("Components");
+                });
+
+            modelBuilder.Entity("Medinilla.DataAccess.Relational.Models.TransactionEvent", b =>
+                {
+                    b.Navigation("Samples");
                 });
 #pragma warning restore 612, 618
         }

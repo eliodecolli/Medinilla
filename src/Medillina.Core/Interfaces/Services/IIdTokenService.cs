@@ -1,11 +1,10 @@
-using Medinilla.DataAccess.Relational.Models;
-using Medinilla.DataAccess.Relational.Models.Authorization;
+using Medinilla.DataTypes.Contracts.Common;
+using DbIdToken = Medinilla.DataAccess.Relational.Models.Authorization.IdToken;
 
 namespace Medinilla.Core.Interfaces.Services;
 
 public interface IIdTokenService
 {
-    IdToken? TryGetForTransaction(ChargingStation chargingStation, IEnumerable<TransactionEvent> currentTransactions, string? requestToken);
-
-    bool RemoveTemporaryToken(ChargingStation cs, IdToken token);
+    Task<IdToken> GenerateCentralToken(string clientIdentifier, Guid authUserId, long durationSeconds, string correlationId);
+    Task ReleaseCentralToken(DbIdToken token);
 }

@@ -3,6 +3,8 @@ using Medinilla.Core.gRPC.Contracts;
 using Medinilla.Core.gRPC.Service;
 using Medinilla.Core.Interfaces;
 using Medinilla.Core.Interfaces.Services;
+using Medinilla.Core.v1.Exceptions;
+using Medinilla.DataAccess.Exceptions;
 using Medinilla.Core.Service.Communication.Mapping;
 using Medinilla.Core.Service.Exceptions;
 using Medinilla.Infrastructure;
@@ -207,46 +209,93 @@ internal sealed class MedinillaGrpc(ILogger<MedinillaGrpc> log, IServiceProvider
         }
     }
 
+    private static RequestStartTransactionResponse StartTransactionError(string correlationId, string message) => new()
+    {
+        CorrelationId = correlationId,
+        Error = new Error
+        {
+            HasError = true,
+            Message = message,
+        },
+    };
+
     public override async Task<RequestStartTransactionResponse> RequestStartTransaction(RequestStartTransactionRequest request, ServerCallContext context)
     {
+        var messageId = Guid.NewGuid().ToString();
         try
         {
-            var messageId = Guid.NewGuid().ToString();
+            if (string.IsNullOrWhiteSpace(request.ClientIdentifier))
+                return StartTransactionError(messageId, "client_identifier is required.");
+
+            if (!Guid.TryParse(request.AuthorizationUserId, out var authUserId) || authUserId == Guid.Empty)
+                return StartTransactionError(messageId, "authorization_user_id must be a valid, non-empty GUID.");
+
+            if (request.DurationSeconds <= 0
+                || request.DurationSeconds > (long)(DateTime.MaxValue - DateTime.UtcNow).TotalSeconds)
+                return StartTransactionError(messageId, "duration_seconds must be positive and produce a valid expiry date.");
+
             log.LogInformation("Request: {an} msgId={mi} ci={ci}",
                 OcppActionNames.RequestStartTransaction,
                 messageId,
                 request.ClientIdentifier);
 
+            using var scope = serviceProvider.CreateScope();
+            var tokenService = scope.ServiceProvider.GetRequiredService<IIdTokenService>();
+            var router = scope.ServiceProvider.GetRequiredService<IOcppCallRouter>();
+
             var payload = MedinillaMapping.MapRequestStartTransaction(request);
+            payload.IdToken = await tokenService.GenerateCentralToken(
+                request.ClientIdentifier,
+                authUserId,
+                request.DurationSeconds,
+                messageId);
 
             var ocppRequest = new OcppCallRequest(messageId, OcppActionNames.RequestStartTransaction, OcppPayloadSerializer.SerializePayload(payload));
-            await SubmitAsync(request.ClientIdentifier, ocppRequest);
+            await SubmitAsync(request.ClientIdentifier, ocppRequest, router);
             return new RequestStartTransactionResponse()
             {
+                Token = new IdToken()
+                {
+                    Token = payload.IdToken.Token,
+                    Type = payload.IdToken.Type.ToString(),
+                    AdditionalInfo = payload.IdToken.AdditionalInfo is not null ? new AdditionalTokenInfo()
+                    {
+                        AdditionalIdToken = payload.IdToken.AdditionalInfo.AdditionalIdToken,
+                        Type = payload.IdToken.AdditionalInfo.Type
+                    } : null
+                },
+                CorrelationId = messageId,
                 Error = new Error()
                 {
                     HasError = false,
                 }
             };
         }
+        catch (AuthorizationUserNotFoundException e)
+        {
+            log.LogWarning(e, "{ci}: {an}: Authorization user {uid} not found msgId={mi}",
+                request.ClientIdentifier, OcppActionNames.RequestStartTransaction, request.AuthorizationUserId, messageId);
+            return StartTransactionError(messageId, "Authorization user not found for this charging station.");
+        }
+        catch (AggregateRootNotFoundException e)
+        {
+            log.LogWarning(e, "{ci}: {an}: Charging station not found msgId={mi}",
+                request.ClientIdentifier, OcppActionNames.RequestStartTransaction, messageId);
+            return StartTransactionError(messageId, "Charging station not found.");
+        }
         catch (ChargerNotConnectedException e)
         {
             return new RequestStartTransactionResponse()
             {
+                CorrelationId = messageId,
                 Error = NotConnectedError(e, OcppActionNames.RequestStartTransaction)
             };
         }
         catch (Exception e)
         {
-            log.LogError("{ci}: {an}: Error: {msg}", request.ClientIdentifier, OcppActionNames.RequestStartTransaction, e.Message);
-            return new RequestStartTransactionResponse()
-            {
-                Error = new Error()
-                {
-                    HasError = true,
-                    Message = e.Message,
-                }
-            };
+            log.LogError(e, "{ci}: {an}: Failed to start transaction msgId={mi}",
+                request.ClientIdentifier, OcppActionNames.RequestStartTransaction, messageId);
+            return StartTransactionError(messageId, "Unable to start transaction due to an internal error.");
         }
     }
 
@@ -311,10 +360,16 @@ internal sealed class MedinillaGrpc(ILogger<MedinillaGrpc> log, IServiceProvider
         return retval;
     }
 
+    private async Task SubmitAsync(string clientIdentifier, OcppCallRequest request, IOcppCallRouter router)
+    {
+        await router.SubmitAsync(clientIdentifier, request);
+    }
+    
     private async Task SubmitAsync(string clientIdentifier, OcppCallRequest request)
     {
         using var scope = serviceProvider.CreateScope();
         var router = scope.ServiceProvider.GetRequiredService<IOcppCallRouter>();
-        await router.SubmitAsync(clientIdentifier, request);
+        await SubmitAsync(clientIdentifier, request, router);
     }
+    
 }

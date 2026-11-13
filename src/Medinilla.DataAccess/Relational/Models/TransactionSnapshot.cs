@@ -1,5 +1,3 @@
-﻿using Medinilla.DataAccess.Relational.Models.Authorization;
-
 namespace Medinilla.DataAccess.Relational.Models;
 
 public class TransactionSnapshot
@@ -8,27 +6,15 @@ public class TransactionSnapshot
 
     public Guid ChargingStationId { get; set; }
 
-    public Guid? IdTokenId { get; set; }
+    // The transaction ID supplied by the charger, not a TransactionEvent row ID.
+    public required string TransactionId { get; set; }
 
-    public string TransactionId { get; set; }
-
-    public string StartReason { get; set; }
-
-    public string EndReason { get; set; }
-
-    public decimal TotalMeteredValue { get; set; }
-
-    public decimal TotalCost { get; set; }
+    // Energy consumed in Wh; null when it cannot yet be calculated.
+    public decimal? Consumption { get; set; }
 
     public DateTime StartedAt { get; set; }
 
-    public DateTime EndedAt { get; set; }
+    public DateTime? EndedAt { get; set; }
 
-    public Guid? EvseConnectorId { get; set; }
-
-    public virtual ChargingStation? ChargingStation { get; set; }
-
-    public virtual EvseConnector? EvseConnector { get; set; }
-
-    public virtual IdToken? IdToken { get; set; }
+    public virtual ChargingStation ChargingStation { get; set; } = null!;
 }

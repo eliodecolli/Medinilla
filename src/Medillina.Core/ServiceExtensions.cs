@@ -8,7 +8,6 @@ using Medinilla.Core.Logic.Authorization;
 using Medinilla.Core.Logic.Authorization.Algorithms;
 using Medinilla.Core.v1;
 using Medinilla.Core.v1.Services;
-using Medinilla.Core.v1.Transactions;
 using Microsoft.Extensions.DependencyInjection;
 
 namespace Medinilla.Core;
@@ -58,18 +57,18 @@ public static class ServiceExtensions
         // add services
         serviceCollection.AddScoped<IChargingStationBootingService, ChargingStationBooting>();
         serviceCollection.AddScoped<IRouterServices, RouterServices>();
+        serviceCollection.AddScoped<ITransactionService, TransactionService>();
         serviceCollection.AddScoped<IIdTokenService, IdTokenService>();
+        serviceCollection.AddScoped<IConsumptionService, ConsumptionService>();
         serviceCollection.AddScoped<ITariffService, TariffService>();
         serviceCollection.AddScoped<ICommandExecutionService, CommandExecutionService>();
         serviceCollection.AddScoped<IChargerConfigService, ChargerConfigService>();
         serviceCollection.AddScoped<IChargerService, ChargerService>();
-        serviceCollection.AddScoped<ITransactionService, TransactionService>();
         serviceCollection.AddScoped<IUnitOfWorkWrapper,  UnitOfWorkWrapper>();
 
         serviceCollection.AddScoped<IOcppActionsFactory, OcppActionsFactory>();
         serviceCollection.AddScoped<IOcppChargerCommandFactory, OcppChargerCommandsFactory>();
         serviceCollection.AddScoped<IOcppCallRouter, OcppCallRouter>();
         serviceCollection.AddScoped<AuthorizationAlgorithmFactory>();
-        serviceCollection.AddScoped<ConsumptionService>();
     }
 }

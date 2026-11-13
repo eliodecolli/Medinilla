@@ -17,8 +17,8 @@ public static class ServiceCollectionExtensions
             options.UseNpgsql(config.GetConnectionString("MedinillaCore"), b => b.MigrationsAssembly("Medinilla.DataAccess"));
         });
 
-        services.AddTransient<TransactionsUnitOfWork>();
         services.AddTransient<CommandExecutionUnitOfWork>();
         services.AddTransient<ChargerConfigUnitOfWork>();
+        // TransactionsUnitOfWork removed in the transaction-handling rewrite.
     }
 }

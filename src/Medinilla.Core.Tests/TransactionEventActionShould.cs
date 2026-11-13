@@ -1,122 +1,107 @@
-﻿using Medinilla.Core.v1.Transactions;
+using Medinilla.Core.Actions.Ocpp201;
+using Medinilla.Core.Interfaces.Services;
 using Medinilla.DataTypes.Contracts;
-using Medinilla.Infrastructure;
-using System.Text.Json;
-using Xunit.Abstractions;
+using Medinilla.DataTypes.Contracts.Common;
+using Medinilla.Infrastructure.WAMP;
+using Microsoft.Extensions.Logging.Abstractions;
+using Moq;
 
 namespace Medinilla.Core.Tests;
 
 public class TransactionEventActionShould
 {
-    private readonly ITestOutputHelper _testOutputHelper;
+    private readonly Mock<ITransactionService> _service = new(MockBehavior.Strict);
 
-    public TransactionEventActionShould(ITestOutputHelper testOutputHelper)
-    {
-        _testOutputHelper = testOutputHelper;
-    }
-    
-    private const float EXPECTED_TOTAL_CONSUMPTION_WH_1 = 51f; // Total: 51 Wh
-    private const float EXPECTED_TOTAL_CONSUMPTION_WH_2 = 41f; // Ditto
+    private TransactionEventAction CreateAction() =>
+        new(NullLogger<TransactionEventAction>.Instance, _service.Object);
 
-    private async Task<TransactionEventRequest> GetRequest(string fileName)
-    {
-        var jsonPath = Path.Combine("Data", fileName);
-        var jsonContent = await File.ReadAllTextAsync(jsonPath);
-        var jsonArray = JsonDocument.Parse(jsonContent).RootElement;
-
-        var payloadJson = jsonArray[3].GetRawText();
-        var request = JsonSerializer.Deserialize<TransactionEventRequest>(payloadJson, new JsonSerializerOptions
+    private static OcppCallRequest CreateCall() => new("event-1", OcppActionNames.TransactionEvent, """
         {
-            PropertyNameCaseInsensitive = true,
-            Converters = { new DottedEnumJsonConverter() }
-        });
-        
-        return request;
-    }
+            "eventType": "Updated",
+            "timestamp": "2026-11-01T12:00:00Z",
+            "triggerReason": "MeterValuePeriodic",
+            "seqNo": 2,
+            "transactionInfo": { "transactionId": "transaction-1" },
+            "meterValue": [{
+                "timestamp": "2026-11-01T11:59:59Z",
+                "sampledValue": [{ "value": 1.5, "unitOfMeasure": { "unit": "kWh" } }]
+            }]
+        }
+        """);
 
-    private async Task AssertCalculation(string fileName, float expected)
+    [Fact]
+    public void ExposeTransactionEventActionName()
     {
-        var request = await GetRequest(fileName);
-        Assert.NotNull(request);
-        Assert.NotNull(request.MeterValue);
-
-        // Create the TransactionService (this is what actually calculates consumption)
-        var transactionService = new ConsumptionService();
-
-        // Act - Calculate consumption from meter values
-        // The JSON has meter values at Transaction.Begin and Transaction.End
-        // The service processes these to determine the consumption
-        var consumption = transactionService.GetTransactionConsumption(request.MeterValue);
-
-        // Assert
-        Assert.NotNull(consumption);
-
-        // CURRENT BEHAVIOR: The implementation returns the LAST Energy.Active.Import.Register value found
-        // In the JSON, the order is: total (51 Wh), L1 (17 Wh), L2 (17 Wh), L3 (17 Wh)
-        // The service iterates and the last one (L3) becomes the result: 0.017 kWh
-        Assert.Equal(expected, consumption.Consumption);
-
-        // EXPECTED BEHAVIOR: Should use the total value without phase (51 Wh)
-        // Assert.Equal(EXPECTED_TOTAL_CONSUMPTION_KWH, consumption.Consumption); // Uncomment when fixed
-
-        Assert.Equal(Medinilla.DataTypes.Core.Enums.ConsumptionType.Cumulative, consumption.ConsumptionType);
+        Assert.Equal(OcppActionNames.TransactionEvent, CreateAction().ActionName);
     }
 
     [Fact]
-    public async Task CalculateCorrectConsumptionFromTransactionEventEndJson()
+    public async Task DelegateTheDeserializedRequestAndReturnTheServiceResponse()
     {
-        await AssertCalculation("TransactionEventEnd.json", EXPECTED_TOTAL_CONSUMPTION_WH_1);
-        await AssertCalculation("TransactionEventEnd2.json", EXPECTED_TOTAL_CONSUMPTION_WH_2);
+        TransactionEventRequest? capturedRequest = null;
+        _service.Setup(s => s.IngestEvent("station-1", It.IsAny<TransactionEventRequest>()))
+            .Callback<string, TransactionEventRequest>((_, request) => capturedRequest = request)
+            .ReturnsAsync(new TransactionEventResponse
+            {
+                TotalCost = 12.50m,
+                ChargingPriority = 2,
+                IdTokenInfo = new IdTokenInfo { Status = AuthorizeStatus.Accepted },
+            });
+        var call = CreateCall();
+
+        var result = await CreateAction().Execute(call, "station-1");
+
+        Assert.NotNull(capturedRequest);
+        Assert.Equal(TransactionEventEnum.Updated, capturedRequest.EventType);
+        Assert.Equal(TriggerReasonEnum.MeterValuePeriodic, capturedRequest.TriggerReason);
+        Assert.Equal("transaction-1", capturedRequest.TransactionInfo.TransactionId);
+        Assert.Equal(2, capturedRequest.SeqNo);
+        Assert.Equal(new DateTime(2026, 11, 1, 12, 0, 0, DateTimeKind.Utc), capturedRequest.Timestamp);
+        var meter = Assert.Single(capturedRequest.MeterValue!);
+        Assert.Equal(new DateTime(2026, 11, 1, 11, 59, 59, DateTimeKind.Utc), meter.Timestamp);
+        var sample = Assert.Single(meter.SampledValue);
+        Assert.Equal(1.5m, sample.Value);
+        Assert.Equal("kWh", sample.UnitOfMeasure.Unit);
+        Assert.True(result.ReturnToCS);
+        Assert.Null(result.Error);
+        Assert.NotNull(result.Result);
+        Assert.Equal(call.MessageId, result.Result.MessageId);
+        var response = result.Result.As<TransactionEventResponse>();
+        Assert.NotNull(response);
+        Assert.Equal(12.50m, response.TotalCost);
+        Assert.Equal(2, response.ChargingPriority);
+        Assert.Equal(AuthorizeStatus.Accepted, response.IdTokenInfo?.Status);
+        _service.Verify(s => s.IngestEvent("station-1", It.IsAny<TransactionEventRequest>()), Times.Once);
+        _service.VerifyNoOtherCalls();
     }
 
     [Fact]
-    public async Task MergesConsumptionGraphs()
+    public async Task ReturnACallResultForAnEmptyServiceResponse()
     {
-        var txService = new ConsumptionService();
-        
-        var request1 = await GetRequest("TransactionEventEnd.json");
+        _service.Setup(s => s.IngestEvent("station-1", It.IsAny<TransactionEventRequest>()))
+            .ReturnsAsync(new TransactionEventResponse());
 
-        var graph1 = txService.GetConsumptionGraph(request1.MeterValue);
-        Assert.NotNull(graph1);
+        var result = await CreateAction().Execute(CreateCall(), "station-1");
 
-        var request2 = await GetRequest("TransactionEventEnd2.json");
-        
-        var graph2 =  txService.GetConsumptionGraph(request2.MeterValue);
-        Assert.NotNull(graph2);
-        
-        Assert.Equal(EXPECTED_TOTAL_CONSUMPTION_WH_1, txService.GetTransactionConsumption(graph1).Consumption);
-        Assert.Equal(EXPECTED_TOTAL_CONSUMPTION_WH_2, txService.GetTransactionConsumption(graph2).Consumption);
-        
-        var expected = EXPECTED_TOTAL_CONSUMPTION_WH_1 + EXPECTED_TOTAL_CONSUMPTION_WH_2;
-        Assert.Equal(expected, txService.GetTransactionConsumption(request2.MeterValue, graph1).Consumption);
+        Assert.True(result.ReturnToCS);
+        Assert.Null(result.Error);
+        Assert.NotNull(result.Result);
+        var response = result.Result.As<TransactionEventResponse>();
+        Assert.NotNull(response);
+        Assert.Null(response.TotalCost);
+        Assert.Null(response.IdTokenInfo);
     }
 
     [Fact]
-    public async Task MergesConsumptionGraphsByOperator()
+    public async Task PropagateServiceExceptionsToTheRouter()
     {
-        var txService =  new ConsumptionService();
-        
-        var request1 = await GetRequest("TransactionEventEnd.json");
+        var expected = new InvalidOperationException("Ingestion failed.");
+        _service.Setup(s => s.IngestEvent("station-1", It.IsAny<TransactionEventRequest>()))
+            .ThrowsAsync(expected);
 
-        var graph1 = txService.GetConsumptionGraph(request1.MeterValue);
-        Assert.NotNull(graph1);
+        var actual = await Assert.ThrowsAsync<InvalidOperationException>(
+            () => CreateAction().Execute(CreateCall(), "station-1"));
 
-        var request2 = await GetRequest("TransactionEventEnd2.json");
-        
-        var graph2 =  txService.GetConsumptionGraph(request2.MeterValue);
-        Assert.NotNull(graph2);
-        
-        Assert.Equal(EXPECTED_TOTAL_CONSUMPTION_WH_1, txService.GetTransactionConsumption(graph1).Consumption);
-        Assert.Equal(EXPECTED_TOTAL_CONSUMPTION_WH_2, txService.GetTransactionConsumption(graph2).Consumption);
-        
-        var expected = EXPECTED_TOTAL_CONSUMPTION_WH_1 + EXPECTED_TOTAL_CONSUMPTION_WH_2;
-        
-        var finalGraph = graph1 << graph2;
-        Assert.NotNull(finalGraph);
-        Assert.Equal(expected, txService.GetTransactionConsumption(finalGraph).Consumption);
-
-        var ff = finalGraph << graph2 << graph1;
-        Assert.NotNull(ff);
-        Assert.Equal(expected * 2, txService.GetTransactionConsumption(ff).Consumption);
+        Assert.Same(expected, actual);
     }
 }

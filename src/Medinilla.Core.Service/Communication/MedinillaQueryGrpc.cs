@@ -50,18 +50,5 @@ internal sealed class MedinillaQueryGrpc(
         return response;
     }
 
-    public override async Task<ListTransactionSnapshotsResponse> ListTransactionSnapshots(ListTransactionSnapshotsRequest request, ServerCallContext context)
-    {
-        using var scope = serviceProvider.CreateScope();
-        var service = scope.ServiceProvider.GetRequiredService<ITransactionService>();
-
-        var snapshots = await service.ListPaged(request.Offset, request.Limit);
-
-        log.LogInformation("Query ListTransactionSnapshots offset={o} limit={l} returned={n}",
-            request.Offset, request.Limit, snapshots.Count);
-
-        var response = new ListTransactionSnapshotsResponse();
-        response.Snapshots.AddRange(snapshots.Select(MedinillaMapping.MapTransactionSnapshot));
-        return response;
-    }
+    // ListTransactionSnapshots RPC removed in the transaction-handling rewrite.
 }
