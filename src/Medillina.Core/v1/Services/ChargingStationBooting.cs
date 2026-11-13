@@ -12,6 +12,7 @@ using Microsoft.Extensions.Logging;
 using System.Diagnostics.Metrics;
 using System.Text.Json;
 using Medinilla.DataAccess.Relational;
+using Medinilla.DataAccess.Relational.Enums;
 using Microsoft.EntityFrameworkCore;
 
 namespace Medinilla.Core.v1.Services;
@@ -83,7 +84,7 @@ public class ChargingStationBooting(MedinillaOcppDbContext context, ILogger<Char
                 Token = defaultUser.Token,
                 CreatedDate = DateTime.UtcNow,
                 ExpiryDate = DateTime.UtcNow.AddDays(100000),
-                IdType = "ISO14443"
+                IdType = IdTokenType.ISO14443
             });
         }
     }

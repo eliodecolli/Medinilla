@@ -1,3 +1,4 @@
+using System.Collections.Immutable;
 using Medinilla.Core.Interfaces.Services;
 using Medinilla.Core.Logic.Authorization;
 using Medinilla.DataAccess.Exceptions;
@@ -6,17 +7,18 @@ using Medinilla.DataAccess.Relational.Enums;
 using Medinilla.DataAccess.Relational.Models;
 using Medinilla.DataTypes.Contracts;
 using Medinilla.DataTypes.Contracts.Common;
-using OcppIdToken = Medinilla.DataTypes.Contracts.Common.IdToken;
 using Microsoft.Extensions.Logging;
 using ChargingStation = Medinilla.DataAccess.Relational.Models.ChargingStation;
 using IdToken = Medinilla.DataAccess.Relational.Models.Authorization.IdToken;
+using IdTokenType = Medinilla.DataAccess.Relational.Enums.IdTokenType;
 
 namespace Medinilla.Core.v1.Services;
 
 public class TransactionService(
     ILogger<ITransactionService> logger,
     MedinillaOcppDbContext context,
-    AuthorizationAlgorithmFactory authFactory)
+    AuthorizationAlgorithmFactory authFactory,
+    IIdTokenService tokenService)
     : ITransactionService
 {
     private TransactionEvent MapEvent(TransactionEventRequest request)
@@ -111,6 +113,18 @@ public class TransactionService(
     {
         return cs.TransactionEvents.Any(x => x.TransactionId == transactionId && x.SeqNo == seqNo);
     }
+
+    private bool IsTransactionComplete(ChargingStation cs, string transactionId)
+    {
+        var txes = cs.TransactionEvents
+            .Where(tx => tx.TransactionId == transactionId).ToList();
+
+        var seqNoSet = txes.Select(tx => tx.SeqNo).ToImmutableSortedSet();
+        var isContinuous = seqNoSet.Count > 0 && (seqNoSet.Max - seqNoSet.Min + 1) == seqNoSet.Count;
+        return txes.Any(tx => tx.EventType == TransactionEventType.Started) &&
+               txes.Any(tx => tx.EventType == TransactionEventType.Ended) &&
+               isContinuous;
+    }
     
     public async Task<TransactionEventResponse> IngestEvent(string clientIdentifier, TransactionEventRequest request)
     {
@@ -204,6 +218,16 @@ public class TransactionService(
         
         // finally append the event
         chargingStation.TransactionEvents.Add(@event);
+        
+        // if this is the end then we should free the token now
+        // one caveat: there's nothing guaranteeing us that the Ended event will come last
+        // thus the check should be: ALL SEQUENCE NUMBERS PRESENT + "Ended" EVENT PRESENT + TOKEN IS TYPE "Central"
+        if (IsTransactionComplete(chargingStation, request.TransactionInfo.TransactionId) 
+            && token is not null
+            && token.IdType == IdTokenType.Central)
+        {
+            await tokenService.ReleaseCentralToken(token);
+        }
         
         await context.SaveChangesAsync();
         

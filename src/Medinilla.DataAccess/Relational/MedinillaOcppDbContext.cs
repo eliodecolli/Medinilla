@@ -62,6 +62,8 @@ public class MedinillaOcppDbContext(DbContextOptions<MedinillaOcppDbContext> opt
 
         modelBuilder.Entity<IdToken>().Property(c => c.Blocked)
             .HasDefaultValue(false);
+        modelBuilder.Entity<IdToken>().Property(c => c.IdType)
+            .HasConversion<string>();
 
         modelBuilder.Entity<AuthorizationUser>().HasOne(c => c.ChargingStation)
             .WithMany(c => c.AuthorizationUsers)

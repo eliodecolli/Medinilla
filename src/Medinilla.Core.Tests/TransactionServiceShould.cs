@@ -17,6 +17,8 @@ using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
 using ChargingStation = Medinilla.DataAccess.Relational.Models.ChargingStation;
 using DbIdToken = Medinilla.DataAccess.Relational.Models.Authorization.IdToken;
+using IdTokenType = Medinilla.DataTypes.Contracts.Common.IdTokenType;
+using DbIdTokenType = Medinilla.DataAccess.Relational.Enums.IdTokenType;
 using OcppIdToken = Medinilla.DataTypes.Contracts.Common.IdToken;
 
 namespace Medinilla.Core.Tests;
@@ -27,6 +29,7 @@ public class TransactionServiceShould : IDisposable
     private static readonly DateTime EventTimestamp = new(2026, 11, 1, 12, 0, 0, DateTimeKind.Utc);
     private readonly TestDbContext _context;
     private readonly Mock<IAuthAlgorithm> _authorization = new(MockBehavior.Strict);
+    private readonly Mock<IIdTokenService> _tokenService = new(MockBehavior.Strict);
     private readonly TransactionService _service;
 
     public TransactionServiceShould()
@@ -157,7 +160,7 @@ public class TransactionServiceShould : IDisposable
     {
         var station = await AddStation();
         station.Location = "garage";
-        var token = new DbIdToken { Token = "token-1", IdType = "ISO14443" };
+        var token = new DbIdToken { Token = "token-1", IdType = DbIdTokenType.ISO14443 };
         station.IdTokens.Add(token);
         var request = CreateRequest();
         request.IdToken = new OcppIdToken { Token = token.Token, Type = IdTokenType.ISO14443 };
@@ -176,8 +179,8 @@ public class TransactionServiceShould : IDisposable
     public async Task RecoverTheTokenFromAnEarlierEventOfTheSameTransaction()
     {
         var station = await AddStation();
-        var unrelatedToken = new DbIdToken { Token = "other-token", IdType = "ISO14443" };
-        var token = new DbIdToken { Token = "token-1", IdType = "ISO14443" };
+        var unrelatedToken = new DbIdToken { Token = "other-token", IdType = DbIdTokenType.ISO14443 };
+        var token = new DbIdToken { Token = "token-1", IdType = DbIdTokenType.ISO14443 };
         station.TransactionEvents.Add(new TransactionEvent
         {
             TransactionId = "other-transaction", SeqNo = 0, IdToken = unrelatedToken,
@@ -197,6 +200,238 @@ public class TransactionServiceShould : IDisposable
         Assert.Same(token, stored.IdToken);
         Assert.Null(response.IdTokenInfo);
         _authorization.Verify(a => a.Authorize(It.Is<AuthorizationContext>(c => c.IdToken == token)), Times.Once);
+    }
+
+    [Theory]
+    [InlineData(true)]
+    [InlineData(false)]
+    public async Task ReleaseTheCentralTokenWhenTheTransactionCompletes(bool includeTokenInEndedEvent)
+    {
+        var station = await AddStation();
+        var token = AddToken(station);
+        _tokenService.Setup(s => s.ReleaseCentralToken(token)).Returns(Task.CompletedTask);
+        await _service.IngestEvent(ClientIdentifier, CreateRequest(TransactionEventEnum.Started, 0, token));
+        await _service.IngestEvent(ClientIdentifier, CreateRequest(TransactionEventEnum.Updated, 1));
+        _tokenService.Verify(s => s.ReleaseCentralToken(It.IsAny<DbIdToken>()), Times.Never);
+
+        var response = await _service.IngestEvent(ClientIdentifier,
+            CreateRequest(TransactionEventEnum.Ended, 2, includeTokenInEndedEvent ? token : null));
+
+        _tokenService.Verify(s => s.ReleaseCentralToken(token), Times.Once);
+        Assert.Equal(3, station.TransactionEvents.Count);
+        var ended = await _context.Set<TransactionEvent>().AsNoTracking()
+            .SingleAsync(e => e.EventType == TransactionEventType.Ended);
+        Assert.Equal(token.Id, ended.IdTokenId);
+        if (includeTokenInEndedEvent)
+            Assert.Equal(AuthorizeStatus.Accepted, response.IdTokenInfo?.Status);
+        else
+            Assert.Null(response.IdTokenInfo);
+    }
+
+    [Theory]
+    [InlineData(0, 2, 1)]
+    [InlineData(1, 0, 2)]
+    [InlineData(1, 2, 0)]
+    [InlineData(2, 0, 1)]
+    [InlineData(2, 1, 0)]
+    [InlineData(5, 7, 6)]
+    [InlineData(6, 5, 7)]
+    public async Task ReleaseTheCentralTokenWhenOutOfOrderEventsFormAContinuousRange(int first, int second, int third)
+    {
+        var station = await AddStation();
+        var token = AddToken(station);
+        _tokenService.Setup(s => s.ReleaseCentralToken(token)).Returns(Task.CompletedTask);
+        var eventTypes = new[]
+        {
+            TransactionEventEnum.Started, TransactionEventEnum.Updated, TransactionEventEnum.Ended,
+        };
+        var firstSeqNo = Math.Min(first, Math.Min(second, third));
+
+        foreach (var seqNo in new[] { first, second })
+        {
+            await _service.IngestEvent(ClientIdentifier, CreateRequest(eventTypes[seqNo - firstSeqNo], seqNo, token));
+            _tokenService.Verify(s => s.ReleaseCentralToken(It.IsAny<DbIdToken>()), Times.Never);
+        }
+
+        await _service.IngestEvent(ClientIdentifier, CreateRequest(eventTypes[third - firstSeqNo], third, token));
+
+        _tokenService.Verify(s => s.ReleaseCentralToken(token), Times.Once);
+        Assert.Equal(3, await _context.Set<TransactionEvent>().CountAsync());
+    }
+
+    [Theory]
+    [InlineData(1)]
+    [InlineData(5)]
+    public async Task KeepTheCentralTokenWhenAContinuousRangeHasNoStartedEvent(int firstSeqNo)
+    {
+        var station = await AddStation();
+        var token = AddToken(station);
+        await _service.IngestEvent(ClientIdentifier, CreateRequest(TransactionEventEnum.Updated, firstSeqNo, token));
+        _tokenService.Verify(s => s.ReleaseCentralToken(It.IsAny<DbIdToken>()), Times.Never);
+
+        await _service.IngestEvent(ClientIdentifier, CreateRequest(TransactionEventEnum.Ended, firstSeqNo + 1));
+
+        _tokenService.Verify(s => s.ReleaseCentralToken(It.IsAny<DbIdToken>()), Times.Never);
+        Assert.Equal(2, await _context.Set<TransactionEvent>().CountAsync());
+    }
+
+    [Theory]
+    [InlineData(0)]
+    [InlineData(2)]
+    [InlineData(7)]
+    public async Task KeepTheCentralTokenForASingleEndedEvent(int seqNo)
+    {
+        var station = await AddStation();
+        var token = AddToken(station);
+
+        await _service.IngestEvent(ClientIdentifier, CreateRequest(TransactionEventEnum.Ended, seqNo, token));
+
+        _tokenService.Verify(s => s.ReleaseCentralToken(It.IsAny<DbIdToken>()), Times.Never);
+        var stored = Assert.Single(await _context.Set<TransactionEvent>().AsNoTracking().ToListAsync());
+        Assert.Equal(seqNo, stored.SeqNo);
+        Assert.Equal(TransactionEventType.Ended, stored.EventType);
+    }
+
+    [Theory]
+    [InlineData(0, 2)]
+    [InlineData(0, 3)]
+    [InlineData(5, 7)]
+    public async Task KeepTheCentralTokenWhileSequenceNumbersAreMissing(int firstSeqNo, int endedSeqNo)
+    {
+        var station = await AddStation();
+        var token = AddToken(station);
+        await _service.IngestEvent(ClientIdentifier, CreateRequest(TransactionEventEnum.Started, firstSeqNo, token));
+
+        await _service.IngestEvent(ClientIdentifier, CreateRequest(TransactionEventEnum.Ended, endedSeqNo));
+
+        _tokenService.Verify(s => s.ReleaseCentralToken(It.IsAny<DbIdToken>()), Times.Never);
+        Assert.Equal(2, await _context.Set<TransactionEvent>().CountAsync());
+    }
+
+    [Theory]
+    [InlineData(TransactionEventEnum.Started)]
+    [InlineData(TransactionEventEnum.Updated)]
+    public async Task KeepTheCentralTokenUntilAnEndedEventArrives(TransactionEventEnum eventType)
+    {
+        var station = await AddStation();
+        var token = AddToken(station);
+        await _service.IngestEvent(ClientIdentifier, CreateRequest(TransactionEventEnum.Started, 0, token));
+
+        await _service.IngestEvent(ClientIdentifier, CreateRequest(eventType, 1));
+
+        _tokenService.Verify(s => s.ReleaseCentralToken(It.IsAny<DbIdToken>()), Times.Never);
+        Assert.Equal(2, station.TransactionEvents.Count);
+    }
+
+    [Theory]
+    [InlineData(DbIdTokenType.EMAID)]
+    [InlineData(DbIdTokenType.ISO14443)]
+    [InlineData(DbIdTokenType.ISO15693)]
+    [InlineData(DbIdTokenType.KeyCode)]
+    [InlineData(DbIdTokenType.Local)]
+    [InlineData(DbIdTokenType.MacAddress)]
+    [InlineData(DbIdTokenType.NoAuthorization)]
+    public async Task NeverReleaseNonCentralTokensWhenTheTransactionCompletes(DbIdTokenType type)
+    {
+        var station = await AddStation();
+        var token = AddToken(station, type);
+        await _service.IngestEvent(ClientIdentifier, CreateRequest(TransactionEventEnum.Started, 0, token));
+
+        await _service.IngestEvent(ClientIdentifier, CreateRequest(TransactionEventEnum.Ended, 1));
+
+        _tokenService.Verify(s => s.ReleaseCentralToken(It.IsAny<DbIdToken>()), Times.Never);
+        Assert.False(token.Blocked);
+        Assert.Equal(2, station.TransactionEvents.Count);
+    }
+
+    [Theory]
+    [InlineData(TransactionEventEnum.Updated, 1)]
+    [InlineData(TransactionEventEnum.Ended, 2)]
+    public async Task IgnoreOtherTransactionsWhenCheckingCompletion(TransactionEventEnum eventType, int seqNo)
+    {
+        var station = await AddStation();
+        var token = AddToken(station);
+        station.TransactionEvents.Add(new TransactionEvent
+        {
+            TransactionId = "another-transaction",
+            SeqNo = 1,
+            EventType = TransactionEventType.Ended,
+            IdToken = token,
+        });
+        await _service.IngestEvent(ClientIdentifier, CreateRequest(TransactionEventEnum.Started, 0, token));
+
+        await _service.IngestEvent(ClientIdentifier, CreateRequest(eventType, seqNo));
+
+        _tokenService.Verify(s => s.ReleaseCentralToken(It.IsAny<DbIdToken>()), Times.Never);
+        Assert.Equal(3, station.TransactionEvents.Count);
+    }
+
+    [Fact]
+    public async Task NotReleaseATokenWhenTheCompletedTransactionHasNone()
+    {
+        var station = await AddStation();
+        await _service.IngestEvent(ClientIdentifier, CreateRequest(TransactionEventEnum.Started, 0));
+
+        await _service.IngestEvent(ClientIdentifier, CreateRequest(TransactionEventEnum.Ended, 1));
+
+        _tokenService.Verify(s => s.ReleaseCentralToken(It.IsAny<DbIdToken>()), Times.Never);
+        Assert.Equal(2, station.TransactionEvents.Count);
+        Assert.All(station.TransactionEvents, e => Assert.Null(e.IdToken));
+    }
+
+    [Fact]
+    public async Task NotReleaseTheCentralTokenAgainForADuplicateEndedEvent()
+    {
+        var station = await AddStation();
+        var token = AddToken(station);
+        _tokenService.Setup(s => s.ReleaseCentralToken(token)).Returns(Task.CompletedTask);
+        await _service.IngestEvent(ClientIdentifier, CreateRequest(TransactionEventEnum.Started, 0, token));
+        var request = CreateRequest(TransactionEventEnum.Ended, 1);
+        await _service.IngestEvent(ClientIdentifier, request);
+
+        var response = await _service.IngestEvent(ClientIdentifier, request);
+
+        _tokenService.Verify(s => s.ReleaseCentralToken(token), Times.Once);
+        _authorization.Verify(a => a.Authorize(It.IsAny<AuthorizationContext>()), Times.Exactly(2));
+        Assert.Equal(2, station.TransactionEvents.Count);
+        Assert.Null(response.IdTokenInfo);
+    }
+
+    [Theory]
+    [InlineData(AuthorizeStatus.Invalid)]
+    [InlineData(AuthorizeStatus.Blocked)]
+    [InlineData(AuthorizeStatus.Expired)]
+    public async Task NotReleaseTheCentralTokenWhenTheEndedEventFailsAuthorization(string status)
+    {
+        var station = await AddStation();
+        var token = AddToken(station);
+        await _service.IngestEvent(ClientIdentifier, CreateRequest(TransactionEventEnum.Started, 0, token));
+        _authorization.Setup(a => a.Authorize(It.IsAny<AuthorizationContext>())).ReturnsAsync(status);
+
+        var response = await _service.IngestEvent(ClientIdentifier, CreateRequest(TransactionEventEnum.Ended, 1));
+
+        _tokenService.Verify(s => s.ReleaseCentralToken(It.IsAny<DbIdToken>()), Times.Never);
+        Assert.Equal(status, response.IdTokenInfo?.Status);
+        Assert.Equal(TransactionEventType.Started, Assert.Single(station.TransactionEvents).EventType);
+        Assert.Equal(1, await _context.Set<TransactionEvent>().CountAsync());
+    }
+
+    [Fact]
+    public async Task PropagateCentralTokenReleaseFailuresWithoutSavingTheEndedEvent()
+    {
+        var station = await AddStation();
+        var token = AddToken(station);
+        await _service.IngestEvent(ClientIdentifier, CreateRequest(TransactionEventEnum.Started, 0, token));
+        var expected = new InvalidOperationException("Simulated release failure");
+        _tokenService.Setup(s => s.ReleaseCentralToken(token)).ThrowsAsync(expected);
+
+        var actual = await Assert.ThrowsAsync<InvalidOperationException>(() =>
+            _service.IngestEvent(ClientIdentifier, CreateRequest(TransactionEventEnum.Ended, 1)));
+
+        Assert.Same(expected, actual);
+        _tokenService.Verify(s => s.ReleaseCentralToken(token), Times.Once);
+        var stored = await _context.Set<TransactionEvent>().AsNoTracking().ToListAsync();
+        Assert.Equal(TransactionEventType.Started, Assert.Single(stored).EventType);
     }
 
     [Theory]
@@ -442,7 +677,8 @@ public class TransactionServiceShould : IDisposable
     private TransactionService CreateService(params IAuthAlgorithm[] algorithms) => new(
         NullLogger<ITransactionService>.Instance,
         _context,
-        new AuthorizationAlgorithmFactory(algorithms, NullLogger<AuthorizationAlgorithmFactory>.Instance));
+        new AuthorizationAlgorithmFactory(algorithms, NullLogger<AuthorizationAlgorithmFactory>.Instance),
+        _tokenService.Object);
 
     private async Task<ChargingStation> AddStation(string? allowedMeasurands = null)
     {
@@ -474,13 +710,26 @@ public class TransactionServiceShould : IDisposable
         return station;
     }
 
-    private static TransactionEventRequest CreateRequest() => new()
+    private static DbIdToken AddToken(ChargingStation station, DbIdTokenType type = DbIdTokenType.Central)
     {
-        EventType = TransactionEventEnum.Started,
+        var token = new DbIdToken { Token = "token-1", IdType = type };
+        station.IdTokens.Add(token);
+        return token;
+    }
+
+    private static TransactionEventRequest CreateRequest(
+        TransactionEventEnum eventType = TransactionEventEnum.Started, int seqNo = 0, DbIdToken? token = null) => new()
+    {
+        EventType = eventType,
         Timestamp = EventTimestamp,
         TriggerReason = TriggerReasonEnum.Authorized,
-        SeqNo = 0,
+        SeqNo = seqNo,
         TransactionInfo = new Transaction { TransactionId = "transaction-1" },
+        IdToken = token is null ? null : new OcppIdToken
+        {
+            Token = token.Token,
+            Type = Enum.Parse<IdTokenType>(token.IdType.ToString()),
+        },
     };
 
     private static MeterValue CreateMeter(DateTime timestamp, params SampledValue[] samples) => new()

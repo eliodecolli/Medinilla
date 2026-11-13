@@ -217,12 +217,32 @@ internal sealed class MedinillaGrpc(ILogger<MedinillaGrpc> log, IServiceProvider
                 messageId,
                 request.ClientIdentifier);
 
+            var scope = serviceProvider.CreateScope();
+            var tokenService = scope.ServiceProvider.GetRequiredService<IIdTokenService>();
+            var router = scope.ServiceProvider.GetRequiredService<IOcppCallRouter>();
+
             var payload = MedinillaMapping.MapRequestStartTransaction(request);
+            payload.IdToken = await tokenService.GenerateCentralToken(
+                request.ClientIdentifier,
+                Guid.Parse(request.AuthorizationUserId),
+                request.DurationSeconds,
+                messageId);
 
             var ocppRequest = new OcppCallRequest(messageId, OcppActionNames.RequestStartTransaction, OcppPayloadSerializer.SerializePayload(payload));
-            await SubmitAsync(request.ClientIdentifier, ocppRequest);
+            await SubmitAsync(request.ClientIdentifier, ocppRequest, router);
             return new RequestStartTransactionResponse()
             {
+                Token = new IdToken()
+                {
+                    Token = payload.IdToken.Token,
+                    Type = payload.IdToken.Type.ToString(),
+                    AdditionalInfo = payload.IdToken.AdditionalInfo is not null ? new AdditionalTokenInfo()
+                    {
+                        AdditionalIdToken = payload.IdToken.AdditionalInfo.AdditionalIdToken,
+                        Type = payload.IdToken.AdditionalInfo.Type
+                    } : null
+                },
+                CorrelationId = messageId,
                 Error = new Error()
                 {
                     HasError = false,
@@ -311,10 +331,16 @@ internal sealed class MedinillaGrpc(ILogger<MedinillaGrpc> log, IServiceProvider
         return retval;
     }
 
+    private async Task SubmitAsync(string clientIdentifier, OcppCallRequest request, IOcppCallRouter router)
+    {
+        await router.SubmitAsync(clientIdentifier, request);
+    }
+    
     private async Task SubmitAsync(string clientIdentifier, OcppCallRequest request)
     {
         using var scope = serviceProvider.CreateScope();
         var router = scope.ServiceProvider.GetRequiredService<IOcppCallRouter>();
-        await router.SubmitAsync(clientIdentifier, request);
+        await SubmitAsync(clientIdentifier, request, router);
     }
+    
 }

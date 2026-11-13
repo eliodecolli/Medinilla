@@ -6,10 +6,16 @@ namespace Medinilla.Core.Logic.Configuration;
 public class MedinillaConfiguration
 {
     public bool UseDefaultUser { get; set; }
+    
     public DefaultUnitConfiguration DefaultUnit { get; set; }
+    
     public DefaultUserConfiguration DefaultUser { get; set; }
+    
     public string DefaultAuthDetails { get; set; }
+    
     public string DefaultAllowedMeasurands { get; set; } = string.Empty;
+    
+    public string SigningSecretKey { get; set; }
 }
 
 public class DefaultUnitConfiguration
