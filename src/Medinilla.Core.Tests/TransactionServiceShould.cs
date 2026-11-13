@@ -320,6 +320,62 @@ public class TransactionServiceShould : IDisposable
         Assert.Equal(expected, stored.Context);
     }
 
+    [Fact]
+    public async Task StoreOnlyTheSamplesWhoseMeasurandIsAllowed()
+    {
+        var station = await AddStation($"{nameof(Measurand.Voltage)},{nameof(Measurand.EnergyActiveImportRegister)}");
+        var request = CreateRequest();
+        request.MeterValue = [CreateMeter(EventTimestamp,
+            new SampledValue { Value = 230m, Measurand = MeasurandEnum.Voltage },
+            new SampledValue { Value = 200m, Measurand = MeasurandEnum.EnergyActiveExportRegister },
+            new SampledValue { Value = 100m })];
+
+        await _service.IngestEvent(ClientIdentifier, request);
+
+        var stored = Assert.Single(station.TransactionEvents).Samples;
+        Assert.Collection(stored,
+            sample =>
+            {
+                Assert.Equal(230m, sample.Value);
+                Assert.Equal(Measurand.Voltage, sample.Measurand);
+            },
+            sample =>
+            {
+                Assert.Equal(100m, sample.Value);
+                Assert.Equal(Measurand.EnergyActiveImportRegister, sample.Measurand);
+            });
+    }
+
+    [Fact]
+    public async Task StoreAllSamplesWhenNoMeasurandIsConfigured()
+    {
+        var station = await AddStation(string.Empty);
+        var request = CreateRequest();
+        request.MeterValue = [CreateMeter(EventTimestamp,
+            new SampledValue { Value = 230m, Measurand = MeasurandEnum.Voltage })];
+
+        await _service.IngestEvent(ClientIdentifier, request);
+
+        var stored = Assert.Single(station.TransactionEvents);
+        Assert.Equal(Measurand.Voltage, Assert.Single(stored.Samples).Measurand);
+        Assert.Single(_context.ChangeTracker.Entries<TransactionSample>());
+    }
+
+    [Fact]
+    public async Task IgnoreUnknownMeasurandsInTheAllowedMeasurandsSettings()
+    {
+        var station = await AddStation($"NotAMeasurand, {nameof(Measurand.Voltage)}");
+        var request = CreateRequest();
+        request.MeterValue = [CreateMeter(EventTimestamp,
+            new SampledValue { Value = 230m, Measurand = MeasurandEnum.Voltage },
+            new SampledValue { Value = 200m, Measurand = MeasurandEnum.EnergyActiveExportRegister })];
+
+        await _service.IngestEvent(ClientIdentifier, request);
+
+        var stored = Assert.Single(Assert.Single(station.TransactionEvents).Samples);
+        Assert.Equal(Measurand.Voltage, stored.Measurand);
+    }
+
     [Theory]
     [InlineData(null, null)]
     [InlineData(PhaseEnum.L1, MeasurementPhase.L1)]
@@ -388,8 +444,21 @@ public class TransactionServiceShould : IDisposable
         _context,
         new AuthorizationAlgorithmFactory(algorithms, NullLogger<AuthorizationAlgorithmFactory>.Instance));
 
-    private async Task<ChargingStation> AddStation()
+    private async Task<ChargingStation> AddStation(string? allowedMeasurands = null)
     {
+        var account = new Account
+        {
+            Id = Guid.NewGuid(),
+            Name = "Test account",
+            Settings = new AccountSettings
+            {
+                AccountId = Guid.NewGuid(),
+                AllowedMeasurands = allowedMeasurands ?? string.Join(",", Enum.GetNames<Measurand>()),
+                Account = null!,
+            },
+        };
+        account.Settings.Account = account;
+
         var station = new ChargingStation
         {
             Id = Guid.NewGuid(),
@@ -397,6 +466,8 @@ public class TransactionServiceShould : IDisposable
             Model = "Test model",
             Vendor = "Test vendor",
             LatestBootNotificationReason = "PowerUp",
+            AccountId = account.Id,
+            Account = account,
         };
         _context.Add(station);
         await _context.SaveChangesAsync();

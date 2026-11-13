@@ -38,6 +38,13 @@ public class ChargingStationBooting(MedinillaOcppDbContext context, ILogger<Char
     {
         var medinillaSettings = CentralConfig.GetMedinillaConfiguration();
 
+        chargingStation.Account.Settings ??= new AccountSettings
+        {
+            AccountId = chargingStation.AccountId,
+            Account = chargingStation.Account,
+            AllowedMeasurands = medinillaSettings.DefaultAllowedMeasurands,
+        };
+
         if (chargingStation.Tariffs.Count == 0)
         {
             // get default unit price
@@ -104,6 +111,7 @@ public class ChargingStationBooting(MedinillaOcppDbContext context, ILogger<Char
             await context.Set<ChargingStation>().AddAsync(entity);
             
             var account = await context.Set<Account>()
+                .Include(c => c.Settings)
                 .Where(c => c.Name == "MedinillaTest-Core")
                 .FirstOrDefaultAsync()
                 .ConfigureAwait(false);
@@ -111,6 +119,7 @@ public class ChargingStationBooting(MedinillaOcppDbContext context, ILogger<Char
             // let account throw here agin if it's not found
             // this logic will be replaced in https://github.com/eliodecolli/Medinilla/issues/24
             entity.AccountId = account!.Id;
+            entity.Account = account;
             entity.CreatedAt = DateTime.UtcNow;
             entity.LatestBootNotificationReason = GetBootupReason(request);
             entity.Booted = true;

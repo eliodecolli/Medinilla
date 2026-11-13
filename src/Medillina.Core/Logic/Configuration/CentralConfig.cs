@@ -1,4 +1,4 @@
-﻿using System.Reflection;
+using System.Reflection;
 using System.Text.Json;
 
 namespace Medinilla.Core.Logic.Configuration;
@@ -9,6 +9,7 @@ public class MedinillaConfiguration
     public DefaultUnitConfiguration DefaultUnit { get; set; }
     public DefaultUserConfiguration DefaultUser { get; set; }
     public string DefaultAuthDetails { get; set; }
+    public string DefaultAllowedMeasurands { get; set; } = string.Empty;
 }
 
 public class DefaultUnitConfiguration
@@ -29,7 +30,7 @@ public class CentralConfig
     public static MedinillaConfiguration GetMedinillaConfiguration()
     {
         var exeDirectory = Path.GetDirectoryName(Assembly.GetExecutingAssembly().Location);
-        var filePath = Path.Combine(exeDirectory, "config.json");
+        var filePath = Path.Combine(exeDirectory, "defaults.json");
 
         var jsonContent = File.ReadAllText(filePath);
         var options = new JsonSerializerOptions

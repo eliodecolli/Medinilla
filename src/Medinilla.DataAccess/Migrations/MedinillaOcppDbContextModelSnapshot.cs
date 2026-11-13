@@ -41,6 +41,20 @@ namespace Medinilla.DataAccess.Migrations
                     b.ToTable("core_account", (string)null);
                 });
 
+            modelBuilder.Entity("Medinilla.DataAccess.Relational.Models.AccountSettings", b =>
+                {
+                    b.Property<Guid>("AccountId")
+                        .HasColumnType("uuid");
+
+                    b.Property<string>("AllowedMeasurands")
+                        .IsRequired()
+                        .HasColumnType("text");
+
+                    b.HasKey("AccountId");
+
+                    b.ToTable("core_account_settings", (string)null);
+                });
+
             modelBuilder.Entity("Medinilla.DataAccess.Relational.Models.Audit.CommandExecution", b =>
                 {
                     b.Property<long>("Id")
@@ -502,6 +516,17 @@ namespace Medinilla.DataAccess.Migrations
                     b.ToTable("core_transaction_samples", (string)null);
                 });
 
+            modelBuilder.Entity("Medinilla.DataAccess.Relational.Models.AccountSettings", b =>
+                {
+                    b.HasOne("Medinilla.DataAccess.Relational.Models.Account", "Account")
+                        .WithOne("Settings")
+                        .HasForeignKey("Medinilla.DataAccess.Relational.Models.AccountSettings", "AccountId")
+                        .OnDelete(DeleteBehavior.Cascade)
+                        .IsRequired();
+
+                    b.Navigation("Account");
+                });
+
             modelBuilder.Entity("Medinilla.DataAccess.Relational.Models.Audit.CommandExecution", b =>
                 {
                     b.HasOne("Medinilla.DataAccess.Relational.Models.ChargingStation", null)
@@ -643,6 +668,9 @@ namespace Medinilla.DataAccess.Migrations
             modelBuilder.Entity("Medinilla.DataAccess.Relational.Models.Account", b =>
                 {
                     b.Navigation("ChargingStations");
+
+                    b.Navigation("Settings")
+                        .IsRequired();
                 });
 
             modelBuilder.Entity("Medinilla.DataAccess.Relational.Models.Authorization.AuthorizationUser", b =>

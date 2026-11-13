@@ -6,5 +6,7 @@ public class Account
 
     public string Name { get; set; }
 
+    public virtual AccountSettings Settings { get; set; }
+
     public virtual ICollection<ChargingStation> ChargingStations { get; set; }
 }

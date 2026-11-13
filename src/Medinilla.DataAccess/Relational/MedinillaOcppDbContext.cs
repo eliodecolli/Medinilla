@@ -16,6 +16,7 @@ public class MedinillaOcppDbContext(DbContextOptions<MedinillaOcppDbContext> opt
 
         // configure table
         modelBuilder.Entity<Account>().ToTable("core_account");
+        modelBuilder.Entity<AccountSettings>().ToTable("core_account_settings");
         modelBuilder.Entity<ChargingStation>().ToTable("core_charging_station");
         modelBuilder.Entity<EvseConnector>().ToTable("core_evse_connector");
         modelBuilder.Entity<Tariff>().ToTable("core_tariff");
@@ -32,6 +33,10 @@ public class MedinillaOcppDbContext(DbContextOptions<MedinillaOcppDbContext> opt
         modelBuilder.Entity<Account>().HasMany(c => c.ChargingStations)
             .WithOne(c => c.Account)
             .HasForeignKey(c => c.AccountId);
+        modelBuilder.Entity<AccountSettings>().HasKey(c => c.AccountId);
+        modelBuilder.Entity<AccountSettings>().HasOne(c => c.Account)
+            .WithOne(c => c.Settings)
+            .HasForeignKey<AccountSettings>(c => c.AccountId);
 
         // configure charging station
         modelBuilder.Entity<ChargingStation>().HasMany(c => c.EvseConnectors)

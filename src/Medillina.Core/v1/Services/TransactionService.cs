@@ -51,24 +51,60 @@ public class TransactionService(
         var unitFactor = sample.UnitOfMeasure?.Unit == "kWh" ? 1000m : 1m;
         return sample.Value * (decimal)Math.Pow(10, multiplier) * unitFactor;
     }
+    
+    private HashSet<Measurand>? ParseAllowedMeasurands(AccountSettings? settings)
+    {
+        var allowed = new HashSet<Measurand>();
+
+        if (settings is null || string.IsNullOrWhiteSpace(settings.AllowedMeasurands))
+        {
+            logger.LogWarning(
+                "No allowed measurands are configured for this account, all sampled value will be stored.");
+            return null;
+        }
+
+        foreach (var entry in settings.AllowedMeasurands.Split(
+                     ',', StringSplitOptions.RemoveEmptyEntries | StringSplitOptions.TrimEntries))
+        {
+            if (Enum.TryParse<Measurand>(entry, true, out var measurand))
+            {
+                allowed.Add(measurand);
+            }
+            else
+            {
+                logger.LogWarning("Ignoring unknown measurand {measurand} in the allowed measurands settings", entry);
+            }
+        }
+
+        return allowed;
+    }
 
     private ICollection<TransactionSample> MapSamples(
-        IEnumerable<MeterValue>? meterValues, TransactionEvent transactionEvent)
+        IEnumerable<MeterValue>? meterValues, AccountSettings? settings)
     {
-        return meterValues?.SelectMany(meter => meter.SampledValue.Select(sample => new TransactionSample
+        var allowedMeasurands = ParseAllowedMeasurands(settings);
+
+        return meterValues?.SelectMany(meter => meter.SampledValue.Select(sample => new
         {
-            Timestamp = meter.Timestamp.ToUniversalTime(),
+            Meter = meter,
+            Sample = sample,
             Measurand = Enum.Parse<Measurand>(
                 (sample.Measurand ?? MeasurandEnum.EnergyActiveImportRegister).ToString()),
-            Location = Enum.Parse<MeasurementLocation>(
-                (sample.Location ?? LocationEnum.Outlet).ToString()),
-            Context = Enum.Parse<ReadingContext>(
-                (sample.Context ?? ReadingContextEnum.SamplePeriodic).ToString()),
-            Phase = sample.Phase.HasValue
-                ? Enum.Parse<MeasurementPhase>(sample.Phase.Value.ToString())
-                : null,
-            Value = NormalizeSampleValue(sample),
-        })).ToList() ?? [];
+        }))
+            .Where(x => allowedMeasurands?.Contains(x.Measurand) ?? true )
+            .Select(x => new TransactionSample
+            {
+                Timestamp = x.Meter.Timestamp.ToUniversalTime(),
+                Measurand = x.Measurand,
+                Location = Enum.Parse<MeasurementLocation>(
+                    (x.Sample.Location ?? LocationEnum.Outlet).ToString()),
+                Context = Enum.Parse<ReadingContext>(
+                    (x.Sample.Context ?? ReadingContextEnum.SamplePeriodic).ToString()),
+                Phase = x.Sample.Phase.HasValue
+                    ? Enum.Parse<MeasurementPhase>(x.Sample.Phase.Value.ToString())
+                    : null,
+                Value = NormalizeSampleValue(x.Sample),
+            }).ToList() ?? [];
     }
 
     private bool IsEventPresent(ChargingStation cs, string transactionId, int seqNo)
@@ -80,10 +116,12 @@ public class TransactionService(
     {
         TransactionEventResponse result = new();
         ChargingStation chargingStation;
+        AccountSettings? settings;
         
         try
         {
             chargingStation = await context.GetChargingStation(clientIdentifier);
+            settings = chargingStation.Account?.Settings;
         }
         catch (AggregateRootNotFoundException e)
         {
@@ -162,7 +200,7 @@ public class TransactionService(
         }
         
         // fill in the samples
-        @event.Samples = MapSamples(request.MeterValue, @event);
+        @event.Samples = MapSamples(request.MeterValue, settings);
         
         // finally append the event
         chargingStation.TransactionEvents.Add(@event);
