@@ -58,6 +58,7 @@ public static class ServiceExtensions
         serviceCollection.AddScoped<IChargingStationBootingService, ChargingStationBooting>();
         serviceCollection.AddScoped<IRouterServices, RouterServices>();
         serviceCollection.AddScoped<ITransactionService, TransactionService>();
+        serviceCollection.AddScoped<IIdTokenService, IdTokenService>();
         serviceCollection.AddScoped<ITariffService, TariffService>();
         serviceCollection.AddScoped<ICommandExecutionService, CommandExecutionService>();
         serviceCollection.AddScoped<IChargerConfigService, ChargerConfigService>();
