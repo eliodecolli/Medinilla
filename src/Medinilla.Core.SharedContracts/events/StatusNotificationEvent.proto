@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+import "google/protobuf/timestamp.proto";
+
+option csharp_namespace = "Medinilla.Core.SharedContracts.Events";
+
+message StatusNotificationEvent {
+  string charger_id = 1;
+  int32 evse_id = 2;
+  int32 connector_id = 3;
+  string connector_status = 4;
+  google.protobuf.Timestamp status_timestamp = 5;
+  optional string connector_type = 6;
+}

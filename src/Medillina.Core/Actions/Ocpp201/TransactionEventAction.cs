@@ -1,3 +1,4 @@
+using Medinilla.Core.Events;
 using Medinilla.Core.Interfaces.Services;
 using Medinilla.DataTypes.Contracts;
 using Medinilla.Infrastructure.WAMP;
@@ -18,12 +19,13 @@ public sealed class TransactionEventAction(
             "{ClientIdentifier}: Received transaction event {EventType} for transaction {TransactionId}, sequence {SeqNo}.",
             clientIdentifier, request.EventType, request.TransactionInfo.TransactionId, request.SeqNo);
         
-        var result = await service.IngestEvent(clientIdentifier, request);
+        var ingestion = await service.IngestEvent(clientIdentifier, request);
         
         return new RpcResult()
         {
-            Result = call.CreateResult(result),
-            ReturnToCS = true
+            Result = call.CreateResult(ingestion.Response),
+            ReturnToCS = true,
+            ProcessingContext = new TransactionEventProcessingContext(ingestion.WasNewlyIngested),
         };
     }
 }

@@ -29,6 +29,13 @@
     <Protobuf Include="comms\QueuedMessage.proto" />
   </ItemGroup>
 
+  <ItemGroup>
+    <Protobuf Include="events\MedinillaHttpEvent.proto" GrpcServices="None" />
+    <Protobuf Include="events\BootupEvent.proto" GrpcServices="None" />
+    <Protobuf Include="events\StatusNotificationEvent.proto" GrpcServices="None" />
+    <Protobuf Include="events\TransactionLifecycleEvent.proto" GrpcServices="None" />
+  </ItemGroup>
+
   <PropertyGroup>
     <ProtoRoot>$(MSBuildProjectDirectory)</ProtoRoot>
   </PropertyGroup>

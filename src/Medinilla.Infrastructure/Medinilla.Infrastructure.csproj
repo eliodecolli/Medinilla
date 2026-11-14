@@ -11,6 +11,7 @@
   </ItemGroup>
 
   <ItemGroup>
+    <ProjectReference Include="..\Medinilla.Core.SharedContracts\Medinilla.Core.SharedContracts.csproj" />
     <ProjectReference Include="..\Medinilla.DataTypes\Medinilla.DataTypes.csproj" />
   </ItemGroup>
 

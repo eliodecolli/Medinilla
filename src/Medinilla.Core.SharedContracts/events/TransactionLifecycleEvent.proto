@@ -1,0 +1,9 @@
+syntax = "proto3";
+
+option csharp_namespace = "Medinilla.Core.SharedContracts.Events";
+
+message TransactionLifecycleEvent {
+  string charger_id = 1;
+  string transaction_id = 2;
+  optional double consumption_wh = 3;
+}

@@ -132,7 +132,7 @@ public class TransactionService(
                isContinuous;
     }
     
-    public async Task<TransactionEventResponse> IngestEvent(string clientIdentifier, TransactionEventRequest request)
+    public async Task<TransactionIngestionResult> IngestEvent(string clientIdentifier, TransactionEventRequest request)
     {
         TransactionEventResponse result = new();
         ChargingStation chargingStation;
@@ -157,7 +157,7 @@ public class TransactionService(
                 clientIdentifier,
                 request.SeqNo,
                 request.TransactionInfo.TransactionId);
-            return result;
+            return new TransactionIngestionResult(result, WasNewlyIngested: false);
         }
         
         var @event = MapEvent(request);
@@ -195,7 +195,7 @@ public class TransactionService(
             {
                 Status = authResult,
             };
-            return result;
+            return new TransactionIngestionResult(result, WasNewlyIngested: false);
         }
 
         if (token is null)
@@ -260,6 +260,6 @@ public class TransactionService(
         
         await context.SaveChangesAsync();
         
-        return result;
+        return new TransactionIngestionResult(result, WasNewlyIngested: true);
     }
 }
