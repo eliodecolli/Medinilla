@@ -1,4 +1,5 @@
 using Medinilla.Core.Actions.Ocpp201;
+using Medinilla.Core.Events;
 using Medinilla.Core.Interfaces.Services;
 using Medinilla.DataTypes.Contracts;
 using Medinilla.DataTypes.Contracts.Common;
@@ -41,12 +42,14 @@ public class TransactionEventActionShould
         TransactionEventRequest? capturedRequest = null;
         _service.Setup(s => s.IngestEvent("station-1", It.IsAny<TransactionEventRequest>()))
             .Callback<string, TransactionEventRequest>((_, request) => capturedRequest = request)
-            .ReturnsAsync(new TransactionEventResponse
-            {
-                TotalCost = 12.50m,
-                ChargingPriority = 2,
-                IdTokenInfo = new IdTokenInfo { Status = AuthorizeStatus.Accepted },
-            });
+            .ReturnsAsync(new TransactionIngestionResult(
+                new TransactionEventResponse
+                {
+                    TotalCost = 12.50m,
+                    ChargingPriority = 2,
+                    IdTokenInfo = new IdTokenInfo { Status = AuthorizeStatus.Accepted },
+                },
+                WasNewlyIngested: true));
         var call = CreateCall();
 
         var result = await CreateAction().Execute(call, "station-1");
@@ -71,6 +74,8 @@ public class TransactionEventActionShould
         Assert.Equal(12.50m, response.TotalCost);
         Assert.Equal(2, response.ChargingPriority);
         Assert.Equal(AuthorizeStatus.Accepted, response.IdTokenInfo?.Status);
+        var context = Assert.IsType<TransactionEventProcessingContext>(result.ProcessingContext);
+        Assert.True(context.WasNewlyProcessed);
         _service.Verify(s => s.IngestEvent("station-1", It.IsAny<TransactionEventRequest>()), Times.Once);
         _service.VerifyNoOtherCalls();
     }
@@ -79,7 +84,9 @@ public class TransactionEventActionShould
     public async Task ReturnACallResultForAnEmptyServiceResponse()
     {
         _service.Setup(s => s.IngestEvent("station-1", It.IsAny<TransactionEventRequest>()))
-            .ReturnsAsync(new TransactionEventResponse());
+            .ReturnsAsync(new TransactionIngestionResult(
+                new TransactionEventResponse(),
+                WasNewlyIngested: false));
 
         var result = await CreateAction().Execute(CreateCall(), "station-1");
 
@@ -90,6 +97,8 @@ public class TransactionEventActionShould
         Assert.NotNull(response);
         Assert.Null(response.TotalCost);
         Assert.Null(response.IdTokenInfo);
+        var context = Assert.IsType<TransactionEventProcessingContext>(result.ProcessingContext);
+        Assert.False(context.WasNewlyProcessed);
     }
 
     [Fact]

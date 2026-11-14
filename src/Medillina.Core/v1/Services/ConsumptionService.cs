@@ -10,21 +10,46 @@ public class ConsumptionService : IConsumptionService
     {
         // One transaction's overall outlet register readings, already normalized to Wh.
         var readings = samples
-            .Where(s => s.Location == MeasurementLocation.Outlet &&
-                        s.Measurand == Measurand.EnergyActiveImportRegister &&
-                        s.Phase is null)
+            .Where(IsConsumptionReading)
             .OrderBy(s => s.Timestamp)
             .ToList();
 
+        return Task.FromResult(ComputeConsumption(readings));
+    }
+
+    public async Task<decimal?> TryComputeConsumption(
+        IAsyncEnumerable<TransactionSample> samples,
+        CancellationToken cancellationToken = default)
+    {
+        var readings = new List<TransactionSample>();
+
+        await foreach (var sample in samples.WithCancellation(cancellationToken).ConfigureAwait(false))
+        {
+            if (IsConsumptionReading(sample))
+            {
+                readings.Add(sample);
+            }
+        }
+
+        return ComputeConsumption(readings.OrderBy(s => s.Timestamp).ToList());
+    }
+
+    private static bool IsConsumptionReading(TransactionSample sample) =>
+        sample.Location == MeasurementLocation.Outlet &&
+        sample.Measurand == Measurand.EnergyActiveImportRegister &&
+        sample.Phase is null;
+
+    private static decimal? ComputeConsumption(IReadOnlyList<TransactionSample> readings)
+    {
         var begin = readings.LastOrDefault(s => s.Context == ReadingContext.TransactionBegin);
         var current = readings.LastOrDefault(s => s.Context == ReadingContext.TransactionEnd)
                       ?? readings.LastOrDefault(s => s.Context == ReadingContext.SamplePeriodic);
 
         if (begin is null || current is null)
         {
-            return Task.FromResult<decimal?>(null);
+            return null;
         }
 
-        return Task.FromResult<decimal?>(current.Value - begin.Value);
+        return current.Value - begin.Value;
     }
 }

@@ -1,5 +1,6 @@
 using Medinilla.Core.Actions;
 using Medinilla.Core.Commands;
+using Medinilla.Core.Events;
 using Medinilla.Core.Interfaces;
 using Medinilla.Core.Interfaces.Services;
 using Medinilla.Core.v1;
@@ -23,6 +24,7 @@ public class OcppCallRouterShould
     private readonly Mock<IChargingStationBootingService> _bootingServiceMock = new();
     private readonly Mock<IOcppRequestDispatcher> _dispatcherMock = new();
     private readonly Mock<ICommandExecutionService> _executionServiceMock = new();
+    private readonly Mock<IProcessedEventPublisher> _processedEventPublisherMock = new();
 
     private const string CLIENT_ID = "TEST-CHARGER-001";
     private const string KNOWN_ACTION = "Heartbeat";
@@ -56,7 +58,8 @@ public class OcppCallRouterShould
             _commandsFactoryMock.Object,
             _dispatcherMock.Object,
             table,
-            _executionServiceMock.Object);
+            _executionServiceMock.Object,
+            _processedEventPublisherMock.Object);
         return (router, table);
     }
 
@@ -105,6 +108,54 @@ public class OcppCallRouterShould
         Assert.Equal("{\"ok\":true}", result.Result.Payload);
         Assert.True(result.ReturnToCS);
         Assert.Equal(1, fakeAction.ExecuteCallCount);
+    }
+
+    [Fact]
+    public async Task RouteOcppCall_AfterSuccessfulAction_PublishesProcessedEvent()
+    {
+        var fakeAction = new FakeAction
+        {
+            ActionName = KNOWN_ACTION,
+            ResultToReturn = new RpcResult
+            {
+                Result = new OcppCallResult("msg-1", "{\"ok\":true}"),
+                ReturnToCS = true,
+            }
+        };
+        _actionsFactoryMock.Setup(f => f.GetAction(KNOWN_ACTION)).Returns(fakeAction);
+
+        var (sut, _) = CreateSut();
+        var frame = Encoding.UTF8.GetBytes(BuildCall("msg-1", KNOWN_ACTION, "{}"));
+
+        await sut.RouteOcppCall(frame, CLIENT_ID);
+
+        _processedEventPublisherMock.Verify(
+            p => p.PublishForCallAsync(
+                It.Is<OcppCallRequest>(call => call.MessageId == "msg-1" && call.Action == KNOWN_ACTION),
+                CLIENT_ID,
+                It.Is<RpcResult>(result => result.Error == null && result.Result != null),
+                It.IsAny<DateTime>()),
+            Times.Once);
+    }
+
+    [Fact]
+    public async Task RouteOcppCall_WhenActionThrows_DoesNotPublishProcessedEvent()
+    {
+        var fakeAction = new FakeAction { ActionName = KNOWN_ACTION, ThrowOnExecute = new InvalidOperationException("boom") };
+        _actionsFactoryMock.Setup(f => f.GetAction(KNOWN_ACTION)).Returns(fakeAction);
+
+        var (sut, _) = CreateSut();
+        var frame = Encoding.UTF8.GetBytes(BuildCall("msg-1", KNOWN_ACTION, "{}"));
+
+        await sut.RouteOcppCall(frame, CLIENT_ID);
+
+        _processedEventPublisherMock.Verify(
+            p => p.PublishForCallAsync(
+                It.IsAny<OcppCallRequest>(),
+                It.IsAny<string>(),
+                It.IsAny<RpcResult>(),
+                It.IsAny<DateTime>()),
+            Times.Never);
     }
 
     [Fact]

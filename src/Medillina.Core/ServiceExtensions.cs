@@ -2,6 +2,7 @@
 using Medinilla.Core.Actions.Ocpp201;
 using Medinilla.Core.Commands;
 using Medinilla.Core.Commands.Ocpp201;
+using Medinilla.Core.Events;
 using Medinilla.Core.Interfaces;
 using Medinilla.Core.Interfaces.Services;
 using Medinilla.Core.Logic.Authorization;
@@ -68,6 +69,10 @@ public static class ServiceExtensions
 
         serviceCollection.AddScoped<IOcppActionsFactory, OcppActionsFactory>();
         serviceCollection.AddScoped<IOcppChargerCommandFactory, OcppChargerCommandsFactory>();
+        serviceCollection.AddScoped<IProcessedEventPublisher, ProcessedEventPublisher>();
+        serviceCollection.AddScoped<BootupEventMapper>();
+        serviceCollection.AddScoped<StatusNotificationEventMapper>();
+        serviceCollection.AddScoped<TransactionLifecycleEventMapper>();
         serviceCollection.AddScoped<IOcppCallRouter, OcppCallRouter>();
         serviceCollection.AddScoped<AuthorizationAlgorithmFactory>();
     }
