@@ -1,4 +1,6 @@
+using Medinilla.Core.Events;
 using Medinilla.Core.Interfaces.Services;
+using Medinilla.Core.SharedContracts.Events;
 using Medinilla.DataAccess.Exceptions;
 using Medinilla.DataAccess.Relational;
 using Medinilla.DataAccess.Relational.Enums;
@@ -12,8 +14,12 @@ using Microsoft.Extensions.Logging;
 
 namespace Medinilla.Core.v1.Services;
 
-public sealed class ChargerConfigService(ILogger<ChargerConfigService> log, ChargerConfigUnitOfWork unitOfWork,
-    MedinillaOcppDbContext context) : IChargerConfigService
+public sealed class ChargerConfigService(
+    ILogger<ChargerConfigService> log,
+    ChargerConfigUnitOfWork unitOfWork,
+    MedinillaOcppDbContext context,
+    IApplicationEventEmitter eventEmitter,
+    ChargerRegistrationCompletedEventMapper registrationEventMapper) : IChargerConfigService
 {
     public async Task<ReportNotificationIngestionResult> IngestReport(string clientIdentifier, int requestId, int seqNumber, bool tbc, IEnumerable<ReportData> data)
     {
@@ -125,6 +131,8 @@ public sealed class ChargerConfigService(ILogger<ChargerConfigService> log, Char
                 await unitOfWork.ClearRequest(requestId);
                 await unitOfWork.Save();
                 log.LogInformation("[{ci}]: Completed report id={ri} at seqNo={sn}", clientIdentifier, requestId, seqNumber);
+
+                await EmitRegistrationCompletedAsync(clientIdentifier);
             }
         }
         catch (Exception e)
@@ -141,6 +149,52 @@ public sealed class ChargerConfigService(ILogger<ChargerConfigService> log, Char
             log.LogError("[{ci}]: Request id={ri} was trying to update component info but no registered charging station was found",
                 clientIdentifier, requestId);
             return ReportNotificationIngestionResult.InternalError;
+        }
+    }
+
+    private async Task EmitRegistrationCompletedAsync(string clientIdentifier)
+    {
+        try
+        {
+            var components = await context.Set<ChargerComponent>()
+                .AsNoTracking()
+                .Where(component =>
+                    component.ClientIdentifier == clientIdentifier &&
+                    component.ComponentName == "Connector" &&
+                    component.Connector != null)
+                .Include(component => component.Connector)
+                .Include(component => component.ComponentVariables)
+                .ToListAsync();
+
+            var snapshot = new ChargerRegistrationSnapshot(
+                clientIdentifier,
+                components
+                    .GroupBy(component => new
+                    {
+                        component.Connector!.EvseId,
+                        component.Connector.ConnectorId,
+                    })
+                    .Select(group => new RegisteredConnectorSnapshot(
+                        group.Key.EvseId,
+                        group.Key.ConnectorId,
+                        group.SelectMany(component =>
+                                component.ComponentVariables ?? Enumerable.Empty<ComponentVariable>())
+                            .Where(variable => variable.Name == "ConnectorType")
+                            .Select(variable => variable.Value)
+                            .FirstOrDefault(value => !string.IsNullOrWhiteSpace(value))))
+                    .ToArray());
+
+            await eventEmitter.TryEmitAsync(
+                WebhookEventTypes.ChargerRegistrationCompleted,
+                DateTimeOffset.UtcNow,
+                () => registrationEventMapper.Map(snapshot));
+        }
+        catch (Exception ex)
+        {
+            log.LogError(
+                ex,
+                "Could not publish registration completion event for charger {ci}.",
+                clientIdentifier);
         }
     }
 }

@@ -1,17 +1,12 @@
 using Google.Protobuf.WellKnownTypes;
-using Medinilla.Core.Interfaces.Services;
 using Medinilla.Core.SharedContracts.Events;
-using Medinilla.DataAccess.Relational;
-using Medinilla.DataAccess.Relational.Models;
-using Medinilla.DataAccess.Relational.Models.ChargerConfig;
 using Medinilla.DataTypes.Contracts;
-using Microsoft.EntityFrameworkCore;
-using Microsoft.Extensions.Logging;
 
 namespace Medinilla.Core.Events;
 
 /// <summary>
 /// Builds <see cref="BootupEvent"/> from a successfully processed, accepted BootNotification.
+/// Pure transformation: no database, clock, or other I/O.
 /// </summary>
 public sealed class BootupEventMapper
 {
@@ -25,7 +20,6 @@ public sealed class BootupEventMapper
             Model = request.ChargingStation.Model ?? string.Empty,
         };
 
-        // Preserve absence for optional fields instead of fabricating an empty value.
         if (!string.IsNullOrWhiteSpace(request.ChargingStation.SerialNumber))
         {
             @event.SerialNumber = request.ChargingStation.SerialNumber;
@@ -41,167 +35,79 @@ public sealed class BootupEventMapper
 }
 
 /// <summary>
-/// Builds <see cref="StatusNotificationEvent"/> after StatusNotification state changes
-/// have been committed. Connector type is optional enrichment from known charger
-/// metadata and never blocks publication.
+/// Builds <see cref="StatusNotificationEvent"/> from a committed StatusNotification.
+/// Connector type is not enriched here; registration metadata owns that information.
+/// The deprecated field number 6 remains unset for new events.
 /// </summary>
-public sealed class StatusNotificationEventMapper(
-    MedinillaOcppDbContext context,
-    ILogger<StatusNotificationEventMapper> logger)
+public sealed class StatusNotificationEventMapper
 {
-    public async Task<StatusNotificationEvent> MapAsync(
-        string chargerId,
-        StatusNotificationRequest request,
-        CancellationToken cancellationToken)
+    public StatusNotificationEvent Map(StatusNotificationSnapshot snapshot)
     {
-        var connectorId = request.ConnectorId ?? 1;
-        var timestamp = ToUtc(request.Timestamp ?? DateTime.UtcNow);
-
-        var @event = new StatusNotificationEvent
+        return new StatusNotificationEvent
         {
-            ChargerId = chargerId,
-            EvseId = request.EvseId,
-            ConnectorId = connectorId,
-            ConnectorStatus = request.ConnectorStatus.ToString(),
-            StatusTimestamp = Timestamp.FromDateTime(timestamp),
+            ChargerId = snapshot.ChargerId,
+            EvseId = snapshot.EvseId,
+            ConnectorId = snapshot.ConnectorId,
+            ConnectorStatus = snapshot.ConnectorStatus,
+            StatusTimestamp = Timestamp.FromDateTime(snapshot.StatusTimestampUtc),
         };
-
-        var connectorType = await TryGetConnectorTypeAsync(
-                chargerId,
-                request.EvseId,
-                connectorId,
-                cancellationToken)
-            .ConfigureAwait(false);
-
-        if (!string.IsNullOrWhiteSpace(connectorType))
-        {
-            @event.ConnectorType = connectorType;
-        }
-
-        return @event;
     }
-
-    private async Task<string?> TryGetConnectorTypeAsync(
-        string chargerId,
-        int evseId,
-        int connectorId,
-        CancellationToken cancellationToken)
-    {
-        try
-        {
-            return await context.Set<ChargerComponent>()
-                .AsNoTracking()
-                .Where(component =>
-                    component.ClientIdentifier == chargerId &&
-                    component.ComponentName == "Connector" &&
-                    component.Connector != null &&
-                    component.Connector.EvseId == evseId &&
-                    component.Connector.ConnectorId == connectorId)
-                .SelectMany(component => component.ComponentVariables)
-                .Where(variable => variable.Name == "ConnectorType")
-                .Select(variable => variable.Value)
-                .FirstOrDefaultAsync(cancellationToken)
-                .ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
-        {
-            logger.LogDebug(
-                "Connector type enrichment timed out for charger {ChargerId} EVSE {EvseId} connector {ConnectorId}.",
-                chargerId,
-                evseId,
-                connectorId);
-            return null;
-        }
-        catch (Exception ex)
-        {
-            // Metadata enrichment is best-effort. An unavailable ConnectorType must
-            // not suppress the status event.
-            logger.LogWarning(
-                ex,
-                "Could not enrich connector type for charger {ChargerId} EVSE {EvseId} connector {ConnectorId}.",
-                chargerId,
-                evseId,
-                connectorId);
-            return null;
-        }
-    }
-
-    private static DateTime ToUtc(DateTime value) => value.Kind switch
-    {
-        DateTimeKind.Utc => value,
-        DateTimeKind.Local => value.ToUniversalTime(),
-        _ => DateTime.SpecifyKind(value, DateTimeKind.Utc),
-    };
 }
 
 /// <summary>
-/// Builds the shared <see cref="TransactionLifecycleEvent"/> for started and ended
-/// transactions. Consumption is read from already processed samples.
+/// Builds the shared <see cref="TransactionLifecycleEvent"/> from a materialized
+/// transaction completion snapshot. Pure transformation only.
 /// </summary>
-public sealed class TransactionLifecycleEventMapper(
-    MedinillaOcppDbContext context,
-    IConsumptionService consumptionService,
-    ILogger<TransactionLifecycleEventMapper> logger)
+public sealed class TransactionLifecycleEventMapper
 {
-    public async Task<TransactionLifecycleEvent> MapAsync(
-        string chargerId,
-        TransactionEventRequest request,
-        CancellationToken cancellationToken)
+    public TransactionLifecycleEvent Map(TransactionLifecycleSnapshot snapshot)
     {
-        var transactionId = request.TransactionInfo.TransactionId;
-
         var @event = new TransactionLifecycleEvent
         {
-            ChargerId = chargerId,
-            TransactionId = transactionId,
+            ChargerId = snapshot.ChargerId,
+            TransactionId = snapshot.TransactionId,
         };
 
-        var consumption = await TryGetConsumptionAsync(chargerId, transactionId, cancellationToken)
-            .ConfigureAwait(false);
-
-        if (consumption.HasValue)
+        if (snapshot.ConsumptionWh.HasValue)
         {
-            @event.ConsumptionWh = (double)consumption.Value;
+            @event.ConsumptionWh = (double)snapshot.ConsumptionWh.Value;
         }
 
         return @event;
     }
+}
 
-    private async Task<decimal?> TryGetConsumptionAsync(
-        string chargerId,
-        string transactionId,
-        CancellationToken cancellationToken)
+/// <summary>
+/// Builds <see cref="ChargerRegistrationCompletedEvent"/> from the committed
+/// registration inventory snapshot. Pure transformation only.
+/// </summary>
+public sealed class ChargerRegistrationCompletedEventMapper
+{
+    public ChargerRegistrationCompletedEvent Map(ChargerRegistrationSnapshot snapshot)
     {
-        try
+        var @event = new ChargerRegistrationCompletedEvent
         {
-            var samples = context.Set<TransactionSample>()
-                .AsNoTracking()
-                .Where(sample =>
-                    sample.ChargingStation.ClientIdentifier == chargerId &&
-                    sample.TransactionId == transactionId)
-                .AsAsyncEnumerable();
+            ChargerId = snapshot.ChargerId,
+        };
 
-            return await consumptionService
-                .TryComputeConsumption(samples, cancellationToken)
-                .ConfigureAwait(false);
-        }
-        catch (OperationCanceledException) when (cancellationToken.IsCancellationRequested)
+        foreach (var connector in snapshot.Connectors
+                     .OrderBy(connector => connector.EvseId)
+                     .ThenBy(connector => connector.ConnectorId))
         {
-            logger.LogDebug(
-                "Consumption enrichment timed out for charger {ChargerId} transaction {TransactionId}.",
-                chargerId,
-                transactionId);
-            return null;
+            var registeredConnector = new RegisteredConnector
+            {
+                EvseId = connector.EvseId,
+                ConnectorId = connector.ConnectorId,
+            };
+
+            if (!string.IsNullOrWhiteSpace(connector.ConnectorType))
+            {
+                registeredConnector.ConnectorType = connector.ConnectorType;
+            }
+
+            @event.Connectors.Add(registeredConnector);
         }
-        catch (Exception ex)
-        {
-            // Consumption is optional. Never block a lifecycle event on it.
-            logger.LogWarning(
-                ex,
-                "Could not resolve consumption for charger {ChargerId} transaction {TransactionId}.",
-                chargerId,
-                transactionId);
-            return null;
-        }
+
+        return @event;
     }
 }

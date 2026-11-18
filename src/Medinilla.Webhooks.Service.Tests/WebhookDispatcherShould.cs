@@ -153,22 +153,38 @@ public class WebhookDispatcherShould
 
     private sealed class RecordingHandler(Func<HttpRequestMessage, HttpStatusCode> status) : HttpMessageHandler
     {
-        public List<CapturedRequest> Requests { get; } = [];
+        private readonly Lock _lock = new();
+        private readonly List<CapturedRequest> _requests = [];
+
+        public IReadOnlyList<CapturedRequest> Requests
+        {
+            get
+            {
+                lock (_lock)
+                {
+                    return [.. _requests];
+                }
+            }
+        }
 
         protected override async Task<HttpResponseMessage> SendAsync(
             HttpRequestMessage request,
             CancellationToken cancellationToken)
         {
             var body = await request.Content!.ReadAsByteArrayAsync(cancellationToken);
-
-            Requests.Add(new CapturedRequest(
+            var captured = new CapturedRequest(
                 request.RequestUri!,
                 body,
                 request.Content.Headers.ContentType?.MediaType,
                 request.Headers.TryGetValues(WebhookHeaders.EventId, out var eventId) ? eventId.Single() : null,
                 request.Headers.TryGetValues(WebhookHeaders.EventType, out var eventType) ? eventType.Single() : null,
                 request.Headers.TryGetValues(WebhookHeaders.Timestamp, out var timestamp) ? timestamp.Single() : null,
-                request.Headers.TryGetValues(WebhookHeaders.Signature, out var signature) ? signature.Single() : null));
+                request.Headers.TryGetValues(WebhookHeaders.Signature, out var signature) ? signature.Single() : null);
+
+            lock (_lock)
+            {
+                _requests.Add(captured);
+            }
 
             return new HttpResponseMessage(status(request));
         }

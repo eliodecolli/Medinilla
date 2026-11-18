@@ -10,5 +10,5 @@ message StatusNotificationEvent {
   int32 connector_id = 3;
   string connector_status = 4;
   google.protobuf.Timestamp status_timestamp = 5;
-  optional string connector_type = 6;
+  optional string connector_type = 6 [deprecated = true];
 }

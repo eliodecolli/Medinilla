@@ -17,4 +17,7 @@ public static class WebhookEventTypes
 
     /// <summary>Payload: <see cref="TransactionLifecycleEvent"/>.</summary>
     public const string TransactionEnded = "transaction.ended";
+
+    /// <summary>Payload: <see cref="ChargerRegistrationCompletedEvent"/>.</summary>
+    public const string ChargerRegistrationCompleted = "charger.registration.completed";
 }

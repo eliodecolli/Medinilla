@@ -1,6 +1,8 @@
 using System.Globalization;
+using Medinilla.Core.Events;
 using Medinilla.Core.Interfaces;
 using Medinilla.Core.Interfaces.Services;
+using Medinilla.Core.SharedContracts.Events;
 using Medinilla.Core.Logic.Authorization;
 using Medinilla.Core.Logic.Authorization.Algorithms;
 using Medinilla.Core.v1.Services;
@@ -12,6 +14,7 @@ using Medinilla.DataAccess.Relational.Models.Authorization;
 using Medinilla.DataTypes.Contracts;
 using Medinilla.DataTypes.Contracts.Common;
 using Medinilla.Infrastructure.Core.Authorization;
+using Medinilla.Infrastructure.Events;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
@@ -31,6 +34,7 @@ public class TransactionServiceShould : IDisposable
     private readonly Mock<IAuthAlgorithm> _authorization = new(MockBehavior.Strict);
     private readonly Mock<IIdTokenService> _tokenService = new(MockBehavior.Strict);
     private readonly Mock<IConsumptionService> _consumptionService = new();
+    private readonly FakeApplicationEventEmitter _eventEmitter = new();
     private readonly TransactionService _service;
 
     public TransactionServiceShould()
@@ -718,12 +722,85 @@ public class TransactionServiceShould : IDisposable
         Assert.Equal(5m, Assert.Single(station.TransactionSnapshots).Consumption);
     }
 
+    [Fact]
+    public async Task EmitLifecycleEventsOnlyForNewStartedAndEndedEvents()
+    {
+        await AddStation();
+        _consumptionService.Setup(s => s.TryComputeConsumption(It.IsAny<IEnumerable<TransactionSample>>()))
+            .ReturnsAsync(12.5m);
+
+        await _service.IngestEvent(ClientIdentifier, CreateRequest(TransactionEventEnum.Started, 0));
+        await _service.IngestEvent(ClientIdentifier, CreateRequest(TransactionEventEnum.Ended, 1));
+        await _service.IngestEvent(ClientIdentifier, CreateRequest(TransactionEventEnum.Ended, 1));
+        await _service.IngestEvent(ClientIdentifier, CreateRequest(TransactionEventEnum.Updated, 2));
+
+        Assert.Collection(
+            _eventEmitter.Events,
+            started =>
+            {
+                Assert.Equal(WebhookEventTypes.TransactionStarted, started.EventType);
+                var payload = Assert.IsType<TransactionLifecycleEvent>(started.Payload);
+                Assert.Equal("transaction-1", payload.TransactionId);
+                Assert.False(payload.HasConsumptionWh);
+            },
+            ended =>
+            {
+                Assert.Equal(WebhookEventTypes.TransactionEnded, ended.EventType);
+                var payload = Assert.IsType<TransactionLifecycleEvent>(ended.Payload);
+                Assert.Equal("transaction-1", payload.TransactionId);
+                Assert.True(payload.HasConsumptionWh);
+                Assert.Equal(12.5, payload.ConsumptionWh);
+            });
+    }
+
+    [Fact]
+    public async Task EmitEndedLifecycleWithoutConsumptionWhenItIsUnavailable()
+    {
+        await AddStation();
+        _consumptionService.Setup(s => s.TryComputeConsumption(It.IsAny<IEnumerable<TransactionSample>>()))
+            .ReturnsAsync((decimal?)null);
+
+        await _service.IngestEvent(ClientIdentifier, CreateRequest(TransactionEventEnum.Started, 0));
+        await _service.IngestEvent(ClientIdentifier, CreateRequest(TransactionEventEnum.Ended, 1));
+
+        var ended = Assert.Single(_eventEmitter.Events, emitted =>
+            emitted.EventType == WebhookEventTypes.TransactionEnded);
+        var payload = Assert.IsType<TransactionLifecycleEvent>(ended.Payload);
+        Assert.False(payload.HasConsumptionWh);
+    }
+
+    [Fact]
+    public async Task PreserveTransactionCompletionWhenEventEmissionFails()
+    {
+        var station = await AddStation();
+        var emitter = new ApplicationEventEmitter(
+            new ThrowingPublisher(),
+            NullLogger<ApplicationEventEmitter>.Instance);
+        var service = new TransactionService(
+            NullLogger<ITransactionService>.Instance,
+            _context,
+            new AuthorizationAlgorithmFactory(
+                [_authorization.Object],
+                NullLogger<AuthorizationAlgorithmFactory>.Instance),
+            _tokenService.Object,
+            _consumptionService.Object,
+            emitter,
+            new TransactionLifecycleEventMapper());
+
+        var result = await service.IngestEvent(ClientIdentifier, CreateRequest());
+
+        Assert.True(result.WasNewlyIngested);
+        Assert.Single(station.TransactionEvents);
+    }
+
     private TransactionService CreateService(params IAuthAlgorithm[] algorithms) => new(
         NullLogger<ITransactionService>.Instance,
         _context,
         new AuthorizationAlgorithmFactory(algorithms, NullLogger<AuthorizationAlgorithmFactory>.Instance),
         _tokenService.Object,
-        _consumptionService.Object);
+        _consumptionService.Object,
+        _eventEmitter,
+        new TransactionLifecycleEventMapper());
 
     private async Task<ChargingStation> AddStation(string? allowedMeasurands = null)
     {
@@ -784,6 +861,14 @@ public class TransactionServiceShould : IDisposable
     };
 
     public void Dispose() => _context.Dispose();
+
+    private sealed class ThrowingPublisher : IChargerEventPublisher
+    {
+        public Task PublishAsync(
+            MedinillaHttpEvent httpEvent,
+            CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("Redis unavailable");
+    }
 
     private sealed class TestDbContext(DbContextOptions<MedinillaOcppDbContext> options)
         : MedinillaOcppDbContext(options)

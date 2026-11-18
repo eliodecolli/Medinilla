@@ -1,5 +1,4 @@
 using Medinilla.Core.Actions.Ocpp201;
-using Medinilla.Core.Events;
 using Medinilla.Core.Interfaces.Services;
 using Medinilla.DataTypes.Contracts;
 using Medinilla.DataTypes.Contracts.Common;
@@ -74,8 +73,6 @@ public class TransactionEventActionShould
         Assert.Equal(12.50m, response.TotalCost);
         Assert.Equal(2, response.ChargingPriority);
         Assert.Equal(AuthorizeStatus.Accepted, response.IdTokenInfo?.Status);
-        var context = Assert.IsType<TransactionEventProcessingContext>(result.ProcessingContext);
-        Assert.True(context.WasNewlyProcessed);
         _service.Verify(s => s.IngestEvent("station-1", It.IsAny<TransactionEventRequest>()), Times.Once);
         _service.VerifyNoOtherCalls();
     }
@@ -97,8 +94,6 @@ public class TransactionEventActionShould
         Assert.NotNull(response);
         Assert.Null(response.TotalCost);
         Assert.Null(response.IdTokenInfo);
-        var context = Assert.IsType<TransactionEventProcessingContext>(result.ProcessingContext);
-        Assert.False(context.WasNewlyProcessed);
     }
 
     [Fact]

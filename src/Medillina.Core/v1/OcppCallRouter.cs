@@ -1,6 +1,5 @@
 ﻿using Medinilla.Core.Actions;
 using Medinilla.Core.Commands;
-using Medinilla.Core.Events;
 using Medinilla.Core.Interfaces;
 using Medinilla.Core.Interfaces.Services;
 using Medinilla.DataTypes.Core;
@@ -20,8 +19,7 @@ public class OcppCallRouter(
     IOcppChargerCommandFactory commandFactory,
     IOcppRequestDispatcher dispatcher,
     BaseOcppRoutingTable outboundTable,
-    ICommandExecutionService executionService,
-    IProcessedEventPublisher processedEventPublisher) : IOcppCallRouter
+    ICommandExecutionService executionService) : IOcppCallRouter
 {
     public async Task<RpcResult?> RouteOcppCall(byte[] buffer, string? clientIdentifier)
     {
@@ -104,23 +102,7 @@ public class OcppCallRouter(
 
         try
         {
-            var result = await ocppAction.Execute(ocppCall, clientIdentifier);
-
-            // Capture processing completion immediately. Optional enrichment and
-            // transport delays must not move the event's agreed timestamp.
-            var completedAtUtc = DateTime.UtcNow;
-
-            // Publish only after the action has completed. The publisher isolates its
-            // own failures, so the OCPP result and charger response are never changed
-            // by webhook availability.
-            await processedEventPublisher.PublishForCallAsync(
-                    ocppCall,
-                    clientIdentifier,
-                    result,
-                    completedAtUtc)
-                .ConfigureAwait(false);
-
-            return result;
+            return await ocppAction.Execute(ocppCall, clientIdentifier);
         }
         catch (Exception ex)
         {

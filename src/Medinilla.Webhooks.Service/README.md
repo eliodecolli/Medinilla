@@ -7,12 +7,26 @@ the serialized event wrapper to configured HTTP endpoints.
 
 Implemented:
 
-- Core publication of accepted `charger.bootup`, every processed `connector.status`, and
-  newly ingested `transaction.started` / `transaction.ended`. Replayed transaction
-  sequence numbers do not produce another lifecycle event.
+- Core publication from the owning application service for accepted `charger.bootup`,
+  every processed `connector.status`, newly ingested `transaction.started` /
+  `transaction.ended`, and `charger.registration.completed` after a final report chunk is
+  ingested. Replayed transaction sequence numbers do not produce duplicate lifecycle
+  events.
 - Redis Streams transport from Core to this worker.
 - Configuration-based subscriptions, `EventType` filtering, bounded HTTP fan-out,
   request timeout, no redirects, and HMAC-SHA256 request signing.
+
+Producer ownership:
+
+| Event | Core producer |
+|---|---|
+| `charger.bootup` | `ChargingStationBooting` boot service |
+| `connector.status` | `StatusNotificationService` |
+| `transaction.started` / `transaction.ended` | `TransactionService` |
+| `charger.registration.completed` | `ChargerConfigService` report ingestion |
+
+OCPP actions are protocol adapters only. They await one service processing call and
+translate its outcome into an OCPP response; they do not publish events.
 
 Not implemented yet:
 
@@ -38,11 +52,48 @@ Consumers first parse the wrapper, then select the payload parser by `EventType`
 | `connector.status` | `StatusNotificationEvent` |
 | `transaction.started` | `TransactionLifecycleEvent` |
 | `transaction.ended` | `TransactionLifecycleEvent` |
+| `charger.registration.completed` | `ChargerRegistrationCompletedEvent` |
 
 `EventId` is a canonical UUID `D` string and stays stable for the logical event. The
 wrapper's `EventTimestamp` is the UTC processing-completion instant. Charge/transaction
 specific timestamps are inside the event payload where applicable. `EventData` is the
 raw serialized event-specific protobuf, not base64 or JSON.
+
+Delivery is at-least-once for accepted events, subject to the deferred retry/recovery
+work. There is no global or per-charger ordering guarantee. `EventId` is not a
+deduplication key for independently reprocessed charger notifications; use it to make
+transport retries idempotent where the same logical publication is repeated.
+
+### Registration metadata and status reconciliation
+
+`charger.registration.completed` is emitted when a `NotifyReport` notification is
+successfully ingested with its final marker (`tbc=false`, including an omitted value) and
+all required sequence numbers have been received and persisted:
+
+- An accepted `GetBaseReport` command response is not registration completion.
+- An omitted `ReportData` payload with a final marker is delegated to ingestion as empty
+  data; it is not skipped by the action.
+- Missing report chunks or failed persistence do not emit the event.
+- No registration-attempt state is persisted for webhook delivery. A successfully
+  processed final report may emit even without a designated attempt or command acceptance.
+- `connectors` currently comes from all stored `Connector` components known for the charger,
+  not from a single report-scoped inventory. Historical connectors or variables can
+  therefore appear in later events. **Do not treat this payload as an authoritative
+  report-specific complete inventory until that contract is resolved.**
+- `connector_type` is absent when no stored value is known.
+- `EventId` identifies an individual published event and is stable across transport
+  retries. It does not deduplicate independently reprocessed reports.
+- Registration and status events are not ordered. Consumers must tolerate status events
+  before registration metadata and reconcile inventory when registration arrives.
+
+`StatusNotificationEvent.connector_type` (field 6) is deprecated for new events and is
+left unset. It remains in the protobuf contract so older events can still carry it.
+Consumers should use registration inventory for connector types and treat status events
+as identity/status updates. Do not block status handling while waiting for registration
+metadata.
+
+There is no automatic report issuance on boot; the caller owns trigger and report
+selection.
 
 ## Adding a subscription
 
@@ -98,7 +149,12 @@ signature does not match, and apply a timestamp tolerance in the consumer.
         "Url": "https://example.internal/hooks/medinilla",
         "Enabled": true,
         "SigningSecretRef": "ExampleConnectorConsumer",
-        "EventTypes": ["connector.status", "transaction.started", "transaction.ended"]
+        "EventTypes": [
+          "connector.status",
+          "transaction.started",
+          "transaction.ended",
+          "charger.registration.completed"
+        ]
       }
     ]
   }

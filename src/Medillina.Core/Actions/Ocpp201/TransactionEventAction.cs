@@ -1,4 +1,3 @@
-using Medinilla.Core.Events;
 using Medinilla.Core.Interfaces.Services;
 using Medinilla.DataTypes.Contracts;
 using Medinilla.Infrastructure.WAMP;
@@ -25,7 +24,6 @@ public sealed class TransactionEventAction(
         {
             Result = call.CreateResult(ingestion.Response),
             ReturnToCS = true,
-            ProcessingContext = new TransactionEventProcessingContext(ingestion.WasNewlyIngested),
         };
     }
 }

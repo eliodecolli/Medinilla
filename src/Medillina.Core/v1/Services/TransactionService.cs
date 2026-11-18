@@ -1,5 +1,7 @@
 using System.Collections.Immutable;
+using Medinilla.Core.Events;
 using Medinilla.Core.Interfaces.Services;
+using Medinilla.Core.SharedContracts.Events;
 using Medinilla.Core.Logic.Authorization;
 using Medinilla.DataAccess.Exceptions;
 using Medinilla.DataAccess.Relational;
@@ -19,7 +21,9 @@ public class TransactionService(
     MedinillaOcppDbContext context,
     AuthorizationAlgorithmFactory authFactory,
     IIdTokenService tokenService,
-    IConsumptionService consumptionService)
+    IConsumptionService consumptionService,
+    IApplicationEventEmitter eventEmitter,
+    TransactionLifecycleEventMapper lifecycleEventMapper)
     : ITransactionService
 {
     private TransactionEvent MapEvent(TransactionEventRequest request)
@@ -224,6 +228,8 @@ public class TransactionService(
         
         // finally append the event
         chargingStation.TransactionEvents.Add(@event);
+
+        decimal? lifecycleConsumptionWh = null;
         
         // first check whether this is an Ended event, if it is, create a snapshot
         if (@event.EventType == TransactionEventType.Ended)
@@ -239,6 +245,7 @@ public class TransactionService(
                 Consumption = await consumptionService.TryComputeConsumption(samples)
             };
             chargingStation.TransactionSnapshots.Add(snapshot);
+            lifecycleConsumptionWh = snapshot.Consumption;
             
             logger.LogInformation(
                 "{ci}: Transaction Event: Computed final consumption {cp} Wh for tx={tx}",
@@ -259,6 +266,24 @@ public class TransactionService(
         }
         
         await context.SaveChangesAsync();
+
+        if (@event.EventType is TransactionEventType.Started or TransactionEventType.Ended)
+        {
+            var eventType = @event.EventType == TransactionEventType.Started
+                ? WebhookEventTypes.TransactionStarted
+                : WebhookEventTypes.TransactionEnded;
+
+            var lifecycleSnapshot = new TransactionLifecycleSnapshot(
+                clientIdentifier,
+                request.TransactionInfo.TransactionId,
+                lifecycleConsumptionWh);
+
+            var completedAtUtc = DateTimeOffset.UtcNow;
+            await eventEmitter.TryEmitAsync(
+                eventType,
+                completedAtUtc,
+                () => lifecycleEventMapper.Map(lifecycleSnapshot));
+        }
         
         return new TransactionIngestionResult(result, WasNewlyIngested: true);
     }

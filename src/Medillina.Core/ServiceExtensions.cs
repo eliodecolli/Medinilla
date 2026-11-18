@@ -59,6 +59,10 @@ public static class ServiceExtensions
         serviceCollection.AddScoped<IChargingStationBootingService, ChargingStationBooting>();
         serviceCollection.AddScoped<IRouterServices, RouterServices>();
         serviceCollection.AddScoped<ITransactionService, TransactionService>();
+        serviceCollection.AddScoped<IStatusNotificationService, StatusNotificationService>();
+        serviceCollection.AddScoped<IAuthorizationService, AuthorizationService>();
+        serviceCollection.AddScoped<IHeartbeatService, HeartbeatService>();
+        serviceCollection.AddScoped<ISecurityEventNotificationService, SecurityEventNotificationService>();
         serviceCollection.AddScoped<IIdTokenService, IdTokenService>();
         serviceCollection.AddScoped<IConsumptionService, ConsumptionService>();
         serviceCollection.AddScoped<ITariffService, TariffService>();
@@ -69,10 +73,11 @@ public static class ServiceExtensions
 
         serviceCollection.AddScoped<IOcppActionsFactory, OcppActionsFactory>();
         serviceCollection.AddScoped<IOcppChargerCommandFactory, OcppChargerCommandsFactory>();
-        serviceCollection.AddScoped<IProcessedEventPublisher, ProcessedEventPublisher>();
+        serviceCollection.AddScoped<IApplicationEventEmitter, ApplicationEventEmitter>();
         serviceCollection.AddScoped<BootupEventMapper>();
         serviceCollection.AddScoped<StatusNotificationEventMapper>();
         serviceCollection.AddScoped<TransactionLifecycleEventMapper>();
+        serviceCollection.AddScoped<ChargerRegistrationCompletedEventMapper>();
         serviceCollection.AddScoped<IOcppCallRouter, OcppCallRouter>();
         serviceCollection.AddScoped<AuthorizationAlgorithmFactory>();
     }
