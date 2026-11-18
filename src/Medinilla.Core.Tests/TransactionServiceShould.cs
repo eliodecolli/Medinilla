@@ -725,7 +725,7 @@ public class TransactionServiceShould : IDisposable
     [Fact]
     public async Task EmitLifecycleEventsOnlyForNewStartedAndEndedEvents()
     {
-        await AddStation();
+        var station = await AddStation();
         _consumptionService.Setup(s => s.TryComputeConsumption(It.IsAny<IEnumerable<TransactionSample>>()))
             .ReturnsAsync(12.5m);
 
@@ -741,6 +741,7 @@ public class TransactionServiceShould : IDisposable
                 Assert.Equal(WebhookEventTypes.TransactionStarted, started.EventType);
                 var payload = Assert.IsType<TransactionLifecycleEvent>(started.Payload);
                 Assert.Equal("transaction-1", payload.TransactionId);
+                Assert.Equal(station.AccountId.ToString("D"), payload.AccountId);
                 Assert.False(payload.HasConsumptionWh);
             },
             ended =>

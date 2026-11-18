@@ -275,6 +275,7 @@ public class TransactionService(
 
             var lifecycleSnapshot = new TransactionLifecycleSnapshot(
                 clientIdentifier,
+                chargingStation.AccountId,
                 request.TransactionInfo.TransactionId,
                 lifecycleConsumptionWh);
 

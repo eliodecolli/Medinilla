@@ -69,7 +69,8 @@ public class ChargingStationBootingShould
             .UseInMemoryDatabase(Guid.NewGuid().ToString())
             .Options;
         using var context = new TestDbContext(options);
-        context.Add(new Account { Id = Guid.NewGuid(), Name = "MedinillaTest-Core" });
+        var account = new Account { Id = Guid.NewGuid(), Name = "MedinillaTest-Core" };
+        context.Add(account);
         await context.SaveChangesAsync();
 
         var emitter = new FakeApplicationEventEmitter();
@@ -81,6 +82,7 @@ public class ChargingStationBootingShould
         Assert.Equal(WebhookEventTypes.ChargerBootup, emitted.EventType);
         var payload = Assert.IsType<BootupEvent>(emitted.Payload);
         Assert.Equal("station-1", payload.ChargerId);
+        Assert.Equal(account.Id.ToString("D"), payload.AccountId);
         Assert.Equal("PowerUp", payload.BootReason);
         Assert.Equal("Vendor", payload.VendorName);
         Assert.Equal("Model", payload.Model);

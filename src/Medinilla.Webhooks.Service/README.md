@@ -59,6 +59,10 @@ wrapper's `EventTimestamp` is the UTC processing-completion instant. Charge/tran
 specific timestamps are inside the event payload where applicable. `EventData` is the
 raw serialized event-specific protobuf, not base64 or JSON.
 
+Every event-specific payload includes `account_id`, the owning account UUID in canonical
+`D` format. It is taken from the charging station already loaded for the operation; no
+additional per-event account lookup is performed.
+
 Delivery is at-least-once for accepted events, subject to the deferred retry/recovery
 work. There is no global or per-charger ordering guarantee. `EventId` is not a
 deduplication key for independently reprocessed charger notifications; use it to make
@@ -80,6 +84,7 @@ all required sequence numbers have been received and persisted:
   not from a single report-scoped inventory. Historical connectors or variables can
   therefore appear in later events. **Do not treat this payload as an authoritative
   report-specific complete inventory until that contract is resolved.**
+- `account_id` identifies the owning account.
 - `connector_type` is absent when no stored value is known.
 - `EventId` identifies an individual published event and is stable across transport
   retries. It does not deduplicate independently reprocessed reports.

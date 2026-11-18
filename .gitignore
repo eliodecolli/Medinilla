@@ -6,6 +6,8 @@
 # ignore .idea
 .idea/**
 
+.DS_Store
+
 # ignore compiled protobufs
 /Medinilla.Core.SharedContracts/compiled/*
 

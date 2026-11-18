@@ -31,6 +31,7 @@ public sealed class StatusNotificationService(
 
         var snapshot = new StatusNotificationSnapshot(
             clientIdentifier,
+            chargingStation.AccountId,
             evseConnector.EvseId,
             evseConnector.ConnectorId,
             evseConnector.ConnectorStatus,

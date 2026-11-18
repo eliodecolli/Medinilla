@@ -132,7 +132,7 @@ public sealed class ChargerConfigService(
                 await unitOfWork.Save();
                 log.LogInformation("[{ci}]: Completed report id={ri} at seqNo={sn}", clientIdentifier, requestId, seqNumber);
 
-                await EmitRegistrationCompletedAsync(clientIdentifier);
+                await EmitRegistrationCompletedAsync(clientIdentifier, chargingStation.AccountId);
             }
         }
         catch (Exception e)
@@ -152,7 +152,7 @@ public sealed class ChargerConfigService(
         }
     }
 
-    private async Task EmitRegistrationCompletedAsync(string clientIdentifier)
+    private async Task EmitRegistrationCompletedAsync(string clientIdentifier, Guid accountId)
     {
         try
         {
@@ -168,6 +168,7 @@ public sealed class ChargerConfigService(
 
             var snapshot = new ChargerRegistrationSnapshot(
                 clientIdentifier,
+                accountId,
                 components
                     .GroupBy(component => new
                     {

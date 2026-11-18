@@ -17,6 +17,9 @@ public class StatusNotificationServiceShould : IDisposable
     private static readonly DateTime ReportedAt =
         new(2026, 11, 14, 10, 30, 0, DateTimeKind.Utc);
 
+    private static readonly Guid AccountId =
+        Guid.Parse("22222222-2222-2222-2222-222222222222");
+
     private readonly TestDbContext _context;
     private readonly FakeApplicationEventEmitter _emitter = new();
 
@@ -29,6 +32,7 @@ public class StatusNotificationServiceShould : IDisposable
         _context.Add(new DbChargingStation
         {
             Id = Guid.NewGuid(),
+            AccountId = AccountId,
             ClientIdentifier = "station-1",
             Model = "Model",
             Vendor = "Vendor",
@@ -56,6 +60,7 @@ public class StatusNotificationServiceShould : IDisposable
             Assert.Equal(WebhookEventTypes.ConnectorStatus, emitted.EventType);
             var payload = Assert.IsType<StatusNotificationEvent>(emitted.Payload);
             Assert.Equal("station-1", payload.ChargerId);
+            Assert.Equal(AccountId.ToString("D"), payload.AccountId);
             Assert.Equal(2, payload.EvseId);
             Assert.Equal(1, payload.ConnectorId);
             Assert.Equal("Available", payload.ConnectorStatus);

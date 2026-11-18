@@ -6,4 +6,5 @@ message TransactionLifecycleEvent {
   string charger_id = 1;
   string transaction_id = 2;
   optional double consumption_wh = 3;
+  string account_id = 4;
 }

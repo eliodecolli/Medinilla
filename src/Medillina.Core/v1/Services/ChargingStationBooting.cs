@@ -98,9 +98,11 @@ public class ChargingStationBooting(
     public async Task<BootupResult> ProcessBootup(string clientIdentifier, BootNotificationRequest request)
     {
         var bootStatus = BootupResult.Ok;
+        Guid accountId;
         try
         {
             var chargingStation = await context.GetChargingStation(clientIdentifier);
+            accountId = chargingStation.AccountId;
             chargingStation.LatestBootNotificationReason = GetBootupReason(request);
             chargingStation.Booted = true;
 
@@ -127,6 +129,7 @@ public class ChargingStationBooting(
             // this logic will be replaced in https://github.com/eliodecolli/Medinilla/issues/24
             entity.AccountId = account!.Id;
             entity.Account = account;
+            accountId = entity.AccountId;
             entity.CreatedAt = DateTime.UtcNow;
             entity.LatestBootNotificationReason = GetBootupReason(request);
             entity.Booted = true;
@@ -141,7 +144,7 @@ public class ChargingStationBooting(
         await eventEmitter.TryEmitAsync(
             WebhookEventTypes.ChargerBootup,
             completedAtUtc,
-            () => bootupEventMapper.Map(clientIdentifier, request));
+            () => bootupEventMapper.Map(accountId, clientIdentifier, request));
 
         return bootStatus;
     }

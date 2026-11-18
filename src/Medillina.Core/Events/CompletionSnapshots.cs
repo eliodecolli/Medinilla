@@ -6,6 +6,7 @@ namespace Medinilla.Core.Events;
 /// </summary>
 public sealed record StatusNotificationSnapshot(
     string ChargerId,
+    Guid AccountId,
     int EvseId,
     int ConnectorId,
     string ConnectorStatus,
@@ -17,6 +18,7 @@ public sealed record StatusNotificationSnapshot(
 /// </summary>
 public sealed record TransactionLifecycleSnapshot(
     string ChargerId,
+    Guid AccountId,
     string TransactionId,
     decimal? ConsumptionWh);
 
@@ -26,6 +28,7 @@ public sealed record TransactionLifecycleSnapshot(
 /// </summary>
 public sealed record ChargerRegistrationSnapshot(
     string ChargerId,
+    Guid AccountId,
     IReadOnlyList<RegisteredConnectorSnapshot> Connectors);
 
 public sealed record RegisteredConnectorSnapshot(

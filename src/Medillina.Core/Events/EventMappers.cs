@@ -10,11 +10,12 @@ namespace Medinilla.Core.Events;
 /// </summary>
 public sealed class BootupEventMapper
 {
-    public BootupEvent Map(string chargerId, BootNotificationRequest request)
+    public BootupEvent Map(Guid accountId, string chargerId, BootNotificationRequest request)
     {
         var @event = new BootupEvent
         {
             ChargerId = chargerId,
+            AccountId = accountId.ToString("D"),
             BootReason = request.Reason.ToString(),
             VendorName = request.ChargingStation.VendorName ?? string.Empty,
             Model = request.ChargingStation.Model ?? string.Empty,
@@ -46,6 +47,7 @@ public sealed class StatusNotificationEventMapper
         return new StatusNotificationEvent
         {
             ChargerId = snapshot.ChargerId,
+            AccountId = snapshot.AccountId.ToString("D"),
             EvseId = snapshot.EvseId,
             ConnectorId = snapshot.ConnectorId,
             ConnectorStatus = snapshot.ConnectorStatus,
@@ -65,6 +67,7 @@ public sealed class TransactionLifecycleEventMapper
         var @event = new TransactionLifecycleEvent
         {
             ChargerId = snapshot.ChargerId,
+            AccountId = snapshot.AccountId.ToString("D"),
             TransactionId = snapshot.TransactionId,
         };
 
@@ -88,6 +91,7 @@ public sealed class ChargerRegistrationCompletedEventMapper
         var @event = new ChargerRegistrationCompletedEvent
         {
             ChargerId = snapshot.ChargerId,
+            AccountId = snapshot.AccountId.ToString("D"),
         };
 
         foreach (var connector in snapshot.Connectors

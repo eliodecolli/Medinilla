@@ -9,4 +9,5 @@ message BootupEvent {
   string model = 4;
   optional string serial_number = 5;
   optional string firmware_version = 6;
+  string account_id = 7;
 }
