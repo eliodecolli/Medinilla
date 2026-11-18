@@ -1,6 +1,8 @@
 using System.Globalization;
+using Medinilla.Core.Events;
 using Medinilla.Core.Interfaces;
 using Medinilla.Core.Interfaces.Services;
+using Medinilla.Core.SharedContracts.Events;
 using Medinilla.Core.Logic.Authorization;
 using Medinilla.Core.Logic.Authorization.Algorithms;
 using Medinilla.Core.v1.Services;
@@ -12,6 +14,7 @@ using Medinilla.DataAccess.Relational.Models.Authorization;
 using Medinilla.DataTypes.Contracts;
 using Medinilla.DataTypes.Contracts.Common;
 using Medinilla.Infrastructure.Core.Authorization;
+using Medinilla.Infrastructure.Events;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
 using Moq;
@@ -31,6 +34,7 @@ public class TransactionServiceShould : IDisposable
     private readonly Mock<IAuthAlgorithm> _authorization = new(MockBehavior.Strict);
     private readonly Mock<IIdTokenService> _tokenService = new(MockBehavior.Strict);
     private readonly Mock<IConsumptionService> _consumptionService = new();
+    private readonly FakeApplicationEventEmitter _eventEmitter = new();
     private readonly TransactionService _service;
 
     public TransactionServiceShould()
@@ -63,10 +67,11 @@ public class TransactionServiceShould : IDisposable
         var existing = new TransactionEvent { TransactionId = "transaction-1", SeqNo = 0 };
         station.TransactionEvents.Add(existing);
 
-        var response = await _service.IngestEvent(ClientIdentifier, CreateRequest());
+        var ingestion = await _service.IngestEvent(ClientIdentifier, CreateRequest());
 
         Assert.Same(existing, Assert.Single(station.TransactionEvents));
-        Assert.Null(response.IdTokenInfo);
+        Assert.Null(ingestion.Response.IdTokenInfo);
+        Assert.False(ingestion.WasNewlyIngested);
         _authorization.Verify(a => a.Authorize(It.IsAny<AuthorizationContext>()), Times.Never);
     }
 
@@ -136,7 +141,7 @@ public class TransactionServiceShould : IDisposable
     {
         var station = await AddStation();
 
-        var response = await _service.IngestEvent(ClientIdentifier, CreateRequest());
+        var ingestion = await _service.IngestEvent(ClientIdentifier, CreateRequest());
 
         var stored = Assert.Single(station.TransactionEvents);
         Assert.Equal(TransactionEventType.Started, stored.EventType);
@@ -153,7 +158,8 @@ public class TransactionServiceShould : IDisposable
         Assert.Null(stored.ConnectorId);
         Assert.Null(stored.IdToken);
         Assert.Empty(stored.Samples);
-        Assert.Null(response.IdTokenInfo);
+        Assert.Null(ingestion.Response.IdTokenInfo);
+        Assert.True(ingestion.WasNewlyIngested);
     }
 
     [Fact]
@@ -167,10 +173,10 @@ public class TransactionServiceShould : IDisposable
         request.IdToken = new OcppIdToken { Token = token.Token, Type = IdTokenType.ISO14443 };
         request.Evse = new EVSE { Id = 2 };
 
-        var response = await _service.IngestEvent(ClientIdentifier, request);
+        var ingestion = await _service.IngestEvent(ClientIdentifier, request);
 
         Assert.Same(token, Assert.Single(station.TransactionEvents).IdToken);
-        Assert.Equal(AuthorizeStatus.Accepted, response.IdTokenInfo?.Status);
+        Assert.Equal(AuthorizeStatus.Accepted, ingestion.Response.IdTokenInfo?.Status);
         Assert.Single(station.IdTokens);
         _authorization.Verify(a => a.Authorize(It.Is<AuthorizationContext>(c =>
             c.IdToken == token && c.EvseId == 2 && c.LocationName == "garage")), Times.Once);
@@ -194,12 +200,12 @@ public class TransactionServiceShould : IDisposable
         request.EventType = TransactionEventEnum.Updated;
         request.SeqNo = 1;
 
-        var response = await _service.IngestEvent(ClientIdentifier, request);
+        var ingestion = await _service.IngestEvent(ClientIdentifier, request);
 
         var stored = Assert.Single(station.TransactionEvents.Where(e =>
             e.TransactionId == "transaction-1" && e.SeqNo == 1));
         Assert.Same(token, stored.IdToken);
-        Assert.Null(response.IdTokenInfo);
+        Assert.Null(ingestion.Response.IdTokenInfo);
         _authorization.Verify(a => a.Authorize(It.Is<AuthorizationContext>(c => c.IdToken == token)), Times.Once);
     }
 
@@ -215,7 +221,7 @@ public class TransactionServiceShould : IDisposable
         await _service.IngestEvent(ClientIdentifier, CreateRequest(TransactionEventEnum.Updated, 1));
         _tokenService.Verify(s => s.ReleaseCentralToken(It.IsAny<DbIdToken>()), Times.Never);
 
-        var response = await _service.IngestEvent(ClientIdentifier,
+        var ingestion = await _service.IngestEvent(ClientIdentifier,
             CreateRequest(TransactionEventEnum.Ended, 2, includeTokenInEndedEvent ? token : null));
 
         _tokenService.Verify(s => s.ReleaseCentralToken(token), Times.Once);
@@ -224,9 +230,10 @@ public class TransactionServiceShould : IDisposable
             .SingleAsync(e => e.EventType == TransactionEventType.Ended);
         Assert.Equal(token.Id, ended.IdTokenId);
         if (includeTokenInEndedEvent)
-            Assert.Equal(AuthorizeStatus.Accepted, response.IdTokenInfo?.Status);
+            Assert.Equal(AuthorizeStatus.Accepted, ingestion.Response.IdTokenInfo?.Status);
         else
-            Assert.Null(response.IdTokenInfo);
+            Assert.Null(ingestion.Response.IdTokenInfo);
+        Assert.True(ingestion.WasNewlyIngested);
     }
 
     [Theory]
@@ -390,12 +397,13 @@ public class TransactionServiceShould : IDisposable
         var request = CreateRequest(TransactionEventEnum.Ended, 1);
         await _service.IngestEvent(ClientIdentifier, request);
 
-        var response = await _service.IngestEvent(ClientIdentifier, request);
+        var ingestion = await _service.IngestEvent(ClientIdentifier, request);
 
         _tokenService.Verify(s => s.ReleaseCentralToken(token), Times.Once);
         _authorization.Verify(a => a.Authorize(It.IsAny<AuthorizationContext>()), Times.Exactly(2));
         Assert.Equal(2, station.TransactionEvents.Count);
-        Assert.Null(response.IdTokenInfo);
+        Assert.Null(ingestion.Response.IdTokenInfo);
+        Assert.False(ingestion.WasNewlyIngested);
     }
 
     [Theory]
@@ -409,10 +417,11 @@ public class TransactionServiceShould : IDisposable
         await _service.IngestEvent(ClientIdentifier, CreateRequest(TransactionEventEnum.Started, 0, token));
         _authorization.Setup(a => a.Authorize(It.IsAny<AuthorizationContext>())).ReturnsAsync(status);
 
-        var response = await _service.IngestEvent(ClientIdentifier, CreateRequest(TransactionEventEnum.Ended, 1));
+        var ingestion = await _service.IngestEvent(ClientIdentifier, CreateRequest(TransactionEventEnum.Ended, 1));
 
         _tokenService.Verify(s => s.ReleaseCentralToken(It.IsAny<DbIdToken>()), Times.Never);
-        Assert.Equal(status, response.IdTokenInfo?.Status);
+        Assert.Equal(status, ingestion.Response.IdTokenInfo?.Status);
+        Assert.False(ingestion.WasNewlyIngested);
         Assert.Equal(TransactionEventType.Started, Assert.Single(station.TransactionEvents).EventType);
         Assert.Equal(1, await _context.Set<TransactionEvent>().CountAsync());
     }
@@ -446,9 +455,10 @@ public class TransactionServiceShould : IDisposable
         var request = CreateRequest();
         request.MeterValue = [CreateMeter(EventTimestamp, new SampledValue { Value = 10m })];
 
-        var response = await _service.IngestEvent(ClientIdentifier, request);
+        var ingestion = await _service.IngestEvent(ClientIdentifier, request);
 
-        Assert.Equal(status, response.IdTokenInfo?.Status);
+        Assert.Equal(status, ingestion.Response.IdTokenInfo?.Status);
+        Assert.False(ingestion.WasNewlyIngested);
         Assert.Empty(station.TransactionEvents);
         Assert.Empty(_context.ChangeTracker.Entries<TransactionEvent>());
         Assert.Empty(_context.ChangeTracker.Entries<TransactionSample>());
@@ -461,9 +471,10 @@ public class TransactionServiceShould : IDisposable
         var request = CreateRequest();
         request.IdToken = new OcppIdToken { Token = "unknown", Type = IdTokenType.ISO14443 };
 
-        var response = await CreateService(new DefaultAuthorization()).IngestEvent(ClientIdentifier, request);
+        var ingestion = await CreateService(new DefaultAuthorization()).IngestEvent(ClientIdentifier, request);
 
-        Assert.Equal(AuthorizeStatus.Invalid, response.IdTokenInfo?.Status);
+        Assert.Equal(AuthorizeStatus.Invalid, ingestion.Response.IdTokenInfo?.Status);
+        Assert.False(ingestion.WasNewlyIngested);
         Assert.Empty(station.IdTokens);
         Assert.Empty(station.TransactionEvents);
     }
@@ -711,12 +722,85 @@ public class TransactionServiceShould : IDisposable
         Assert.Equal(5m, Assert.Single(station.TransactionSnapshots).Consumption);
     }
 
+    [Fact]
+    public async Task EmitLifecycleEventsOnlyForNewStartedAndEndedEvents()
+    {
+        await AddStation();
+        _consumptionService.Setup(s => s.TryComputeConsumption(It.IsAny<IEnumerable<TransactionSample>>()))
+            .ReturnsAsync(12.5m);
+
+        await _service.IngestEvent(ClientIdentifier, CreateRequest(TransactionEventEnum.Started, 0));
+        await _service.IngestEvent(ClientIdentifier, CreateRequest(TransactionEventEnum.Ended, 1));
+        await _service.IngestEvent(ClientIdentifier, CreateRequest(TransactionEventEnum.Ended, 1));
+        await _service.IngestEvent(ClientIdentifier, CreateRequest(TransactionEventEnum.Updated, 2));
+
+        Assert.Collection(
+            _eventEmitter.Events,
+            started =>
+            {
+                Assert.Equal(WebhookEventTypes.TransactionStarted, started.EventType);
+                var payload = Assert.IsType<TransactionLifecycleEvent>(started.Payload);
+                Assert.Equal("transaction-1", payload.TransactionId);
+                Assert.False(payload.HasConsumptionWh);
+            },
+            ended =>
+            {
+                Assert.Equal(WebhookEventTypes.TransactionEnded, ended.EventType);
+                var payload = Assert.IsType<TransactionLifecycleEvent>(ended.Payload);
+                Assert.Equal("transaction-1", payload.TransactionId);
+                Assert.True(payload.HasConsumptionWh);
+                Assert.Equal(12.5, payload.ConsumptionWh);
+            });
+    }
+
+    [Fact]
+    public async Task EmitEndedLifecycleWithoutConsumptionWhenItIsUnavailable()
+    {
+        await AddStation();
+        _consumptionService.Setup(s => s.TryComputeConsumption(It.IsAny<IEnumerable<TransactionSample>>()))
+            .ReturnsAsync((decimal?)null);
+
+        await _service.IngestEvent(ClientIdentifier, CreateRequest(TransactionEventEnum.Started, 0));
+        await _service.IngestEvent(ClientIdentifier, CreateRequest(TransactionEventEnum.Ended, 1));
+
+        var ended = Assert.Single(_eventEmitter.Events, emitted =>
+            emitted.EventType == WebhookEventTypes.TransactionEnded);
+        var payload = Assert.IsType<TransactionLifecycleEvent>(ended.Payload);
+        Assert.False(payload.HasConsumptionWh);
+    }
+
+    [Fact]
+    public async Task PreserveTransactionCompletionWhenEventEmissionFails()
+    {
+        var station = await AddStation();
+        var emitter = new ApplicationEventEmitter(
+            new ThrowingPublisher(),
+            NullLogger<ApplicationEventEmitter>.Instance);
+        var service = new TransactionService(
+            NullLogger<ITransactionService>.Instance,
+            _context,
+            new AuthorizationAlgorithmFactory(
+                [_authorization.Object],
+                NullLogger<AuthorizationAlgorithmFactory>.Instance),
+            _tokenService.Object,
+            _consumptionService.Object,
+            emitter,
+            new TransactionLifecycleEventMapper());
+
+        var result = await service.IngestEvent(ClientIdentifier, CreateRequest());
+
+        Assert.True(result.WasNewlyIngested);
+        Assert.Single(station.TransactionEvents);
+    }
+
     private TransactionService CreateService(params IAuthAlgorithm[] algorithms) => new(
         NullLogger<ITransactionService>.Instance,
         _context,
         new AuthorizationAlgorithmFactory(algorithms, NullLogger<AuthorizationAlgorithmFactory>.Instance),
         _tokenService.Object,
-        _consumptionService.Object);
+        _consumptionService.Object,
+        _eventEmitter,
+        new TransactionLifecycleEventMapper());
 
     private async Task<ChargingStation> AddStation(string? allowedMeasurands = null)
     {
@@ -777,6 +861,14 @@ public class TransactionServiceShould : IDisposable
     };
 
     public void Dispose() => _context.Dispose();
+
+    private sealed class ThrowingPublisher : IChargerEventPublisher
+    {
+        public Task PublishAsync(
+            MedinillaHttpEvent httpEvent,
+            CancellationToken cancellationToken = default) =>
+            throw new InvalidOperationException("Redis unavailable");
+    }
 
     private sealed class TestDbContext(DbContextOptions<MedinillaOcppDbContext> options)
         : MedinillaOcppDbContext(options)

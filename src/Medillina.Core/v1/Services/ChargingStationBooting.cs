@@ -1,6 +1,8 @@
+using Medinilla.Core.Events;
 using Medinilla.Core.Interfaces;
 using Medinilla.Core.Interfaces.Services;
 using Medinilla.Core.Logic.Configuration;
+using Medinilla.Core.SharedContracts.Events;
 using Medinilla.DataAccess.Exceptions;
 using Medinilla.DataAccess.Relational.Models;
 using Medinilla.DataAccess.Relational.Models.Authorization;
@@ -17,7 +19,11 @@ using Microsoft.EntityFrameworkCore;
 
 namespace Medinilla.Core.v1.Services;
 
-public class ChargingStationBooting(MedinillaOcppDbContext context, ILogger<ChargingStationBooting> log) : IChargingStationBootingService
+public class ChargingStationBooting(
+    MedinillaOcppDbContext context,
+    IApplicationEventEmitter eventEmitter,
+    BootupEventMapper bootupEventMapper,
+    ILogger<ChargingStationBooting> log) : IChargingStationBootingService
 {
     private string GetBootupReason(BootNotificationRequest request)
     {
@@ -130,7 +136,13 @@ public class ChargingStationBooting(MedinillaOcppDbContext context, ILogger<Char
 
             bootStatus = BootupResult.FirstBoot;
         }
-        
+
+        var completedAtUtc = DateTimeOffset.UtcNow;
+        await eventEmitter.TryEmitAsync(
+            WebhookEventTypes.ChargerBootup,
+            completedAtUtc,
+            () => bootupEventMapper.Map(clientIdentifier, request));
+
         return bootStatus;
     }
 

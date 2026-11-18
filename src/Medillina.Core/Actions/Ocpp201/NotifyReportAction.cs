@@ -19,42 +19,39 @@ public sealed class NotifyReportAction(ILogger<NotifyReportAction> logger, IChar
             "{ci}: Received NotifyReport requestId={rid} seqNo={seq} tbc={tbc} generatedAt={ga} reportDataCount={count}",
             clientIdentifier, request.RequestId, request.SeqNo, request.Tbc ?? false, request.GeneratedAt, reportCount);
 
-        if (request.ReportData is not null)
+        var result = await service.IngestReport(clientIdentifier,
+            request.RequestId,
+            request.SeqNo,
+            request.Tbc ?? false,
+            request.ReportData ?? []);
+
+        switch (result)
         {
-            var result = await service.IngestReport(clientIdentifier,
-                request.RequestId, 
-                request.SeqNo,
-                request.Tbc ?? false,
-                request.ReportData);
-
-            switch (result)
+            case ReportNotificationIngestionResult.InvalidSeqNo:
             {
-                case ReportNotificationIngestionResult.InvalidSeqNo:
+                return new RpcResult()
                 {
-                    return new RpcResult()
-                    {
-                        Error = call.CreateErrorResult<NotifyReportResponse>(OcppCallError.ErrorCodes.OccurrenceConstraintViolation,
-                            $"SeqNo {request.SeqNo} is invalid")
-                    };
-                }
+                    Error = call.CreateErrorResult<NotifyReportResponse>(OcppCallError.ErrorCodes.OccurrenceConstraintViolation,
+                        $"SeqNo {request.SeqNo} is invalid")
+                };
+            }
 
-                case ReportNotificationIngestionResult.InternalError:
+            case ReportNotificationIngestionResult.InternalError:
+            {
+                return new RpcResult()
                 {
-                    return new RpcResult()
-                    {
-                        Error = OcppCallError.InternalError(call.MessageId)
-                    };
-                }
+                    Error = OcppCallError.InternalError(call.MessageId)
+                };
+            }
 
-                case ReportNotificationIngestionResult.MissingSeq:
+            case ReportNotificationIngestionResult.MissingSeq:
+            {
+                return new RpcResult()
                 {
-                    return new RpcResult()
-                    {
-                        Error = call.CreateErrorResult<NotifyReportResponse>(
-                            OcppCallError.ErrorCodes.OccurrenceConstraintViolation,
-                            $"Request {request.RequestId} marked as completed but we haven't received all the sequences")
-                    };
-                }
+                    Error = call.CreateErrorResult<NotifyReportResponse>(
+                        OcppCallError.ErrorCodes.OccurrenceConstraintViolation,
+                        $"Request {request.RequestId} marked as completed but we haven't received all the sequences")
+                };
             }
         }
 

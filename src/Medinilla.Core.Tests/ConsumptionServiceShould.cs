@@ -1,3 +1,4 @@
+using System.Runtime.CompilerServices;
 using Medinilla.Core.v1.Services;
 using Medinilla.DataAccess.Relational.Enums;
 using Medinilla.DataAccess.Relational.Models;
@@ -119,6 +120,16 @@ public class ConsumptionServiceShould
     }
 
     [Fact]
+    public async Task PropagateCancellationWhenEnumeratingADatabaseQuery()
+    {
+        using var cancellation = new CancellationTokenSource();
+        cancellation.Cancel();
+
+        await Assert.ThrowsAnyAsync<OperationCanceledException>(() =>
+            _service.TryComputeConsumption(BlockingSamples(cancellation.Token), cancellation.Token));
+    }
+
+    [Fact]
     public async Task PreserveDecimalPrecision()
     {
         const decimal begin = 1234567890123456.123456789m;
@@ -129,6 +140,15 @@ public class ConsumptionServiceShould
         ]);
 
         Assert.Equal(0.000000003m, result);
+    }
+
+    private static async IAsyncEnumerable<TransactionSample> BlockingSamples(
+        [EnumeratorCancellation] CancellationToken cancellationToken)
+    {
+        cancellationToken.ThrowIfCancellationRequested();
+        yield return Sample(ReadingContext.TransactionBegin, 100m);
+        await Task.Yield();
+        yield return Sample(ReadingContext.TransactionEnd, 150m, minute: 10);
     }
 
     private static TransactionSample Sample(ReadingContext context, decimal value, int minute = 0)

@@ -1,0 +1,14 @@
+syntax = "proto3";
+
+option csharp_namespace = "Medinilla.Core.SharedContracts.Events";
+
+message ChargerRegistrationCompletedEvent {
+  string charger_id = 1;
+  repeated RegisteredConnector connectors = 2;
+}
+
+message RegisteredConnector {
+  int32 evse_id = 1;
+  int32 connector_id = 2;
+  optional string connector_type = 3;
+}

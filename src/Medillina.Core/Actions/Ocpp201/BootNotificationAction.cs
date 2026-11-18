@@ -4,11 +4,11 @@ using Medinilla.DataTypes.Contracts.Common;
 using Medinilla.DataTypes.Core;
 using Medinilla.Infrastructure.WAMP;
 using Microsoft.Extensions.Logging;
-using System.Text.Json;
 
 namespace Medinilla.Core.Actions.Ocpp201;
 
-public sealed class BootNotificationAction(IChargingStationBootingService service,
+public sealed class BootNotificationAction(
+    IChargingStationBootingService service,
     ILogger<BootNotificationAction> _logger) : IOcppAction
 {
     public string ActionName => OcppActionNames.BootNotification;

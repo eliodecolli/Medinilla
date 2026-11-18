@@ -2,11 +2,13 @@
 using Medinilla.Core.Interfaces;
 using Medinilla.Core.Service;
 using Medinilla.Core.Service.Communication;
+using Medinilla.Core.Service.Events;
 using Medinilla.Core.Service.Interfaces;
 using Medinilla.Core.Service.Types;
 using Medinilla.Core.v1;
 using Medinilla.DataAccess;
 using Medinilla.Infrastructure;
+using Medinilla.Infrastructure.Events;
 using Medinilla.RealTime;
 using Microsoft.AspNetCore.Builder;
 using Microsoft.Extensions.Configuration;
@@ -38,6 +40,7 @@ builder.Services.AddScoped<IOcppRequestDispatcher, OcppRequestDispatcher>();
 builder.Services.AddSingleton<MedinillaGrpc>();
 builder.Services.AddSingleton<MedinillaQueryGrpc>();
 builder.Services.AddScoped<BaseOcppRoutingTable, RedisRoutingTable>();
+builder.Services.AddScoped<IChargerEventPublisher, RedisChargerEventPublisher>();
 builder.Services.AddSingleton<IInterfaceCommunication, CoreInterfaceCommunication>();
 
 builder.Services.AddHostedService<InboundWorker>();

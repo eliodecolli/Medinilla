@@ -1,4 +1,6 @@
+using Medinilla.Core.Events;
 using Medinilla.Core.Logic.Configuration;
+using Medinilla.Core.SharedContracts.Events;
 using Medinilla.Core.v1.Services;
 using Medinilla.DataAccess.Relational;
 using Medinilla.DataAccess.Relational.Models;
@@ -8,6 +10,7 @@ using Medinilla.DataTypes.Contracts.Common;
 using Medinilla.DataTypes.Core.Enums;
 using Microsoft.EntityFrameworkCore;
 using Microsoft.Extensions.Logging.Abstractions;
+using DbChargingStation = Medinilla.DataAccess.Relational.Models.ChargingStation;
 using OcppChargingStation = Medinilla.DataTypes.Contracts.Common.ChargingStation;
 
 namespace Medinilla.Core.Tests;
@@ -40,12 +43,8 @@ public class ChargingStationBootingShould
         await context.SaveChangesAsync();
         context.ChangeTracker.Clear();
 
-        var service = new ChargingStationBooting(context, NullLogger<ChargingStationBooting>.Instance);
-        var request = new BootNotificationRequest(BootReasonEnum.PowerUp, new OcppChargingStation
-        {
-            Model = "Test model",
-            VendorName = "Test vendor",
-        });
+        var service = CreateService(context, new FakeApplicationEventEmitter());
+        var request = CreateRequest();
 
         var result = await service.ProcessBootup("station-1", request);
 
@@ -63,6 +62,73 @@ public class ChargingStationBootingShould
         Assert.Equal(allowedMeasurands ?? defaults, settings.AllowedMeasurands);
     }
 
+    [Fact]
+    public async Task EmitBootupAfterACommittedFirstBoot()
+    {
+        var options = new DbContextOptionsBuilder<MedinillaOcppDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+        using var context = new TestDbContext(options);
+        context.Add(new Account { Id = Guid.NewGuid(), Name = "MedinillaTest-Core" });
+        await context.SaveChangesAsync();
+
+        var emitter = new FakeApplicationEventEmitter();
+        var service = CreateService(context, emitter);
+
+        await service.ProcessBootup("station-1", CreateRequest());
+
+        var emitted = Assert.Single(emitter.Events);
+        Assert.Equal(WebhookEventTypes.ChargerBootup, emitted.EventType);
+        var payload = Assert.IsType<BootupEvent>(emitted.Payload);
+        Assert.Equal("station-1", payload.ChargerId);
+        Assert.Equal("PowerUp", payload.BootReason);
+        Assert.Equal("Vendor", payload.VendorName);
+        Assert.Equal("Model", payload.Model);
+    }
+
+    [Fact]
+    public async Task NotEmitBootupWhenPersistenceFails()
+    {
+        var options = new DbContextOptionsBuilder<MedinillaOcppDbContext>()
+            .UseInMemoryDatabase(Guid.NewGuid().ToString())
+            .Options;
+        using var context = new FailingDbContext(options);
+        context.Add(new DbChargingStation
+        {
+            Id = Guid.NewGuid(),
+            ClientIdentifier = "station-1",
+            Model = "Model",
+            Vendor = "Vendor",
+            LatestBootNotificationReason = "PowerUp",
+        });
+        await context.SaveChangesAsync();
+        context.FailSaves = true;
+
+        var emitter = new FakeApplicationEventEmitter();
+        var service = CreateService(context, emitter);
+
+        await Assert.ThrowsAsync<InvalidOperationException>(
+            () => service.ProcessBootup("station-1", CreateRequest()));
+
+        Assert.Empty(emitter.Events);
+    }
+
+    private static ChargingStationBooting CreateService(
+        MedinillaOcppDbContext context,
+        FakeApplicationEventEmitter emitter) => new(
+        context,
+        emitter,
+        new BootupEventMapper(),
+        NullLogger<ChargingStationBooting>.Instance);
+
+    private static BootNotificationRequest CreateRequest() => new(
+        BootReasonEnum.PowerUp,
+        new OcppChargingStation
+        {
+            Model = "Model",
+            VendorName = "Vendor",
+        });
+
     private sealed class TestDbContext(DbContextOptions<MedinillaOcppDbContext> options)
         : MedinillaOcppDbContext(options)
     {
@@ -70,6 +136,23 @@ public class ChargingStationBootingShould
         {
             base.OnModelCreating(modelBuilder);
             // PostgreSQL JSON storage is unsupported by the InMemory provider.
+            modelBuilder.Entity<AuthorizationDetails>().Ignore(details => details.AuthBlob);
+        }
+    }
+
+    private sealed class FailingDbContext(DbContextOptions<MedinillaOcppDbContext> options)
+        : MedinillaOcppDbContext(options)
+    {
+        public bool FailSaves { get; set; }
+
+        public override Task<int> SaveChangesAsync(CancellationToken cancellationToken = default) =>
+            FailSaves
+                ? throw new InvalidOperationException("Simulated persistence failure")
+                : base.SaveChangesAsync(cancellationToken);
+
+        protected override void OnModelCreating(ModelBuilder modelBuilder)
+        {
+            base.OnModelCreating(modelBuilder);
             modelBuilder.Entity<AuthorizationDetails>().Ignore(details => details.AuthBlob);
         }
     }

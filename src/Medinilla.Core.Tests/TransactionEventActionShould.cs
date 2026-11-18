@@ -41,12 +41,14 @@ public class TransactionEventActionShould
         TransactionEventRequest? capturedRequest = null;
         _service.Setup(s => s.IngestEvent("station-1", It.IsAny<TransactionEventRequest>()))
             .Callback<string, TransactionEventRequest>((_, request) => capturedRequest = request)
-            .ReturnsAsync(new TransactionEventResponse
-            {
-                TotalCost = 12.50m,
-                ChargingPriority = 2,
-                IdTokenInfo = new IdTokenInfo { Status = AuthorizeStatus.Accepted },
-            });
+            .ReturnsAsync(new TransactionIngestionResult(
+                new TransactionEventResponse
+                {
+                    TotalCost = 12.50m,
+                    ChargingPriority = 2,
+                    IdTokenInfo = new IdTokenInfo { Status = AuthorizeStatus.Accepted },
+                },
+                WasNewlyIngested: true));
         var call = CreateCall();
 
         var result = await CreateAction().Execute(call, "station-1");
@@ -79,7 +81,9 @@ public class TransactionEventActionShould
     public async Task ReturnACallResultForAnEmptyServiceResponse()
     {
         _service.Setup(s => s.IngestEvent("station-1", It.IsAny<TransactionEventRequest>()))
-            .ReturnsAsync(new TransactionEventResponse());
+            .ReturnsAsync(new TransactionIngestionResult(
+                new TransactionEventResponse(),
+                WasNewlyIngested: false));
 
         var result = await CreateAction().Execute(CreateCall(), "station-1");
 

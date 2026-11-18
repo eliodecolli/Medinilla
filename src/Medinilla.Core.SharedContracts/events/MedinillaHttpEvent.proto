@@ -1,0 +1,12 @@
+syntax = "proto3";
+
+import "google/protobuf/timestamp.proto";
+
+option csharp_namespace = "Medinilla.Core.SharedContracts.Events";
+
+message MedinillaHttpEvent {
+  string event_id = 1;
+  string event_type = 2;
+  google.protobuf.Timestamp event_timestamp = 3;
+  bytes event_data = 4;
+}

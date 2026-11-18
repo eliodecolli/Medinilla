@@ -1,25 +1,22 @@
-﻿using Medinilla.DataTypes.Contracts;
+﻿using Medinilla.Core.Interfaces.Services;
+using Medinilla.DataTypes.Contracts;
 using Medinilla.Infrastructure.WAMP;
-using Microsoft.Extensions.Logging;
 
 namespace Medinilla.Core.Actions.Ocpp201;
 
-internal class HeartbeatAction : IOcppAction
+internal class HeartbeatAction(IHeartbeatService service) : IOcppAction
 {
-    private readonly ILogger<HeartbeatAction> _logger;
-
-    public HeartbeatAction(ILogger<HeartbeatAction> logger)
-        => _logger = logger;
-
     public string ActionName => OcppActionNames.Heartbeat;
 
-    public Task<RpcResult> Execute(OcppCallRequest call, string clientIdentifier)
+    public async Task<RpcResult> Execute(OcppCallRequest call, string clientIdentifier)
     {
-        return Task.FromResult(new RpcResult()
+        var response = await service.ProcessHeartbeat(clientIdentifier);
+
+        return new RpcResult()
         {
-            Result = call.CreateResult(new HeartbeatResponse()),
+            Result = call.CreateResult(response),
             Error = null,
             ReturnToCS = true
-        });
+        };
     }
 }
