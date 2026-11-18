@@ -110,6 +110,9 @@ The script prints the generated secret. For production, do not commit it in
 `appsettings.json`; remove the generated `Webhooks:Secrets` entry and provide the
 secret through the printed `MEDINILLA_WEBHOOK_SECRET_<REF>` environment variable.
 
+The helper tolerates the comments in this repository's `appsettings.json`, but it rewrites
+the file as plain JSON, so comments are not preserved after running it.
+
 ## HTTP headers
 
 | Header | Meaning |
@@ -130,24 +133,43 @@ signature does not match, and apply a timestamp tolerance in the consumer.
 
 ## Configuration
 
-```json
+```jsonc
 {
   "Webhooks": {
+    // Redis connection used by the worker to read the event stream.
     "RedisUri": "localhost:6379",
+    // Redis stream that Core writes serialized MedinillaHttpEvent protobufs to.
     "EventsStream": "medinilla:{webhooks}:events",
+    // Stream entry field containing the serialized wrapper bytes.
     "PayloadField": "payload",
+    // Consumer group shared by all worker replicas.
     "ConsumerGroup": "medinilla.webhooks",
+    // Optional stable consumer name. Leave unset to generate one per process.
+    // "ConsumerName": "webhook-worker-1",
+    // Maximum number of stream entries read per batch.
     "ReadBatchSize": 10,
+    // Delay between reads when no new stream entries are available.
     "IdleReadDelayMilliseconds": 500,
+    // Backoff after an unexpected read or processing failure.
     "ErrorBackoffSeconds": 5,
+    // Maximum number of HTTP deliveries attempted concurrently.
     "MaxConcurrency": 8,
+    // HTTP request timeout in seconds.
     "HttpTimeoutSeconds": 10,
+    // Optional inline signing secrets keyed by SigningSecretRef. Prefer environment variables.
+    // "Secrets": { "ExampleConnectorConsumer": "replace-with-secret" },
+    // Endpoints that receive matching events.
     "Subscriptions": [
       {
+        // Stable subscription identity used in logs and delivery state.
         "Id": "example-connector-consumer",
+        // Absolute HTTP(S) URL that receives matching events.
         "Url": "https://example.internal/hooks/medinilla",
+        // Set false to keep the entry but stop delivering to it.
         "Enabled": true,
+        // Reference resolved from Webhooks:Secrets or MEDINILLA_WEBHOOK_SECRET_<REF>.
         "SigningSecretRef": "ExampleConnectorConsumer",
+        // EventType allow-list. Omit or leave empty to receive all supported events.
         "EventTypes": [
           "connector.status",
           "transaction.started",
@@ -159,6 +181,8 @@ signature does not match, and apply a timestamp tolerance in the consumer.
   }
 }
 ```
+
+Behavior notes:
 
 - `SigningSecretRef` is resolved from `Webhooks:Secrets:<ref>` (for example via
   `Webhooks__Secrets__ExampleConnectorConsumer`) or the environment variable

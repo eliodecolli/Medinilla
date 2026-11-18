@@ -2,7 +2,8 @@
 """Add a webhook subscription to the service configuration.
 
 Generates a signing secret, stores it under Webhooks:Secrets, and appends a
-subscription pointing at the requested URL.
+subscription pointing at the requested URL. The configuration may contain JSON
+comments; the rewritten file is plain JSON, so comments are not preserved.
 
 Examples:
     python add_subscription.py https://example.test/hooks/medinilla
@@ -23,6 +24,55 @@ from urllib.parse import urlparse
 
 PROJECT_DIR = Path(__file__).resolve().parent
 DEFAULT_CONFIG = PROJECT_DIR / "appsettings.json"
+
+
+def strip_json_comments(text: str) -> str:
+    """Remove // and /* */ comments while preserving string contents."""
+    result: list[str] = []
+    in_string = False
+    escaped = False
+    index = 0
+
+    while index < len(text):
+        char = text[index]
+
+        if in_string:
+            result.append(char)
+            if escaped:
+                escaped = False
+            elif char == "\\":
+                escaped = True
+            elif char == '"':
+                in_string = False
+            index += 1
+            continue
+
+        if char == '"':
+            in_string = True
+            result.append(char)
+            index += 1
+            continue
+
+        if char == "/" and index + 1 < len(text):
+            next_char = text[index + 1]
+            if next_char == "/":
+                index += 2
+                while index < len(text) and text[index] not in "\r\n":
+                    index += 1
+                continue
+            if next_char == "*":
+                index += 2
+                while index + 1 < len(text) and not (
+                    text[index] == "*" and text[index + 1] == "/"
+                ):
+                    index += 1
+                index += 2
+                continue
+
+        result.append(char)
+        index += 1
+
+    return "".join(result)
 
 
 def slugify(value: str) -> str:
@@ -74,7 +124,7 @@ def main() -> int:
     if not config_path.is_file():
         raise SystemExit(f"Configuration file not found: {config_path}")
 
-    config = json.loads(config_path.read_text(encoding="utf-8"))
+    config = json.loads(strip_json_comments(config_path.read_text(encoding="utf-8")))
     webhooks = config.setdefault("Webhooks", {})
     subscriptions = webhooks.setdefault("Subscriptions", [])
     stored_secrets = webhooks.setdefault("Secrets", {})
