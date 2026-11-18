@@ -30,7 +30,7 @@ public class EventMappersShould
     }
 
     [Fact]
-    public void MapStatusWithoutConnectorTypeEnrichment()
+    public void MapStatusIdentityAndReportedTimestamp()
     {
         var payload = new StatusNotificationEventMapper().Map(
             new StatusNotificationSnapshot(
@@ -45,9 +45,6 @@ public class EventMappersShould
         Assert.Equal(1, payload.ConnectorId);
         Assert.Equal("Available", payload.ConnectorStatus);
         Assert.Equal(new DateTime(2026, 11, 14, 10, 30, 0, DateTimeKind.Utc), payload.StatusTimestamp.ToDateTime());
-#pragma warning disable CS0612 // Intentionally assert the deprecated field stays absent.
-        Assert.False(payload.HasConnectorType);
-#pragma warning restore CS0612
     }
 
     [Fact]

@@ -86,11 +86,10 @@ all required sequence numbers have been received and persisted:
 - Registration and status events are not ordered. Consumers must tolerate status events
   before registration metadata and reconcile inventory when registration arrives.
 
-`StatusNotificationEvent.connector_type` (field 6) is deprecated for new events and is
-left unset. It remains in the protobuf contract so older events can still carry it.
-Consumers should use registration inventory for connector types and treat status events
-as identity/status updates. Do not block status handling while waiting for registration
-metadata.
+`StatusNotificationEvent` carries identity, status, and the reported timestamp only; it
+does not contain connector type. Consumers should use registration inventory for connector
+types and treat status events as identity/status updates. Do not block status handling
+while waiting for registration metadata.
 
 There is no automatic report issuance on boot; the caller owns trigger and report
 selection.

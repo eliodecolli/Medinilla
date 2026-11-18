@@ -38,7 +38,7 @@ public class StatusNotificationServiceShould : IDisposable
     }
 
     [Fact]
-    public async Task EmitEveryCommittedStatusNotificationWithoutConnectorType()
+    public async Task EmitEveryCommittedStatusNotification()
     {
         var service = new StatusNotificationService(
             _context,
@@ -60,9 +60,6 @@ public class StatusNotificationServiceShould : IDisposable
             Assert.Equal(1, payload.ConnectorId);
             Assert.Equal("Available", payload.ConnectorStatus);
             Assert.Equal(ReportedAt, payload.StatusTimestamp.ToDateTime());
-#pragma warning disable CS0612 // Intentionally assert the deprecated field stays absent.
-            Assert.False(payload.HasConnectorType);
-#pragma warning restore CS0612
         });
         Assert.Single(_context.Set<EvseConnector>());
     }

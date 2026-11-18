@@ -36,8 +36,8 @@ public sealed class BootupEventMapper
 
 /// <summary>
 /// Builds <see cref="StatusNotificationEvent"/> from a committed StatusNotification.
-/// Connector type is not enriched here; registration metadata owns that information.
-/// The deprecated field number 6 remains unset for new events.
+/// Status events carry identity, status, and the reported timestamp only; connector
+/// type belongs to registration inventory.
 /// </summary>
 public sealed class StatusNotificationEventMapper
 {
